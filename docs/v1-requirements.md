@@ -13,9 +13,39 @@ Optimised for:
 ## Positioning
 
 - Modern, mobile-first productivity tool for property investors
-- Monthly clarity artifact (not full accounting software)
-- Transparency and predictability > automation magic
+- Monthly portfolio clarity artifact
 - Portfolio-first. Properties nested inside.
+- Transparency and predictability as core principles
+
+---
+
+# 🔒 Key Principles
+
+### 1️⃣ Transparency
+
+- No hidden assumptions
+- No silent adjustments
+- Missing data clearly disclosed
+
+### 2️⃣ Predictability
+
+- Fixed report structure
+- Fixed terminology
+- Stable property ordering
+- Consistent calculation logic
+
+### 3️⃣ Conservative Bias
+
+- Mortgage included even if PM missing
+- No optimistic projections
+- No inferred values
+
+### 4️⃣ Simplicity Over Completeness
+
+- No loan parsing
+- No bank integration
+- No tax optimisation
+- No forecasting
 
 ---
 
@@ -26,11 +56,18 @@ Optimised for:
 - Web portal (mobile-first UI)
 - Multi-property support
 - Single or bulk PDF upload (Property Manager statements)
+  - Automatic parsing:
+    - Property address
+    - Statement period
+    - Rent collected
+    - Expenses
+- Automatic grouping of statements by month
 - Manual mortgage entry (optional)
-- Monthly portfolio summaries
-- Support multiple months
+- Monthly portfolio report generation
+- Support for generating multiple months (but report generated individually)
 - On-demand report generation (user-triggered)
 - Accountant-style summary + AI commentary
+- Explicit data flags and transparency indicators
 
 ## Out of Scope (Fast Follow)
 
@@ -41,10 +78,25 @@ Optimised for:
 - Interest vs principal tracking
 - Tax reporting
 - Multi-user or accountant access
+- Cross-month pro-rata allocation
+- Combined multi-month reports
 
-## Inputs
+---
 
-### Onboarding (One-Time)
+# 📍 UX Flow
+
+1. Landing Page: Clear positioning.
+2. Account Creation
+3. Onboarding:
+
+- Add Properties
+- Address + mortgage amount.
+
+4. Ongoing:
+
+- Upload Page. Drag-and-drop zone.
+
+## Onboarding (One-Time)
 
 - Property address (required)
 - Monthly mortgage payment per property (optional, manual amount)
@@ -53,44 +105,10 @@ Optimised for:
   - Treated as $0
   - Explicitly flagged in report
 
-### Monthly Usage
+## Monthly Usage
 
 - User selects month (e.g. March 2026)
 - User uploads PM PDF statements (single or batch upload)
-
----
-
-## Output
-
-For each selected month:
-
-### 1️⃣ Accountant Section (Deterministic Format)
-
-- Properties Registered
-- Statements Received (X / Y)explicit list)
-- Total Rent Collected
-- Total Operating Expenses
-- Total Mortgage (Manual)
-- Net Before Mortgage
-- Net After Mortgage
-- Average Per Property (based on received statements)
-- Per-property breakdown
-- Flag section
-
-Structure is fixed and consistent every month.
-
-### 2️⃣ AI Commentary Section (Optional Narrative)
-
-- Portfolio health commentary
-- Month-on-month comparison
-- Performance concentration insights
-- Expense anomalies
-- Limited commentary if data incomplete
-- Missing data warnings
-- Cashflow risk observations
-
-AI does NOT calculate numbers.
-AI only interprets backend-calculated metrics.
 
 ---
 
@@ -107,18 +125,46 @@ AI only interprets backend-calculated metrics.
 
 ---
 
-# 🔄 Upload & Generation Flow
+# Upload & Generation Flow
 
-1. User uploads one or multiple PDFs
-2. System extracts:
-   - Property address
-   - Statement period
-   - Key financial fields
-3. System groups by month
-4. User explicitly triggers report generation
-5. Summary generated
+## Step 1 — Upload
 
-No automatic report generation on upload.
+- User uploads multiple PM PDFs (any month)
+- System parses and extracts:
+  - Property
+  - Statement end date
+  - Financial values
+- System groups statements by calendar month
+
+## Step 2 — Month Detection
+
+System displays:
+
+> We detected statements for:
+>
+> - February 2026 (3 properties)
+> - March 2026 (5 properties)
+
+User selects month to generate.
+
+## Step 3 — Mortgage Input (Optional)
+
+Per property:
+
+- Manual monthly mortgage payment field
+- If blank → treated as $0
+  - Clearly flagged in report
+
+## Step 4 — Generate Report
+
+User explicitly clicks:
+
+> Generate March 2026 Portfolio Summary
+
+Reports are:
+
+- Versioned
+- Immutable once generated (new version if regenerated)
 
 ---
 
@@ -158,54 +204,68 @@ Transparency over perfection.
 
 ---
 
-# 🔒 Key Principles
+# Report Structure (Portfolio-First)
 
-### 1️⃣ Transparency
+## Section 1 — Accountant Summary (Fixed Format)
 
-- No hidden assumptions
-- No silent adjustments
-- Missing data clearly disclosed
+Bullet-point numeric clarity:
 
-### 2️⃣ Predictability
+- Properties Registered
+- Statements Received (X / Y)
+- Total Rent Collected
+- Total Operating Expenses
+- Total Mortgage (Manual)
+- Net Before Mortgage
+- Net After Mortgage
+- Per-property breakdown
+- Flag section
 
-- Fixed report structure
-- Fixed terminology
-- Stable property ordering
-- Consistent calculation logic
+Then nested per-property breakdown:
 
-### 3️⃣ Conservative Bias
+Per property:
 
-- Mortgage included even if PM missing
-- No optimistic projections
-- No inferred values
+- Rent
+- Expenses
+- Mortgage
+- Net Cash Flow
 
-### 4️⃣ Simplicity Over Completeness
+Consistent format every month.
 
-- No loan parsing
-- No bank integration
-- No tax optimisation
-- No forecasting
+## Section 2 — AI Commentary
+
+Optional narrative layer:
+
+- Month-on-month comparison (if prior data exists)
+- Expense anomalies
+- Cashflow signals
+- Missing data warnings
+- Observations based only on extracted data
+
+AI Rules:
+
+- Never invent numbers
+- Only reference parsed or user-entered data
+- Clearly flag missing mortgage inputs
+- No speculative forecasting in V1
 
 ---
 
-# 🏁 Definition of Done (V1)
+# Example Flow & Output
 
-Selects month →
-User uploads PM PDFs →
-Receives structured portfolio summary →
+User uploads 7 PDFs.
 
-Understands:
+System detects:
 
-- True monthly cashflow
-- Missing statements
-- Negative properties
-- Major risk flags
+- February 2026 (1 properties)
+- March 2026 (2 properties)
 
-Delivered clearly, consistently, and conservatively.
+User selects:
 
----
+> Generate March 2026 Report
 
-# Example Output
+Mortgage entered for 1/2 properties.
+
+System generates:
 
 ## 🧾 March 2026 Portfolio Summary
 
@@ -214,7 +274,9 @@ Delivered clearly, consistently, and conservatively.
 • Total Rent Collected: $12,400  
 • Property Expenses: $3,250  
 • Mortgage Payments: $6,800  
-• Net Cash Flow: $2,350
+• Net Cash Flow: $3,350
+
+⚠ Mortgage expense not included for 1 property.
 
 ---
 
@@ -231,8 +293,6 @@ Delivered clearly, consistently, and conservatively.
 - Expenses: $1,050
 - Mortgage: $0 _(Not Provided)_
 - Net: $2,550
-
-⚠ Mortgage expense not included for 1 property.
 
 ---
 
