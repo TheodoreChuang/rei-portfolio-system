@@ -2,20 +2,13 @@
 
 ## 🎯 Objective
 
-Provide individual Australian property investors (2–10 properties) with a clear, transparent monthly portfolio summary generated from uploaded PM PDF statements, with optional manual mortgage inputs.
+Provide individual Australian property investors (2–10 properties) with a clear, transparent monthly portfolio summary generated from uploaded PM PDF statements, with optional fixed monthly mortgage inputs.
 
 Optimised for:
 
 - Speed to launch
 - Minimal user effort
 - Transparency & predictability
-
-## Positioning
-
-- Modern, mobile-first productivity tool for property investors
-- Monthly portfolio clarity artifact
-- Portfolio-first. Properties nested inside.
-- Transparency and predictability as core principles
 
 ---
 
@@ -46,6 +39,7 @@ Optimised for:
 - No bank integration
 - No tax optimisation
 - No forecasting
+- No cross-period comparisons
 
 ---
 
@@ -61,12 +55,12 @@ Optimised for:
     - Statement period
     - Rent collected
     - Expenses
+
 - Automatic grouping of statements by month
-- Manual mortgage entry (optional)
+- Fixed monthly mortgage per property (manual, optional)
 - Monthly portfolio report generation
-- Support for generating multiple months (but report generated individually)
 - On-demand report generation (user-triggered)
-- Accountant-style summary + AI commentary
+- Accountant-style summary + AI commentary (single month only)
 - Explicit data flags and transparency indicators
 
 ## Out of Scope (Fast Follow)
@@ -80,35 +74,23 @@ Optimised for:
 - Multi-user or accountant access
 - Cross-month pro-rata allocation
 - Combined multi-month reports
+- Report version history
 
 ---
 
 # 📍 UX Flow
 
-1. Landing Page: Clear positioning.
-2. Account Creation
-3. Onboarding:
+1. Landing Page
 
-- Add Properties
-- Address + mortgage amount.
+2. Account Creation (Supabase Auth)
+
+3. Onboarding:
+   - Add Properties, with full address + fixed monthly mortgage amount (optional)
 
 4. Ongoing:
-
-- Upload Page. Drag-and-drop zone.
-
-## Onboarding (One-Time)
-
-- Property address (required)
-- Monthly mortgage payment per property (optional, manual amount)
-  - Note properties can have 0–many loans (but V1 = single total monthly payment field)
-- If left blank:
-  - Treated as $0
-  - Explicitly flagged in report
-
-## Monthly Usage
-
-- User selects month (e.g. March 2026)
-- User uploads PM PDF statements (single or batch upload)
+   - Upload Page
+   - Select month
+   - Generate report
 
 ---
 
@@ -116,55 +98,15 @@ Optimised for:
 
 - Month determined by **statement end date**
 - Multiple statements in same month → summed
+- Expected properties = total registered properties
 - If property has no statement:
-  - Mortgage still included (conservative rule)
+  - Mortgage still included
   - Rent assumed zero
   - Explicitly flagged as missing
+
 - No estimation or auto-fill of missing data
 - No projections or smoothing
-
----
-
-# Upload & Generation Flow
-
-## Step 1 — Upload
-
-- User uploads multiple PM PDFs (any month)
-- System parses and extracts:
-  - Property
-  - Statement end date
-  - Financial values
-- System groups statements by calendar month
-
-## Step 2 — Month Detection
-
-System displays:
-
-> We detected statements for:
->
-> - February 2026 (3 properties)
-> - March 2026 (5 properties)
-
-User selects month to generate.
-
-## Step 3 — Mortgage Input (Optional)
-
-Per property:
-
-- Manual monthly mortgage payment field
-- If blank → treated as $0
-  - Clearly flagged in report
-
-## Step 4 — Generate Report
-
-User explicitly clicks:
-
-> Generate March 2026 Portfolio Summary
-
-Reports are:
-
-- Versioned
-- Immutable once generated (new version if regenerated)
+- No cross-month comparison in V1
 
 ---
 
@@ -181,6 +123,8 @@ Minimum required:
 - Maintenance expenses
 - Arrears indicator (if present)
 
+If required fields missing → extraction fails.
+
 No tenant names.
 No ledger-level granularity.
 No historical reconciliation.
@@ -193,7 +137,6 @@ No historical reconciliation.
 - Always list missing properties
 - Always show warning if incomplete
 - Never assume missing equals zero rent without flagging
-- Never hide incomplete status
 
 If <50% properties uploaded:
 
@@ -214,7 +157,7 @@ Bullet-point numeric clarity:
 - Statements Received (X / Y)
 - Total Rent Collected
 - Total Operating Expenses
-- Total Mortgage (Manual)
+- Total Mortgage (Fixed Monthly)
 - Net Before Mortgage
 - Net After Mortgage
 - Per-property breakdown
@@ -231,22 +174,42 @@ Per property:
 
 Consistent format every month.
 
+---
+
 ## Section 2 — AI Commentary
 
-Optional narrative layer:
+Single-month only.
 
-- Month-on-month comparison (if prior data exists)
-- Expense anomalies
-- Cashflow signals
+- Expense anomalies within month
 - Missing data warnings
-- Observations based only on extracted data
+- Cashflow observations
 
 AI Rules:
 
 - Never invent numbers
 - Only reference parsed or user-entered data
 - Clearly flag missing mortgage inputs
-- No speculative forecasting in V1
+- No forecasting
+- No quarter or cross-month comparisons
+
+---
+
+# Regeneration Rule
+
+- One report per (user, month)
+- Regenerating overwrites existing report
+- No versioning in V1
+
+---
+
+# Data Model Principles
+
+- All monetary values stored as integer cents
+- Supabase Auth user ID used directly
+- No separate users table
+- Mortgage stored as fixed monthly value on property
+
+Lean. Deterministic. End-to-end functional.
 
 ---
 
@@ -297,8 +260,6 @@ System generates:
 ---
 
 ### AI Commentary
-
-March was your strongest month this quarter, primarily driven by full rent collection across all properties.
 
 Expenses at 8 George Ave were 22% higher than February due to a once-off plumbing repair. Mortgage data is missing for one property, which may overstate actual cash flow.
 
