@@ -119,8 +119,6 @@ Minimum required:
 - Statement end date
 - Rent collected
 - Total operating expenses
-- PM fees
-- Maintenance expenses
 - Arrears indicator (if present)
 
 If required fields missing → extraction fails.
