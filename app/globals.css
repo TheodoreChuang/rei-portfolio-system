@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+/*
+  Tailwind v4: replaces the three @tailwind directives from v3.
+  - @tailwind base     → gone
+  - @tailwind components → gone
+  - @tailwind utilities  → gone
+  One import handles everything.
+*/
+@import "tailwindcss";
+
+/*
+  ── DESIGN TOKENS (@theme) ──────────────────────────────────────────────────
+  In Tailwind v4, all customisation lives here — not in tailwind.config.ts,
+  which no longer exists. Tailwind auto-generates utility classes from these:
+    --color-ink        → bg-ink, text-ink, border-ink, fill-ink …
+    --color-accent     → bg-accent, text-accent …
+    --font-sans        → font-sans …
+
+  These are also the single source of truth for shadcn's CSS variable bridge
+  below — one token drives both Tailwind utilities and shadcn internals.
+*/
+@theme inline {
+  /* Fonts */
+  --font-sans:  'DM Sans', sans-serif;
+  --font-mono:  'DM Mono', monospace;
+  --font-serif: 'Instrument Serif', serif;
+
+  /* PropFlow colour palette */
+  --color-ink:           #1a1a1a;
+  --color-paper:         #f5f2eb;
+  --color-screen-bg:     #edeae0;
+  --color-ruled:         #ddd9cf;
+  --color-muted:         #7a7670;
+  --color-border:        #c8c4bb;
+  --color-accent:        #2d5a3d;
+  --color-accent-light:  #e8f0eb;
+  --color-warn:          #c4622d;
+  --color-warn-light:    #fdf0e8;
+
+  /* Border radius scale */
+  --radius:    0.375rem;
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+/*
+  ── SHADCN VARIABLE BRIDGE (:root) ──────────────────────────────────────────
+  shadcn components read these specific variable names internally.
+  We map them to PropFlow tokens so every shadcn component inherits
+  the design system automatically — no per-component restyling needed.
+
+  These stay in :root (not @theme) because they are runtime CSS custom
+  properties that shadcn resolves at render time, not Tailwind design tokens.
+*/
+:root {
+  --background:           var(--color-screen-bg);
+  --foreground:           var(--color-ink);
+  --card:                 #ffffff;
+  --card-foreground:      var(--color-ink);
+  --popover:              #ffffff;
+  --popover-foreground:   var(--color-ink);
+  --primary:              var(--color-ink);
+  --primary-foreground:   #ffffff;
+  --secondary:            var(--color-screen-bg);
+  --secondary-foreground: var(--color-ink);
+  --muted:                var(--color-screen-bg);
+  --muted-foreground:     var(--color-muted);
+  --accent:               var(--color-accent-light);
+  --accent-foreground:    var(--color-accent);
+  --destructive:          var(--color-warn);
+  --destructive-foreground: #ffffff;
+  --border:               var(--color-border);
+  --input:                var(--color-border);
+  --ring:                 var(--color-accent);
+}
+
+/*
+  ── BASE OVERRIDES ──────────────────────────────────────────────────────────
+  Tailwind v4 changed the default border colour to currentColor (not a grey).
+  This restores the v3 behaviour so existing border-* utilities use our token.
+*/
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-screen-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+}
