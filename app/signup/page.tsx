@@ -7,14 +7,32 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
+import { createClient } from '@/lib/supabase/client'
 
 export default function SignupPage() {
+  const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [email, setEmail] = useState('')
 
-  function handleSend() {
+  async function handleSend() {
     if (!email) return
-    // TODO: supabase.auth.signInWithOtp({ email })
+    setLoading(true)
+  
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+  
+    setLoading(false)
+  
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+  
     setSent(true)
     toast.success('Magic link sent — check your inbox')
   }
@@ -68,8 +86,8 @@ export default function SignupPage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 />
               </div>
-              <Button className="w-full" onClick={handleSend} disabled={!email}>
-                Send magic link →
+              <Button className="w-full" onClick={handleSend} disabled={!email || loading}>
+                {loading ? 'Sending…' : 'Send magic link →'}
               </Button>
             </div>
             <p className="text-center text-sm text-muted mt-5">
