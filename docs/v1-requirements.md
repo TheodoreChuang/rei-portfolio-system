@@ -2,7 +2,7 @@
 
 ## 🎯 Objective
 
-Provide individual Australian property investors (2–10 properties) with a clear, transparent monthly portfolio summary generated from uploaded PM PDF statements, with optional fixed monthly mortgage inputs.
+Provide individual Australian property investors (2–10 properties) with a clear, transparent monthly portfolio summary generated from uploaded PM PDF statements, with loan payment inputs.
 
 Optimised for:
 
@@ -29,7 +29,7 @@ Optimised for:
 
 ### 3️⃣ Conservative Bias
 
-- Mortgage included even if PM missing
+- Loan payment included even if PM missing
 - No optimistic projections
 - No inferred values
 
@@ -57,7 +57,7 @@ Optimised for:
     - Expenses
 
 - Automatic grouping of statements by month
-- Fixed monthly mortgage per property (manual, optional)
+- Monthly total loan amount per property (manual, optional)
 - Monthly portfolio report generation
 - On-demand report generation (user-triggered)
 - Accountant-style summary + AI commentary (single month only)
@@ -85,11 +85,12 @@ Optimised for:
 2. Account Creation (Supabase Auth)
 
 3. Onboarding:
-   - Add Properties, with full address + fixed monthly mortgage amount (optional)
+   - Add Properties, with full address
 
-4. Ongoing:
+4. Ongoing (monthly):
    - Upload Page
    - Select month
+   - Input total loan payment per property (optional)
    - Generate report
 
 ---
@@ -100,7 +101,7 @@ Optimised for:
 - Multiple statements in same month → summed
 - Expected properties = total registered properties
 - If property has no statement:
-  - Mortgage still included
+  - Loan payment still included
   - Rent assumed zero
   - Explicitly flagged as missing
 
@@ -155,9 +156,9 @@ Bullet-point numeric clarity:
 - Statements Received (X / Y)
 - Total Rent Collected
 - Total Operating Expenses
-- Total Mortgage (Fixed Monthly)
-- Net Before Mortgage
-- Net After Mortgage
+- Total Loan Payments
+- Net Before Loan Payments
+- Net After Loan Payments
 - Per-property breakdown
 - Flag section
 
@@ -167,7 +168,7 @@ Per property:
 
 - Rent
 - Expenses
-- Mortgage
+- Loan Payments
 - Net Cash Flow
 
 Consistent format every month.
@@ -186,9 +187,9 @@ AI Rules:
 
 - Never invent numbers
 - Only reference parsed or user-entered data
-- Clearly flag missing mortgage inputs
-- No forecasting
-- No quarter or cross-month comparisons
+- Clearly flag missing loan payment inputs
+- No forecasting yet
+- No quarter or cross-month comparisons yet
 
 ---
 
@@ -205,7 +206,7 @@ AI Rules:
 - All monetary values stored as integer cents
 - Supabase Auth user ID used directly
 - No separate users table
-- Mortgage stored as fixed monthly value on property
+- Total monthly loan payment stored against property
 
 Lean. Deterministic. End-to-end functional.
 
@@ -224,7 +225,7 @@ User selects:
 
 > Generate March 2026 Report
 
-Mortgage entered for 1/2 properties.
+Loan entered for 1/2 properties.
 
 System generates:
 
@@ -234,10 +235,10 @@ System generates:
 
 • Total Rent Collected: $12,400  
 • Property Expenses: $3,250  
-• Mortgage Payments: $6,800  
+• Loan Payments: $6,800  
 • Net Cash Flow: $3,350
 
-⚠ Mortgage expense not included for 1 property.
+⚠ Loan expense not included for 1 property.
 
 ---
 
@@ -245,21 +246,21 @@ System generates:
 
 - Rent: $4,000
 - Expenses: $900
-- Mortgage: $2,100
+- Loan: $2,100
 - Net: $1,000
 
 **8 George Ave (Brisbane)**
 
 - Rent: $3,600
 - Expenses: $1,050
-- Mortgage: $0 _(Not Provided)_
+- Loan: $0 _(Not Provided)_
 - Net: $2,550
 
 ---
 
 ### AI Commentary
 
-Expenses at 8 George Ave were 22% higher than February due to a once-off plumbing repair. Mortgage data is missing for one property, which may overstate actual cash flow.
+Expenses at 8 George Ave were 22% higher than February due to a once-off plumbing repair. Loan data is missing for one property, which may overstate actual cash flow.
 
 Overall, your portfolio remains positively geared this month.
 

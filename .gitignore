@@ -2,3 +2,7 @@
 
 .claude
 .cursor
+
+node_modules
+
+.next
