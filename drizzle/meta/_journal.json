@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1771679931637,
+      "tag": "0000_wooden_christian_walker",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771679932000,
+      "tag": "0001_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771679933000,
+      "tag": "0002_auto_rls_trigger",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,309 @@
+{
+  "id": "c0b19f33-58c9-4e27-bb38-5053d6bdb99f",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.mortgage_entries": {
+      "name": "mortgage_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "month": {
+          "name": "month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "mortgage_entries_property_id_properties_id_fk": {
+          "name": "mortgage_entries_property_id_properties_id_fk",
+          "tableFrom": "mortgage_entries",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "mortgage_entries_user_id_property_id_month_unique": {
+          "name": "mortgage_entries_user_id_property_id_month_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id",
+            "property_id",
+            "month"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.portfolio_reports": {
+      "name": "portfolio_reports",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "month": {
+          "name": "month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_rent_cents": {
+          "name": "total_rent_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "total_expenses_cents": {
+          "name": "total_expenses_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "total_mortgage_cents": {
+          "name": "total_mortgage_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "ai_commentary": {
+          "name": "ai_commentary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "portfolio_reports_user_id_month_unique": {
+          "name": "portfolio_reports_user_id_month_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id",
+            "month"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.properties": {
+      "name": "properties",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nickname": {
+          "name": "nickname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.statements": {
+      "name": "statements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assigned_month": {
+          "name": "assigned_month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rent_cents": {
+          "name": "rent_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "expenses_cents": {
+          "name": "expenses_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pdf_url": {
+          "name": "pdf_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw_json": {
+          "name": "raw_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "statements_property_id_properties_id_fk": {
+          "name": "statements_property_id_properties_id_fk",
+          "tableFrom": "statements",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "statements_user_id_property_id_assigned_month_unique": {
+          "name": "statements_user_id_property_id_assigned_month_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id",
+            "property_id",
+            "assigned_month"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

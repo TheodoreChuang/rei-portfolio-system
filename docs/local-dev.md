@@ -1,178 +1,87 @@
-# Local Development Setup
-
-Local mirrors production exactly. The Supabase CLI runs the full stack in Docker:
-**Auth** (including magic links), **Storage**, **Postgres**, and **Studio**.
-No mocks. No bypasses. No AWS or GCP account needed.
-
----
+# Local Development
 
 ## Prerequisites
 
-```bash
-# 1. Docker Desktop — must be running before anything else
-#    https://www.docker.com/products/docker-desktop
-docker info   # should return engine info, not an error
-
-# 2. Supabase CLI
-brew install supabase/tap/supabase        # macOS/Linux via Homebrew
-# Windows: https://supabase.com/docs/guides/cli/getting-started
-
-supabase --version   # confirm: supabase 2.x.x
-```
-
----
-
-## One-time project setup
-
-Run once in the project root. Creates a `supabase/` config folder — commit this.
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) running
+- [Supabase CLI](https://supabase.com/docs/guides/cli/getting-started) installed
 
 ```bash
-supabase init
+supabase --version   # confirm install
+docker info          # confirm Docker is running
 ```
 
----
-
-## Starting the local stack
+## First-time setup
 
 ```bash
-supabase start
+supabase init        # creates supabase/ config folder — commit this
+supabase start       # pulls images (~1.5 GB), starts full local stack
 ```
 
-First run downloads ~1.5 GB of images — a few minutes. Every subsequent start
-is fast (seconds). When ready, the CLI prints:
+`supabase start` prints your local keys — paste the `publishable key` and
+`secret key` into `.env.local`. The URLs and DB credentials are
+already pre-filled with the correct local defaults.
 
-```
-         API URL: http://localhost:54321
-          DB URL: postgresql://postgres:postgres@localhost:54322/postgres
-      Studio URL: http://localhost:54323
-    Inbucket URL: http://localhost:54324
-        anon key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIi...
-service_role key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIi...
-```
-
----
-
-## Configuring .env.local
-
-The `.env.local` file is pre-filled with the standard local defaults — the DB
-URL and port are always the same. **Only the anon key changes** — paste the
-`anon key` value printed by `supabase start`:
+## Apply schema + seed
 
 ```bash
-# .env.local (already in the repo with correct local values except the key)
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321          # always this locally
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...               # paste from supabase start output
-DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres
-DATABASE_URL_DIRECT=postgresql://postgres:postgres@localhost:54322/postgres
+pnpm install
+pnpm db:generate     # reads db/schema.ts → creates drizzle/ folder with SQL + journal
+pnpm db:migrate      # now applies them
+pnpm seed            # creates two test users with realistic data
 ```
-
-> Note: locally there is no connection pooler, so both DB URLs are identical
-> direct connections. The `prepare: false` flag in `lib/db.ts` is harmless
-> locally and required in production — leave it in.
-
----
-
-## Apply the schema
-
-```bash
-pnpm db:generate   # generates SQL migration from db/schema.ts
-pnpm db:migrate    # applies it to local Postgres
-```
-
-Inspect the result in Studio → Table Editor at http://localhost:54323.
-
----
 
 ## Start the app
 
 ```bash
-pnpm dev
-# → http://localhost:3000
+pnpm dev             # → http://localhost:3000
 ```
 
-The middleware runs in full — unauthenticated requests to `/dashboard`, `/upload`,
-`/properties`, `/reports` redirect to `/login`, exactly as in production.
+## Logging in
 
----
+The local stack runs [full Supabase Auth](https://supabase.com/docs/guides/auth) in Docker.
+Auth emails are caught by **Inbucket** — no real email is sent.
 
-## Logging in locally (magic links)
+Two ways to log in:
 
-Supabase Auth is fully functional locally. Magic link emails don't go to a real
-inbox — they're caught by **Inbucket** at http://localhost:54324.
+**Option A — Inbucket** (if `enable_confirmations = true` in `supabase/config.toml`)
+1. Submit the login form with any email
+2. Open [http://localhost:54324](http://localhost:54324)
+3. Click the magic link
 
-1. Go to http://localhost:3000/login
-2. Enter any email address
-3. Open Inbucket at http://localhost:54324
-4. Click the magic link — you're authenticated
+**Option B — password login** (if `enable_confirmations = false` in config.toml — skips email entirely)
 
-The JWT, session cookies, and `getUser()` all work identically to production.
+After `pnpm seed`, log in directly with:
 
----
+| Email | Password | State |
+|---|---|---|
+| `dev-owner@propflow.test` | `password123` | 3 properties, March 2026 report |
+| `dev-new@propflow.test` | `password123` | No data — tests empty state |
 
-## Supabase Storage locally
+Different emails = different `auth.uid()` = fully isolated data via RLS.
 
-Storage runs locally with a real S3-compatible API — no AWS account needed.
+## Local services
 
-- **Endpoint**: automatically `http://localhost:54321/storage/v1` (via `NEXT_PUBLIC_SUPABASE_URL`)
-- **Studio**: http://localhost:54323 → Storage — create buckets, inspect uploads
-- **Bucket policy**: configure in Studio or via migrations in `supabase/migrations/`
+| Service  | URL | Purpose |
+|---|---|---|
+| App | http://localhost:3000 | Next.js |
+| Supabase API | http://localhost:54321 | Auth, Storage, REST |
+| Studio | http://localhost:54323 | DB admin, Auth users, Storage buckets |
+| Inbucket | http://localhost:54324 | Catches magic link emails |
+| Postgres | localhost:54322 | Direct DB (Drizzle) |
 
-When you wire up PDF upload, the Supabase JS client (`supabase.storage.from('statements').upload(...)`)
-works identically locally and in production — only the URL changes, which the
-client resolves from env automatically.
-
----
-
-## Local services reference
-
-| Service  | URL                    | Purpose                                |
-| -------- | ---------------------- | -------------------------------------- |
-| API      | http://localhost:54321 | Supabase REST, Auth, Storage endpoints |
-| Postgres | localhost:54322        | Direct DB connection for Drizzle       |
-| Studio   | http://localhost:54323 | Admin UI — tables, auth users, storage |
-| Inbucket | http://localhost:54324 | Catches all outgoing auth emails       |
-
----
-
-## Day-to-day commands
+## Useful commands
 
 ```bash
-supabase start          # start the stack
-supabase stop           # stop (data persists in Docker volumes)
-supabase status         # show URLs and keys for a running stack
-supabase db reset       # wipe local DB and re-run all migrations from scratch
-supabase db diff        # diff current schema against last migration (useful before generate)
-supabase logs           # tail logs from all services
+supabase stop            # stop stack (data persists)
+supabase db reset        # wipe and re-run all migrations
+supabase status          # show URLs + keys for running stack
+supabase logs --service auth   # debug auth issues
 ```
 
----
+## Further reading
 
-## Production differences
-
-| Concern          | Local                      | Production (Vercel + Supabase cloud)                  |
-| ---------------- | -------------------------- | ----------------------------------------------------- |
-| Auth emails      | Inbucket (localhost:54324) | Real SMTP (Supabase default or custom)                |
-| Storage endpoint | localhost:54321            | your-project.supabase.co                              |
-| DB connection    | Direct only (no pooler)    | Transaction pooler for runtime, direct for migrations |
-| `prepare: false` | Harmless (leave it in)     | Required                                              |
-| Env vars         | `.env.local`               | Vercel project env vars                               |
-
----
-
-## Deploying to production
-
-```bash
-vercel link                              # link to your Vercel project
-
-# Add env vars (run once per var)
-vercel env add NEXT_PUBLIC_SUPABASE_URL
-vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
-vercel env add DATABASE_URL              # Transaction pooler URL, port 6543
-vercel env add DATABASE_URL_DIRECT       # Direct connection URL, port 5432
-vercel env add ANTHROPIC_API_KEY
-
-# Run schema migrations against the cloud DB (once)
-DATABASE_URL_DIRECT=<cloud-direct-url> pnpm db:migrate
-
-vercel --prod
-```
+- [Supabase local dev guide](https://supabase.com/docs/guides/cli/local-development)
+- [Supabase Auth docs](https://supabase.com/docs/guides/auth)
+- [Supabase Storage docs](https://supabase.com/docs/guides/storage)
+- [RLS guide](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- [Drizzle + Supabase](https://orm.drizzle.team/docs/connect-supabase)
