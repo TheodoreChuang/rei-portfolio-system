@@ -10,7 +10,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
     "next": "^16.1.6",
@@ -48,6 +51,9 @@
     "tsx": "^4.19.2",
     "eslint": "^9",
     "eslint-config-next": "^16.1.6",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "vitest": "^4.0.18",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }
