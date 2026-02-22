@@ -10,7 +10,7 @@ Keep AI context tight — one feature at a time.
 
 _The core value prop. Everything else depends on having real statement data._
 
-- [ ] Supabase Storage bucket (`statements`) + upload from client
+- [x] Supabase Storage create bucket (`documents`)
 - [ ] `/api/extract` — pdf-parse → `generateObject()` with Zod schema
 - [ ] Extraction error handling (unreadable PDF, LLM hallucination, missing fields)
 - [ ] Save extracted statement to DB via Drizzle
@@ -30,7 +30,7 @@ _Simple but needed before any real data can exist._
 
 _Depends on Slices 1 + 2 being real._
 
-- [ ] `/api/reports` POST — aggregate statements + mortgages → compute totals
+- [ ] `/api/reports` POST — aggregate ledger_entries → compute totals
 - [ ] `generateText()` for AI commentary
 - [ ] Wire dashboard + report page to real data
 - [ ] Month selector shows only months with data

@@ -1,7 +1,5 @@
 # Technial Specification Document
 
----
-
 # Tech Stack
 
 ## Application
@@ -12,8 +10,6 @@
 - **Package Manager**: pnpm
 - **UI**: TailwindCSS + shadcn/ui
 - **Architecture**: Single repo (single Next.js app)
-
----
 
 ## Backend
 
@@ -27,8 +23,6 @@ Notes:
 
 - Supabase Auth `auth.users` is the source of truth for users.
 - No custom `users` table in V1.
-
----
 
 ## AI & Parsing
 
@@ -46,8 +40,6 @@ Constraints:
 - Enforce PDF size limit (e.g. 5MB max) at upload.
 - Hard validation: required fields must be present or extraction fails.
 
----
-
 ## Deployment & Infra
 
 - **Hosting**: Vercel (Free Tier)
@@ -57,8 +49,6 @@ Constraints:
 - **No Docker**
 - **No background jobs (V1)**
 - **No queues**
-
----
 
 # Repository Structure
 
@@ -92,8 +82,6 @@ Single Next.js app:
 Clear boundary:
 
 UI → API → Business Logic → DB
-
----
 
 # Key Flows (Mermaid)
 
@@ -163,7 +151,20 @@ Notes:
 - All monetary values stored as positive **integer cents**, including expenses.
 - Regenerating a report overwrites the existing `(user_id, month)` record.
 
----
+# Supabase Bucket Structure
+
+Example:
+
+```
+documents/
+  {userId}/
+    pm_statements/
+      smith-st-march-2026.pdf
+    loan_statements/
+      westpac-march-2026.pdf
+    bank_statements/
+      anz-march-2026.pdf
+```
 
 # Key Logic Rules
 
