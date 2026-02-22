@@ -8,12 +8,13 @@ Keep AI context tight — one feature at a time.
 
 ## Slice 1 — PDF Upload + LLM Extraction
 
-_The core value prop. Everything else depends on having real statement data._
+_The core value prop. Everything else depends on having real ledge entries data._
 
 - [x] Supabase Storage create bucket (`documents`)
+- [x] `/api/upload` —
 - [ ] `/api/extract` — pdf-parse → `generateObject()` with Zod schema
 - [ ] Extraction error handling (unreadable PDF, LLM hallucination, missing fields)
-- [ ] Save extracted statement to DB via Drizzle
+- [ ] Save extracted ledge entries to DB via Drizzle
 - [ ] Upload UI wired to real API (replace mock processing simulation)
 - [ ] **Tests:** extraction logic, Zod schema validation, malformed PDF handling
 
