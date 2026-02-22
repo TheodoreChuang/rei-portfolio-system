@@ -119,7 +119,7 @@ sequenceDiagram
     API->>API: Validate required fields
 
     alt Valid
-        API->>DB: Insert Statement
+        API->>DB: Insert Ledger Entries
         API-->>WebApp: Success
     else Invalid
         API-->>WebApp: Extraction Error
@@ -150,188 +150,18 @@ sequenceDiagram
 
 # Database Schema
 
-All monetary values stored as **integer cents**.
+Tables:
 
-```typescript
-// drizzle/schema.ts
-
-import {
-  pgTable,
-  uuid,
-  text,
-  timestamp,
-  date,
-  numeric,
-  pgEnum,
-  varchar,
-  index,
-} from "drizzle-orm/pg-core";
-
-//
-// ENUMS
-//
-
-export const transactionCategoryEnum = pgEnum("transaction_category", [
-  // Income
-  "rent",
-
-  // Property expenses
-  "insurance",
-  "rates",
-  "repairs",
-  "property_management",
-  "utilities",
-  "strata_fees",
-  "other_expense",
-
-  // Loan-related
-  "loan_payment",
-]);
-
-//
-// USERS
-//
-
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  auth_user_id: uuid("auth_user_id").notNull().unique(), // Supabase auth.users.id
-  email: varchar("email", { length: 255 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-//
-// PROPERTIES
-//
-
-export const properties = pgTable(
-  "properties",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-
-    address: text("address").notNull(),
-
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    userIdx: index("idx_properties_user").on(table.userId),
-  }),
-);
-
-//
-// SOURCE DOCUMENTS (PM PDFs, etc)
-//
-
-export const sourceDocuments = pgTable(
-  "source_documents",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-
-    fileName: text("file_name").notNull(),
-    fileHash: text("file_hash").notNull(), // SHA-256
-    filePath: text("file_path").notNull(),
-    uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    userIdx: index("idx_source_docs_user").on(table.userId),
-  }),
-);
-
-//
-// TRANSACTIONS (Ledger)
-//
-
-export const transactions = pgTable(
-  "transactions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-
-    propertyId: uuid("property_id").references(() => properties.id, {
-      onDelete: "set null",
-    }),
-
-    // Optional link to source document
-    sourceDocumentId: uuid("source_document_id"),
-
-    transactionDate: date("transaction_date").notNull(),
-
-    // Store money as DECIMAL(15,2)
-    amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
-
-    // Explicit category
-    category: transactionCategoryEnum("category").notNull(),
-
-    description: text("description"),
-
-    // Canonical month bucket YYYY-MM
-    assignedMonth: varchar("assigned_month", { length: 7 }).notNull(),
-
-    notes: text("notes"),
-
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    userIdx: index("idx_transactions_user").on(table.userId),
-    idxUserMonth: index("idx_transactions_user_month").on(
-      table.userId,
-      table.assignedMonth,
-    ),
-    idxPropertyMonth: index("idx_transactions_property_month").on(
-      table.propertyId,
-      table.assignedMonth,
-    ),
-    idxSourceDoc: index("idx_transactions_source_document").on(
-      table.sourceDocumentId,
-    ),
-  }),
-);
-
-//
-// PORTFOLIO REPORT SNAPSHOT
-//
-
-export const portfolioReports = pgTable(
-  "portfolio_reports",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
-
-    totalsJson: text("totals_json").notNull(), // Snapshot of computed totals
-    flagsJson: text("flags_json").notNull(),
-    aiCommentary: text("ai_commentary"),
-
-    version: numeric("version").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    userIdx: index("idx_reports_user").on(table.userId),
-    idxUserMonth: index("idx_reports_user_month").on(table.userId, table.month),
-  }),
-);
-```
-
-Constraints (to implement in migrations):
-
-- Unique: `(property_id, assigned_month, period_end)` on statements
-- Unique: `(user_id, month)` on portfolio_reports
+- properties.user_id → users.id
+- ledger_entries.user_id → users.id
+- portfolio_reports.user_id → users.id
+- source_documents.user_id → users.id
 
 Notes:
 
+- (Row Level Security)[https://supabase.com/docs/guides/database/postgres/row-level-security] enabled.
+- All monetary values stored as positive **integer cents**, including expenses.
 - Regenerating a report overwrites the existing `(user_id, month)` record.
-- No report versioning in V1.
 
 ---
 

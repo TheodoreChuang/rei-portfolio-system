@@ -1,11 +1,11 @@
 {
-  "id": "c0b19f33-58c9-4e27-bb38-5053d6bdb99f",
+  "id": "b963fd8b-53b2-47cb-bb4e-d1dfefe10764",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.mortgage_entries": {
-      "name": "mortgage_entries",
+    "public.ledger_entries": {
+      "name": "ledger_entries",
       "schema": "",
       "columns": {
         "id": {
@@ -27,9 +27,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "month": {
-          "name": "month",
-          "type": "text",
+        "source_document_id": {
+          "name": "source_document_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "line_item_date": {
+          "name": "line_item_date",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -39,6 +45,25 @@
           "primaryKey": false,
           "notNull": true
         },
+        "category": {
+          "name": "category",
+          "type": "ledger_category",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_notes": {
+          "name": "user_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -47,11 +72,69 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_ledger_user_month": {
+          "name": "idx_ledger_user_month",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "line_item_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ledger_property": {
+          "name": "idx_ledger_property",
+          "columns": [
+            {
+              "expression": "property_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "line_item_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ledger_source_doc": {
+          "name": "idx_ledger_source_doc",
+          "columns": [
+            {
+              "expression": "source_document_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
-        "mortgage_entries_property_id_properties_id_fk": {
-          "name": "mortgage_entries_property_id_properties_id_fk",
-          "tableFrom": "mortgage_entries",
+        "ledger_entries_property_id_properties_id_fk": {
+          "name": "ledger_entries_property_id_properties_id_fk",
+          "tableFrom": "ledger_entries",
           "tableTo": "properties",
           "columnsFrom": [
             "property_id"
@@ -61,20 +144,23 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "ledger_entries_source_document_id_source_documents_id_fk": {
+          "name": "ledger_entries_source_document_id_source_documents_id_fk",
+          "tableFrom": "ledger_entries",
+          "tableTo": "source_documents",
+          "columnsFrom": [
+            "source_document_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "mortgage_entries_user_id_property_id_month_unique": {
-          "name": "mortgage_entries_user_id_property_id_month_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "user_id",
-            "property_id",
-            "month"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -98,36 +184,34 @@
         },
         "month": {
           "name": "month",
-          "type": "text",
+          "type": "varchar(7)",
           "primaryKey": false,
           "notNull": true
         },
-        "total_rent_cents": {
-          "name": "total_rent_cents",
-          "type": "integer",
+        "totals": {
+          "name": "totals",
+          "type": "jsonb",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
+          "notNull": true
         },
-        "total_expenses_cents": {
-          "name": "total_expenses_cents",
-          "type": "integer",
+        "flags": {
+          "name": "flags",
+          "type": "jsonb",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "total_mortgage_cents": {
-          "name": "total_mortgage_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
+          "notNull": true
         },
         "ai_commentary": {
           "name": "ai_commentary",
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
         },
         "created_at": {
           "name": "created_at",
@@ -137,7 +221,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_reports_user_month": {
+          "name": "idx_reports_user_month",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "month",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
@@ -199,8 +305,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.statements": {
-      "name": "statements",
+    "public.source_documents": {
+      "name": "source_documents",
       "schema": "",
       "columns": {
         "id": {
@@ -216,46 +322,32 @@
           "primaryKey": false,
           "notNull": true
         },
-        "property_id": {
-          "name": "property_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "assigned_month": {
-          "name": "assigned_month",
+        "file_name": {
+          "name": "file_name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "rent_cents": {
-          "name": "rent_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "expenses_cents": {
-          "name": "expenses_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "pdf_url": {
-          "name": "pdf_url",
+        "file_hash": {
+          "name": "file_hash",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "raw_json": {
-          "name": "raw_json",
+        "document_type": {
+          "name": "document_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_path": {
+          "name": "file_path",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "created_at": {
-          "name": "created_at",
+        "uploaded_at": {
+          "name": "uploaded_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -263,30 +355,15 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "statements_property_id_properties_id_fk": {
-          "name": "statements_property_id_properties_id_fk",
-          "tableFrom": "statements",
-          "tableTo": "properties",
-          "columnsFrom": [
-            "property_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "statements_user_id_property_id_assigned_month_unique": {
-          "name": "statements_user_id_property_id_assigned_month_unique",
+        "source_documents_user_id_file_hash_unique": {
+          "name": "source_documents_user_id_file_hash_unique",
           "nullsNotDistinct": false,
           "columns": [
             "user_id",
-            "property_id",
-            "assigned_month"
+            "file_hash"
           ]
         }
       },
@@ -295,7 +372,23 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.ledger_category": {
+      "name": "ledger_category",
+      "schema": "public",
+      "values": [
+        "rent",
+        "insurance",
+        "rates",
+        "repairs",
+        "property_management",
+        "utilities",
+        "strata_fees",
+        "other_expense",
+        "loan_payment"
+      ]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},
