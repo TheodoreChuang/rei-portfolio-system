@@ -1,58 +1,125 @@
+import { and, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
-// Vercel AI SDK v6 imports
-// import { generateObject } from 'ai'
-// import { anthropic } from '@ai-sdk/anthropic'
-// import { z } from 'zod'
+import { db } from '@/lib/db'
+import { sourceDocuments } from '@/db/schema'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { extractTextFromPdf, extractStatementData } from '@/lib/extraction/parse'
 
-// Zod schema for what the LLM should extract from the PDF
-// const statementSchema = z.object({
-//   address:          z.string(),
-//   periodStart:      z.string(), // ISO date
-//   periodEnd:        z.string(),
-//   rentCents:        z.number().int(),
-//   expensesCents:    z.number().int(),
-//   managementFeeCents: z.number().int().optional(),
-//   maintenanceCents: z.number().int().optional(),
-//   arrearsIndicator: z.boolean(),
-// })
+const ASSIGNED_MONTH_REGEX = /^\d{4}-\d{2}$/
 
-// POST /api/extract
-// Called once per PDF after upload to Supabase Storage.
-// Production flow:
-//   1. Fetch PDF bytes from Supabase Storage by pdfUrl
-//   2. Extract text (pdf-parse or similar)
-//   3. generateObject() with Anthropic/OpenAI to extract structured data
-//   4. Return validated schema output
-//   5. Caller then POST /api/statements to persist
+function isValidUuid(s: unknown): s is string {
+  if (typeof s !== 'string') return false
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(s)
+}
+
 export async function POST(request: Request) {
-  const body = await request.json()
-  const { pdfUrl, assignedMonth } = body
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
-  // TODO: real implementation
-  // const pdfBytes = await fetch(pdfUrl).then(r => r.arrayBuffer())
-  // const text = extractTextFromPdf(pdfBytes)
-  //
-  // const { object } = await generateObject({
-  //   model: anthropic('claude-sonnet-4-5-20251101'),
-  //   schema: statementSchema,
-  //   prompt: `Extract property management statement data from the following text:\n\n${text}`,
-  // })
-  //
-  // return NextResponse.json({ success: true, data: object })
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON body' },
+      { status: 400 }
+    )
+  }
 
-  console.log('[STUB] POST /api/extract', { pdfUrl, assignedMonth })
+  const { sourceDocumentId, assignedMonth } =
+    body && typeof body === 'object' && 'sourceDocumentId' in body && 'assignedMonth' in body
+      ? (body as { sourceDocumentId: unknown; assignedMonth: unknown })
+      : { sourceDocumentId: undefined, assignedMonth: undefined }
 
-  await new Promise(r => setTimeout(r, 800))
+  if (!isValidUuid(sourceDocumentId)) {
+    return NextResponse.json(
+      { error: 'Missing or invalid sourceDocumentId' },
+      { status: 400 }
+    )
+  }
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      address:       '123 Smith St, Sydney NSW 2000',
-      periodStart:   '2026-03-01',
-      periodEnd:     '2026-03-31',
-      rentCents:     400000,
-      expensesCents: 90000,
-      arrearsIndicator: false,
-    },
-  })
+  const assignedMonthStr =
+    typeof assignedMonth === 'string' ? assignedMonth.trim() : ''
+  if (!ASSIGNED_MONTH_REGEX.test(assignedMonthStr)) {
+    return NextResponse.json(
+      { error: 'Missing or invalid assignedMonth (must be YYYY-MM)' },
+      { status: 400 }
+    )
+  }
+
+  const [doc] = await db
+    .select()
+    .from(sourceDocuments)
+    .where(
+      and(
+        eq(sourceDocuments.id, sourceDocumentId),
+        eq(sourceDocuments.userId, user.id)
+      )
+    )
+    .limit(1)
+
+  if (!doc) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  const { data, error: downloadError } = await supabase.storage
+    .from('documents')
+    .download(doc.filePath)
+
+  if (downloadError || !data) {
+    return NextResponse.json(
+      {
+        error: 'Storage download failed',
+        detail: downloadError?.message ?? undefined,
+      },
+      { status: 500 }
+    )
+  }
+
+  let pdfText: string
+  try {
+    const buffer = Buffer.from(await data.arrayBuffer())
+    pdfText = await extractTextFromPdf(buffer)
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'PDF text extraction failed'
+    if (message.includes('scanned') || message.includes('image-only')) {
+      return NextResponse.json(
+        { error: message },
+        { status: 422 }
+      )
+    }
+    return NextResponse.json(
+      { error: 'PDF text extraction failed', detail: message },
+      { status: 500 }
+    )
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[extract] pdfText length:', pdfText.length)
+  }
+
+  let result: Awaited<ReturnType<typeof extractStatementData>>
+  try {
+    result = await extractStatementData(pdfText, assignedMonthStr)
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : String(err)
+    return NextResponse.json(
+      {
+        error: 'Extraction failed',
+        detail: message,
+      },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json({ sourceDocumentId, result })
 }
