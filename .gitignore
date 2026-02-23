@@ -6,9 +6,12 @@
 node_modules
 
 .next
+tsconfig.tsbuildinfo
 
 .env.local
 .env*.local
+
+test-pm-statements
 
 # Supabase local runtime
 supabase/.temp

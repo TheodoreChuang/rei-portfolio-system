@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sourceDocuments } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10MB
 const ALLOWED_DOCUMENT_TYPES = ['pm_statement', 'loan_statement', 'bank_statement'] as const
@@ -120,11 +121,18 @@ export async function POST(request: Request) {
     })
 
   if (uploadError) {
+    logger.debug('[upload] storage error', uploadError)
+
+    const statusCode = (uploadError as { statusCode?: string }).statusCode
+    if (statusCode === '409') {
+      return NextResponse.json(
+        { error: 'File already exists in storage' },
+        { status: 409 }
+      )
+    }
+
     return NextResponse.json(
-      {
-        error: 'Storage upload failed',
-        detail: uploadError.message ?? String(uploadError),
-      },
+      { error: 'Storage upload failed', detail: uploadError.message ?? String(uploadError) },
       { status: 500 }
     )
   }

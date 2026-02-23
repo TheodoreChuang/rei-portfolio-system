@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { sourceDocuments } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { extractTextFromPdf, extractStatementData } from '@/lib/extraction/parse'
+import { logger } from '@/lib/logger'
 
 const ASSIGNED_MONTH_REGEX = /^\d{4}-\d{2}$/
 
@@ -102,9 +103,7 @@ export async function POST(request: Request) {
     )
   }
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[extract] pdfText length:', pdfText.length)
-  }
+  logger.debug('[extract] pdfText length:', pdfText.length)
 
   let result: Awaited<ReturnType<typeof extractStatementData>>
   try {
