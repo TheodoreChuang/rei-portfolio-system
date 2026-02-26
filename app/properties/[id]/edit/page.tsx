@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { AppNav } from '@/components/app-nav'
 import { Button } from '@/components/ui/button'
@@ -13,24 +13,78 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter, DialogClose,
 } from '@/components/ui/dialog'
-import { PROPERTIES } from '@/lib/mock-data'
+import type { Property } from '@/db/schema'
 
-export default function EditPropertyPage({ params }: { params: { id: string } }) {
+export default function EditPropertyPage() {
   const router = useRouter()
-  const prop = PROPERTIES.find(p => p.id === params.id) || PROPERTIES[1]
-  const [address, setAddress] = useState(prop.address)
-  const [nickname, setNickname] = useState(prop.nickname)
+  const { id } = useParams<{ id: string }>()
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+  const [originalAddress, setOriginalAddress] = useState('')
+  const [address, setAddress] = useState('')
+  const [nickname, setNickname] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
 
-  function handleSave() {
+  useEffect(() => {
+    fetch(`/api/properties/${id}`)
+      .then(r => {
+        if (r.status === 404) { setNotFound(true); return null }
+        if (!r.ok) throw new Error()
+        return r.json()
+      })
+      .then(data => {
+        if (!data) return
+        const p: Property = data.property
+        setAddress(p.address)
+        setNickname(p.nickname ?? '')
+        setOriginalAddress(p.address)
+      })
+      .catch(() => toast.error('Failed to load property'))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  async function handleSave() {
+    const res = await fetch(`/api/properties/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address, nickname: nickname.trim() || null }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.error ?? 'Failed to update property')
+      return
+    }
     toast.success('Property updated')
     router.push('/properties')
   }
 
-  function handleDelete() {
+  async function handleDelete() {
+    const res = await fetch(`/api/properties/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.error ?? 'Failed to delete property')
+      return
+    }
     toast.success('Property deleted')
     router.push('/properties')
   }
+
+  if (loading) return (
+    <div className="min-h-screen bg-screen-bg">
+      <AppNav />
+      <div className="max-w-lg mx-auto px-4 py-8 text-center text-sm text-muted">Loading…</div>
+    </div>
+  )
+
+  if (notFound) return (
+    <div className="min-h-screen bg-screen-bg">
+      <AppNav />
+      <div className="max-w-lg mx-auto px-4 py-8 text-center">
+        <p className="text-sm text-muted mb-4">Property not found.</p>
+        <Button variant="outline" onClick={() => router.push('/properties')}>← Back to properties</Button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-screen-bg">
@@ -76,7 +130,7 @@ export default function EditPropertyPage({ params }: { params: { id: string } })
             <DialogHeader>
               <DialogTitle>Delete property?</DialogTitle>
               <DialogDescription>
-                This will remove <strong>{prop.address}</strong> from your account.
+                This will remove <strong>{originalAddress}</strong> from your account.
                 Historical statements and reports are not affected.
               </DialogDescription>
             </DialogHeader>

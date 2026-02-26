@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { AppNav } from '@/components/app-nav'
@@ -10,19 +10,37 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { PROPERTIES } from '@/lib/mock-data'
-
-type Property = { id: string; address: string; nickname: string }
+import type { Property } from '@/db/schema'
 
 export default function PropertiesPage() {
-  const [properties, setProperties] = useState<Property[]>(PROPERTIES)
+  const [properties, setProperties] = useState<Property[]>([])
+  const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [newAddress, setNewAddress] = useState('')
   const [newNickname, setNewNickname] = useState('')
 
-  function addProperty() {
+  useEffect(() => {
+    fetch('/api/properties')
+      .then(r => r.json())
+      .then(data => setProperties(data.properties ?? []))
+      .catch(() => toast.error('Failed to load properties'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function addProperty() {
     if (!newAddress.trim()) return
-    setProperties(prev => [...prev, { id: String(Date.now()), address: newAddress.trim(), nickname: newNickname.trim() }])
+    const res = await fetch('/api/properties', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: newAddress.trim(), nickname: newNickname.trim() || null }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.error ?? 'Failed to add property')
+      return
+    }
+    const { property } = await res.json()
+    setProperties(prev => [...prev, property])
     setNewAddress(''); setNewNickname(''); setShowAdd(false)
     toast.success('Property added')
   }
@@ -58,6 +76,11 @@ export default function PropertiesPage() {
           </Card>
         )}
 
+        {loading ? (
+          <Card>
+            <div className="px-5 py-6 text-center text-sm text-muted">Loading properties…</div>
+          </Card>
+        ) : (
         <Card>
           <div className="px-5 py-3 border-b border-border">
             <span className="text-[10px] font-mono uppercase tracking-widest text-muted">Your properties ({properties.length})</span>
@@ -75,6 +98,7 @@ export default function PropertiesPage() {
             </div>
           ))}
         </Card>
+        )}
 
         <p className="text-xs text-muted mt-4 leading-relaxed">
           Mortgage amounts are entered per-month when you generate a report.

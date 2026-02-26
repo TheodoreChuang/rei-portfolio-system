@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -8,22 +8,42 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-
-type Property = { id: string; address: string; nickname: string }
+import type { Property } from '@/db/schema'
 
 export default function OnboardingPage() {
   const router = useRouter()
   const [properties, setProperties] = useState<Property[]>([])
+  const [loading, setLoading] = useState(true)
   const [address, setAddress] = useState('')
   const [nickname, setNickname] = useState('')
   const [showForm, setShowForm] = useState(true)
 
-  function addProperty() {
+  useEffect(() => {
+    fetch('/api/properties')
+      .then(r => r.json())
+      .then(data => {
+        const existing: Property[] = data.properties ?? []
+        setProperties(existing)
+        if (existing.length > 0) setShowForm(false)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function addProperty() {
     if (!address.trim()) return
-    setProperties((prev) => [
-      ...prev,
-      { id: String(Date.now()), address: address.trim(), nickname: nickname.trim() },
-    ])
+    const res = await fetch('/api/properties', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: address.trim(), nickname: nickname.trim() || null }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.error ?? 'Failed to add property')
+      return
+    }
+    const { property } = await res.json()
+    setProperties(prev => [...prev, property])
     setAddress('')
     setNickname('')
     setShowForm(false)
@@ -83,7 +103,14 @@ export default function OnboardingPage() {
                     variant="ghost"
                     size="sm"
                     className="text-muted hover:text-warn"
-                    onClick={() => setProperties((prev) => prev.filter((x) => x.id !== p.id))}
+                    onClick={async () => {
+                      const res = await fetch(`/api/properties/${p.id}`, { method: 'DELETE' })
+                      if (!res.ok) {
+                        toast.error('Failed to remove property')
+                        return
+                      }
+                      setProperties((prev) => prev.filter((x) => x.id !== p.id))
+                    }}
                   >
                     Remove
                   </Button>

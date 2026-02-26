@@ -448,7 +448,7 @@ export default function UploadPage() {
           {matchableFiles.length > 0 && properties.length === 0 ? (
             <div className="border border-border rounded-lg p-6 text-center text-sm text-muted mb-6">
               No properties registered yet.{' '}
-              <a href="/properties" className="underline text-accent">Register a property →</a>
+              <a href="/properties" target="_blank" rel="noopener noreferrer" className="underline text-accent">Register a property →</a>
             </div>
           ) : (
             <div className="space-y-3 mb-6">
@@ -496,7 +496,7 @@ export default function UploadPage() {
             Continue to confirm mortgages →
           </Button>
           <p className="text-center text-[11px] text-muted mt-2">
-            <a href="/properties" className="underline hover:text-ink">Register new property →</a>
+            <a href="/properties" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">Register new property →</a>
           </p>
         </div>
       </div>
