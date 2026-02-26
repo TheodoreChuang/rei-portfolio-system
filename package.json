@@ -12,6 +12,7 @@
     "db:studio": "drizzle-kit studio",
     "seed": "tsx scripts/seed.ts",
     "storage:clear": "tsx scripts/storage-clear.ts",
+    "debug:extract": "tsx --env-file=.env.local scripts/debug-extract.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run -c vitest.integration.config.ts"
@@ -29,7 +30,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.1",
-    "@ai-sdk/anthropic": "^3.0.46",
     "lucide-react": "^0.469.0",
     "next": "^16.1.6",
     "pdf-parse": "^2.4.5",
