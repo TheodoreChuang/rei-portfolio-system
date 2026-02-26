@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { MONTH_LABELS, MONTHS } from '@/lib/mock-data'
+import { MONTHS } from '@/lib/mock-data'
+import { formatMonth } from '@/lib/format'
 import type { Property } from '@/db/schema'
 import type { ExtractionResult } from '@/lib/extraction/schema'
 import { cn } from '@/lib/utils'
@@ -108,6 +109,9 @@ export default function UploadPage() {
   const [files, setFiles] = useState<FileProcessingStatus[]>([])
   const [mortgages, setMortgages] = useState<MortgageEntry[]>([])
   const [properties, setProperties] = useState<Property[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [showInlineAdd, setShowInlineAdd] = useState<number | null>(null)
+  const [inlineAddress, setInlineAddress] = useState('')
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -239,41 +243,64 @@ export default function UploadPage() {
 
   async function saveMortgagesAndContinue() {
     const toSubmit = mortgages.filter(m => m.mortgageValue.trim() !== '')
-    try {
-      await Promise.all(toSubmit.map(m => {
-        const periodEnd = lastDayOfMonth(selectedMonth)
-        let amountCents: number
-        try {
-          amountCents = parseCents(m.mortgageValue)
-        } catch {
-          throw new Error(`Invalid mortgage amount for ${m.address}`)
-        }
-        return fetch('/api/statements', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sourceDocumentId: null,
-            assignedMonth: selectedMonth,
-            result: {
-              propertyAddress: m.address,
-              statementPeriodStart: `${selectedMonth}-01`,
-              statementPeriodEnd: periodEnd,
-              lineItems: [{
-                lineItemDate: periodEnd,
-                amountCents,
-                category: 'loan_payment',
-                description: `Loan repayment ${selectedMonth}`,
-                confidence: 'high',
-              }],
-            },
-          }),
-        })
-      }))
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save mortgage entries')
-      return
+    for (const m of toSubmit) {
+      const periodEnd = lastDayOfMonth(selectedMonth)
+      let amountCents: number
+      try {
+        amountCents = parseCents(m.mortgageValue)
+      } catch {
+        toast.error(`Invalid mortgage amount for ${m.address}`)
+        return
+      }
+      const res = await fetch('/api/statements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceDocumentId: null,
+          propertyId: m.propertyId,
+          assignedMonth: selectedMonth,
+          result: {
+            propertyAddress: m.address,
+            statementPeriodStart: `${selectedMonth}-01`,
+            statementPeriodEnd: periodEnd,
+            lineItems: [{
+              lineItemDate: periodEnd,
+              amountCents,
+              category: 'loan_payment',
+              description: `Loan repayment ${selectedMonth}`,
+              confidence: 'high',
+            }],
+          },
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? `Failed to save mortgage for ${m.address}`)
+        return
+      }
     }
     setStep('review')
+  }
+
+  async function createInlineProperty(fileIndex: number) {
+    if (!inlineAddress.trim()) return
+    const res = await fetch('/api/properties', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: inlineAddress.trim(), nickname: null }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.error ?? 'Failed to create property')
+      return
+    }
+    const { property } = await res.json()
+    setProperties(prev => [...prev, property])
+    setFiles(prev => prev.map((f, i) =>
+      i === fileIndex ? { ...f, selectedPropertyId: property.id } : f
+    ))
+    setInlineAddress('')
+    setShowInlineAdd(null)
   }
 
   const mortgagesEntered = mortgages.filter(m => m.mortgageValue.trim() !== '').length
@@ -295,7 +322,7 @@ export default function UploadPage() {
                 selectedMonth === m
                   ? 'bg-ink text-white border-ink'
                   : 'bg-white text-muted border-border hover:border-ink hover:text-ink'
-              )}>{MONTH_LABELS[m]}</button>
+              )}>{formatMonth(m)}</button>
             ))}
           </div>
           <p className="text-[11px] text-muted font-mono">Month is set by statement end date.</p>
@@ -365,7 +392,7 @@ export default function UploadPage() {
         <AppNav />
         <StepBar current="processing" />
         <div className="max-w-xl mx-auto px-4 py-8">
-          <p className="text-sm font-semibold mb-1">{MONTH_LABELS[selectedMonth]} — Extracting data…</p>
+          <p className="text-sm font-semibold mb-1">{formatMonth(selectedMonth)} — Extracting data…</p>
           <p className="text-xs text-muted mb-5">Processing {files.length} file{files.length !== 1 ? 's' : ''}. Usually 10–20 seconds.</p>
 
           {someErrored && (
@@ -440,7 +467,7 @@ export default function UploadPage() {
         <AppNav />
         <StepBar current="matching" />
         <div className="max-w-xl mx-auto px-4 py-8">
-          <p className="text-sm font-semibold mb-1">{MONTH_LABELS[selectedMonth]} — Match properties</p>
+          <p className="text-sm font-semibold mb-1">{formatMonth(selectedMonth)} — Match properties</p>
           <p className="text-xs text-muted mb-5 leading-relaxed">
             Confirm which registered property each statement belongs to.
           </p>
@@ -480,6 +507,27 @@ export default function UploadPage() {
                         </option>
                       ))}
                     </select>
+                    {showInlineAdd === i ? (
+                      <div className="mt-2 flex gap-2">
+                        <Input
+                          autoFocus
+                          placeholder="Full address"
+                          value={inlineAddress}
+                          onChange={e => setInlineAddress(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && createInlineProperty(i)}
+                          className="flex-1 text-sm"
+                        />
+                        <Button size="sm" onClick={() => createInlineProperty(i)} disabled={!inlineAddress.trim()}>Add</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setShowInlineAdd(null); setInlineAddress('') }}>✕</Button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowInlineAdd(i)}
+                        className="mt-1.5 text-xs text-accent underline hover:no-underline"
+                      >
+                        + Add new property
+                      </button>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -509,7 +557,7 @@ export default function UploadPage() {
       <AppNav />
       <StepBar current="mortgages" />
       <div className="max-w-xl mx-auto px-4 py-8">
-        <p className="text-sm font-semibold mb-1">{MONTH_LABELS[selectedMonth]} — Mortgage amounts</p>
+        <p className="text-sm font-semibold mb-1">{formatMonth(selectedMonth)} — Mortgage amounts</p>
         <p className="text-xs text-muted mb-5 leading-relaxed">Enter each property's mortgage for this month. Leave blank to exclude — it will be flagged.</p>
         <div className="space-y-3 mb-6">
           {mortgages.map(m => (
@@ -558,7 +606,7 @@ export default function UploadPage() {
       <AppNav />
       <StepBar current="review" />
       <div className="max-w-xl mx-auto px-4 py-8">
-        <p className="text-sm font-semibold mb-1">Ready to generate — {MONTH_LABELS[selectedMonth]}</p>
+        <p className="text-sm font-semibold mb-1">Ready to generate — {formatMonth(selectedMonth)}</p>
         <p className="text-xs text-muted mb-5">Here's a summary of what will be included.</p>
 
         <Card className="mb-4">
@@ -567,7 +615,7 @@ export default function UploadPage() {
             { label: 'Properties',        value: `${mortgages.length} registered` },
             { label: 'Statements',        value: `${statementsReceived} of ${mortgages.length}`, warn: statementsReceived < mortgages.length, warnText: `${mortgages.length - statementsReceived} missing` },
             { label: 'Mortgages entered', value: `${mortgagesEntered} of ${mortgages.length}`, warn: mortgagesEntered < mortgages.length, warnText: `${mortgages.length - mortgagesEntered} blank` },
-            { label: 'Report month',      value: MONTH_LABELS[selectedMonth], mono: true },
+            { label: 'Report month',      value: formatMonth(selectedMonth), mono: true },
           ].map((row, i) => (
             <div key={i} className="flex items-center justify-between px-4 py-2.5 border-b border-ruled last:border-b-0 text-xs">
               <span className="text-muted">{row.label}</span>
@@ -589,12 +637,29 @@ export default function UploadPage() {
           data-testid="generate-report"
           className="w-full mb-3"
           size="lg"
-          onClick={() => {
-            toast.success(`${MONTH_LABELS[selectedMonth]} report generated`)
-            router.push('/dashboard?month=' + selectedMonth)
+          disabled={generating}
+          onClick={async () => {
+            setGenerating(true)
+            try {
+              const res = await fetch('/api/reports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ month: selectedMonth }),
+              })
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}))
+                toast.error(err.error ?? 'Failed to generate report')
+                return
+              }
+              router.push('/dashboard?month=' + selectedMonth)
+            } catch {
+              toast.error('Failed to generate report')
+            } finally {
+              setGenerating(false)
+            }
           }}
         >
-          Generate {MONTH_LABELS[selectedMonth]} report →
+          {generating ? 'Generating report…' : `Generate ${formatMonth(selectedMonth)} report →`}
         </Button>
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" size="sm" onClick={() => setStep('mortgages')}>← Edit mortgages</Button>

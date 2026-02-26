@@ -22,33 +22,52 @@ _The core value prop. Everything else depends on having real ledge entries data.
 
 _Simple but needed before any real data can exist._
 
-- [ ] Properties API routes (GET, POST, PATCH, DELETE)
-- [ ] Wire properties page to real DB
-- [ ] Wire onboarding to real DB
-- [ ] **Tests:** API routes, RLS isolation between users
-- [ ] **Bug fix:** "Register new property" link in upload matching step navigates to
-      `/properties`, losing all in-progress upload state (files, extraction results,
-      selected month). **Repro:** upload a PDF → reach matching step → click
-      "Register new property →" → after saving new property, no way to return to
-      upload flow. **Fix:** open `/properties` in a new tab, or add inline property
-      creation within the matching step.
+- [x] Properties API routes (GET, POST, PUT, DELETE) — `app/api/properties/route.ts` + `[id]/route.ts`
+- [x] Wire properties list page to real DB (`app/properties/page.tsx`)
+- [x] Wire properties edit page to real DB (`app/properties/[id]/edit/page.tsx`)
+- [x] Wire onboarding to real DB (`app/onboarding/page.tsx`)
+- [x] **Tests:** 78 passing (API routes: GET/POST/PUT/DELETE, auth, validation, 404 handling)
+- [x] **Bug fix:** "Register new property" links in upload matching step now open in a
+      new tab (`target="_blank"`), preserving upload state
+- [x] **Gap — RLS isolation tests:** cross-user tests added to both `properties.test.ts`
+      and `properties-id.test.ts` — verifies GET/PUT/DELETE all return 404 when a
+      different user's ID is in session, and GET list returns only the caller's rows.
+- [ ] **Gap → Slice 3 — inline property creation:** allow creating a property directly
+      within the upload matching step without leaving the flow (modal or inline form).
 
-## Slice 3 — Report Generation
+## Slice 3 — Report Generation ✓ COMPLETE (119 tests passing)
 
-_Depends on Slices 1 + 2 being real._
+- [x] **Chunk 1** — Fix mortgage persistence: `/api/statements` POST accepts `null` sourceDocumentId
+      with valid `propertyId` (manual entry path); `saveMortgagesAndContinue()` passes `propertyId`,
+      uses sequential loop, checks `response.ok`; new statement tests for manual entry path
+- [x] **Chunk 2** — `lib/reports/compute.ts`: `computeReport(entries, properties)` → `{ totals, flags }`;
+      `PropertyTotals`, `ReportTotals`, `ReportFlags` types; 15 tests
+- [x] **Chunk 3** — `lib/reports/commentary.ts`: `generateCommentary(totals, month)` using
+      `generateText()` with claude-haiku-4-5-20251001; returns `''` on failure (non-blocking)
+- [x] **Chunk 4** — Real `app/api/reports/route.ts`: GET list, GET by month, POST generate/upsert
+      (`onConflictDoUpdate`); 15 tests
+- [x] **Chunk 5** — Wire upload "Generate" button: `POST /api/reports`, loading state, redirect
+      to `/dashboard?month=`
+- [x] **Chunk 6** — Dynamic `app/reports/[month]/page.tsx`; deleted `app/reports/2026-03/page.tsx`
+- [x] **Chunk 7** — Wire dashboard: fetch report list + selected report; all mock-data imports removed
+- [x] **Chunk 8** — Inline property creation in matching step (expand-on-click form, auto-select)
+- [x] **lib/format.ts** — `formatCents`, `formatMonth`, `lastDayOfMonth` shared utilities
+- [x] **Tests:** 119 passing (`pnpm test`)
 
-- [ ] `/api/reports` POST — aggregate ledger_entries → compute totals
-- [ ] `generateText()` for AI commentary
-- [ ] Wire dashboard + report page to real data
-- [ ] Month selector shows only months with data
-- [ ] **Tests:** totals calculation, missing data edge cases, AI commentary stub
+## Slice 4 — Re-generation Correctness
 
-## Slice 4 — Mortgage Entry
+_First-time generation works after Slice 3. This slice makes re-generation safe._
 
-_Simple persistence but tied to the upload flow._
+The problem: clicking "Generate" for a month that already has a report will duplicate
+the mortgage ledger entries (loan_payment rows), causing inflated mortgage totals.
+The `portfolioReports` upsert is safe (unique constraint), but `ledgerEntries` is not.
 
-- [ ] Wire mortgage step in upload flow to real DB (upsert on re-generate)
-- [ ] **Tests:** upsert behaviour, unique constraint handling
+- [ ] In `saveMortgagesAndContinue()`: before inserting mortgage entries, delete
+      existing `loan_payment` ledger entries for the same user+month+property
+      (or do this server-side in the statements route using a sentinel marker)
+- [ ] Clean up `/api/statements` GET stub — replace mock with real Drizzle query
+      (returns ledger entries for a given month, grouped by property)
+- [ ] **Tests:** re-generation path, duplicate prevention, idempotent mortgage save
 
 ## Slice 5 — Auth Polish
 
