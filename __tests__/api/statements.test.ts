@@ -250,4 +250,51 @@ describe('POST /api/statements', () => {
     const json = await res.json()
     expect(json.error).toBe('Transaction failed')
   })
+
+  describe('propertyId override', () => {
+    const overridePropId = '11111111-2222-4333-8444-555555555555'
+
+    it('uses propertyId directly and skips address matching', async () => {
+      mocks.mockSelectLimit.mockReset()
+      mocks.mockSelectLimit
+        .mockResolvedValueOnce([docRow])   // doc found
+        .mockResolvedValueOnce([propRow])  // property by id found
+
+      const res = await POST(makeRequest(makeBody({ propertyId: overridePropId })))
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.propertyId).toBe(propRow.id)
+      // Only 2 select calls (doc + property by id) — no address-match passes
+      expect(mocks.mockSelectLimit).toHaveBeenCalledTimes(2)
+    })
+
+    it('returns 404 when propertyId not found', async () => {
+      mocks.mockSelectLimit.mockReset()
+      mocks.mockSelectLimit
+        .mockResolvedValueOnce([docRow])  // doc found
+        .mockResolvedValueOnce([])        // property not found
+
+      const res = await POST(makeRequest(makeBody({ propertyId: overridePropId })))
+      expect(res.status).toBe(404)
+      expect(mocks.mockTransaction).not.toHaveBeenCalled()
+    })
+
+    it('returns 404 when propertyId belongs to a different user', async () => {
+      // where clause includes userId; returning [] simulates wrong-user match
+      mocks.mockSelectLimit.mockReset()
+      mocks.mockSelectLimit
+        .mockResolvedValueOnce([docRow])
+        .mockResolvedValueOnce([])
+
+      const res = await POST(makeRequest(makeBody({ propertyId: '22222222-3333-4444-5555-666666666666' })))
+      expect(res.status).toBe(404)
+      expect(mocks.mockTransaction).not.toHaveBeenCalled()
+    })
+
+    it('falls back to address matching when propertyId is absent', async () => {
+      // default beforeEach mocks: doc found + exact property match
+      const res = await POST(makeRequest(makeBody()))
+      expect(res.status).toBe(200)
+    })
+  })
 })

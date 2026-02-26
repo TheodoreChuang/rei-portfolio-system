@@ -14,9 +14,9 @@ _The core value prop. Everything else depends on having real ledge entries data.
 - [x] `/api/upload` —
 - [x] `/api/extract` — pdf-parse → `generateObject()` with Zod schema
 - [x] Extraction error handling (unreadable PDF, LLM hallucination, missing fields)
-- [ ] Save extracted ledge entries to DB via Drizzle
-- [ ] Upload UI wired to real API (replace mock processing simulation)
-- [ ] **Tests:** extraction logic, Zod schema validation, malformed PDF handling
+- [x] Save extracted ledge entries to DB via Drizzle
+- [x] Upload UI wired to real API (replace mock processing simulation)
+- [x] **Tests:** extraction logic, Zod schema validation, malformed PDF handling
 
 ## Slice 2 — Properties CRUD
 
@@ -26,6 +26,12 @@ _Simple but needed before any real data can exist._
 - [ ] Wire properties page to real DB
 - [ ] Wire onboarding to real DB
 - [ ] **Tests:** API routes, RLS isolation between users
+- [ ] **Bug fix:** "Register new property" link in upload matching step navigates to
+      `/properties`, losing all in-progress upload state (files, extraction results,
+      selected month). **Repro:** upload a PDF → reach matching step → click
+      "Register new property →" → after saving new property, no way to return to
+      upload flow. **Fix:** open `/properties` in a new tab, or add inline property
+      creation within the matching step.
 
 ## Slice 3 — Report Generation
 

@@ -13,27 +13,29 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { MONTH_LABELS, MONTHS } from '@/lib/mock-data'
 import type { Property } from '@/db/schema'
+import type { ExtractionResult } from '@/lib/extraction/schema'
 import { cn } from '@/lib/utils'
 
-type Step = 'select' | 'processing' | 'mortgages' | 'review'
+type Step = 'select' | 'processing' | 'matching' | 'mortgages' | 'review'
 
 type ProcessingError =
-  | { code: 'upload_failed';        message: string }
-  | { code: 'scanned_pdf';          message: string }
-  | { code: 'extraction_failed';    message: string }
-  | { code: 'property_not_matched'; extractedAddress: string }
-  | { code: 'save_failed';          message: string }
+  | { code: 'upload_failed';     message: string }
+  | { code: 'scanned_pdf';       message: string }
+  | { code: 'extraction_failed'; message: string }
+  | { code: 'save_failed';       message: string }
 
 type FileProcessingStatus = {
-  file:             File
-  name:             string
-  sizeMb:           string
-  status:           'queued' | 'uploading' | 'extracting' | 'saving' | 'done' | 'error'
-  progress:         number
-  sourceDocumentId: string | null
-  matchedAddress:   string | null
-  isDuplicate:      boolean
-  error:            ProcessingError | null
+  file:               File
+  name:               string
+  sizeMb:             string
+  status:             'queued' | 'uploading' | 'extracting' | 'saving' | 'done' | 'error'
+  progress:           number
+  sourceDocumentId:   string | null
+  matchedAddress:     string | null
+  extractionResult:   ExtractionResult | null
+  selectedPropertyId: string | null
+  isDuplicate:        boolean
+  error:              ProcessingError | null
 }
 
 type MortgageEntry = {
@@ -48,7 +50,9 @@ const STEP_LABELS = ['Select month & upload', 'Confirm mortgages', 'Generate rep
 
 function StepBar({ current }: { current: Step }) {
   const steps: Step[] = ['select', 'mortgages', 'review']
-  const idx = steps.indexOf(current === 'processing' ? 'select' : current)
+  const idx = steps.indexOf(
+    (current === 'processing' || current === 'matching') ? 'select' : current
+  )
   return (
     <div className="flex border-b border-border">
       {STEP_LABELS.map((label, i) => {
@@ -103,6 +107,7 @@ export default function UploadPage() {
   const [selectedMonth, setSelectedMonth] = useState('')
   const [files, setFiles] = useState<FileProcessingStatus[]>([])
   const [mortgages, setMortgages] = useState<MortgageEntry[]>([])
+  const [properties, setProperties] = useState<Property[]>([])
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -111,7 +116,9 @@ export default function UploadPage() {
     setFiles(dropped.map(f => ({
       file: f, name: f.name, sizeMb: (f.size / 1024 / 1024).toFixed(1),
       status: 'queued', progress: 0,
-      sourceDocumentId: null, matchedAddress: null, isDuplicate: false, error: null,
+      sourceDocumentId: null, matchedAddress: null,
+      extractionResult: null, selectedPropertyId: null,
+      isDuplicate: false, error: null,
     })))
   }
 
@@ -163,25 +170,12 @@ export default function UploadPage() {
         continue
       }
       const { result } = await extractRes.json()
-      update(i, { progress: 66, matchedAddress: result.propertyAddress })
-
-      // Stage 3: save
-      update(i, { status: 'saving', progress: 80 })
-      const saveRes = await fetch('/api/statements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceDocumentId, assignedMonth: selectedMonth, result }),
+      update(i, {
+        status: 'done',
+        progress: 100,
+        matchedAddress: result.propertyAddress,
+        extractionResult: result,
       })
-      if (!saveRes.ok) {
-        const err = await saveRes.json().catch(() => ({}))
-        const code = saveRes.status === 422 ? 'property_not_matched' : 'save_failed'
-        const error: ProcessingError = code === 'property_not_matched'
-          ? { code, extractedAddress: result.propertyAddress }
-          : { code: 'save_failed', message: err.error ?? 'Save failed' }
-        update(i, { status: 'error', error })
-        continue
-      }
-      update(i, { status: 'done', progress: 100 })
     }
 
     const allErrored = local.every(f => f.status === 'error')
@@ -191,11 +185,56 @@ export default function UploadPage() {
     if (successCount) toast.success(`${successCount} file${successCount !== 1 ? 's' : ''} extracted successfully`)
 
     const propsData = await fetch('/api/properties').then(r => r.json()).catch(() => ({ properties: [] }))
-    const matchedAddresses = local
-      .filter(f => f.status === 'done' && f.matchedAddress)
-      .map(f => f.matchedAddress!.toLowerCase())
-    setMortgages(buildMortgages(propsData.properties, matchedAddresses))
-    setTimeout(() => setStep('mortgages'), 500)
+    const allProps: Property[] = propsData.properties ?? []
+    setProperties(allProps)
+
+    // Client-side auto-match: exact then includes
+    for (let i = 0; i < local.length; i++) {
+      if (!local[i].extractionResult) continue
+      const addr = local[i].extractionResult!.propertyAddress
+      let matched = allProps.find(p => p.address.toLowerCase() === addr.toLowerCase())
+      if (!matched) {
+        matched = allProps.find(p => p.address.toLowerCase().includes(addr.toLowerCase()))
+      }
+      if (matched) {
+        local[i] = { ...local[i], selectedPropertyId: matched.id }
+      }
+    }
+    setFiles([...local])
+    setTimeout(() => setStep('matching'), 500)
+  }
+
+  async function confirmMatching() {
+    const toSave = files.filter(f => f.extractionResult !== null && f.selectedPropertyId !== null)
+
+    for (const f of toSave) {
+      const saveRes = await fetch('/api/statements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceDocumentId: f.sourceDocumentId,
+          assignedMonth: selectedMonth,
+          result: f.extractionResult,
+          propertyId: f.selectedPropertyId,
+        }),
+      })
+      if (!saveRes.ok) {
+        const err = await saveRes.json().catch(() => ({}))
+        setFiles(prev => prev.map(x =>
+          x.sourceDocumentId === f.sourceDocumentId
+            ? { ...x, status: 'error', error: { code: 'save_failed', message: err.error ?? 'Save failed' } }
+            : x
+        ))
+      }
+    }
+
+    const matchedAddresses = toSave.flatMap(f => {
+      const prop = properties.find(p => p.id === f.selectedPropertyId)
+      return prop ? [prop.address.toLowerCase()] : []
+    })
+
+    setMortgages(buildMortgages(properties, matchedAddresses))
+    setStep('mortgages')
   }
 
   async function saveMortgagesAndContinue() {
@@ -284,7 +323,9 @@ export default function UploadPage() {
             onChange={e => setFiles(Array.from(e.target.files || []).map(f => ({
               file: f, name: f.name, sizeMb: (f.size / 1024 / 1024).toFixed(1),
               status: 'queued', progress: 0,
-              sourceDocumentId: null, matchedAddress: null, isDuplicate: false, error: null,
+              sourceDocumentId: null, matchedAddress: null,
+              extractionResult: null, selectedPropertyId: null,
+              isDuplicate: false, error: null,
             })))} />
         </div>
 
@@ -355,9 +396,6 @@ export default function UploadPage() {
                         {f.error.code === 'scanned_pdf' && (
                           <>⚠ This PDF appears to be scanned — no text could be extracted. Try a digital version.</>
                         )}
-                        {f.error.code === 'property_not_matched' && (
-                          <>⚠ No registered property matches &ldquo;{f.error.extractedAddress}&rdquo;. <a href="/properties" className="underline">Register this property →</a></>
-                        )}
                         {f.error.code === 'extraction_failed' && (
                           <>⚠ Extraction failed — format may not be supported.</>
                         )}
@@ -385,6 +423,81 @@ export default function UploadPage() {
               <Button variant="outline" onClick={() => setStep('select')}>← Back to file selection</Button>
             </div>
           )}
+        </div>
+      </div>
+    )
+  }
+
+  /* ── STEP: MATCHING ── */
+  if (step === 'matching') {
+    const matchableFiles = files
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f.extractionResult !== null && f.status !== 'error')
+    const allMatched = matchableFiles.every(({ f }) => f.selectedPropertyId !== null)
+
+    return (
+      <div className="min-h-screen bg-screen-bg">
+        <AppNav />
+        <StepBar current="matching" />
+        <div className="max-w-xl mx-auto px-4 py-8">
+          <p className="text-sm font-semibold mb-1">{MONTH_LABELS[selectedMonth]} — Match properties</p>
+          <p className="text-xs text-muted mb-5 leading-relaxed">
+            Confirm which registered property each statement belongs to.
+          </p>
+
+          {matchableFiles.length > 0 && properties.length === 0 ? (
+            <div className="border border-border rounded-lg p-6 text-center text-sm text-muted mb-6">
+              No properties registered yet.{' '}
+              <a href="/properties" className="underline text-accent">Register a property →</a>
+            </div>
+          ) : (
+            <div className="space-y-3 mb-6">
+              {matchableFiles.map(({ f, i }) => (
+                <Card key={i}>
+                  <CardContent className="py-3">
+                    <div className="flex items-start gap-3 mb-2">
+                      <span className="text-lg flex-shrink-0">📄</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{f.name}</p>
+                        <p className="text-[11px] text-muted font-mono">{f.extractionResult!.propertyAddress}</p>
+                      </div>
+                    </div>
+                    <select
+                      value={f.selectedPropertyId ?? ''}
+                      onChange={e => {
+                        const val = e.target.value
+                        setFiles(prev => prev.map((x, xi) => xi === i
+                          ? { ...x, selectedPropertyId: val || null }
+                          : x
+                        ))
+                      }}
+                      className="w-full border border-border rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+                    >
+                      <option value="">— select property —</option>
+                      {properties.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.nickname ? `${p.nickname} — ${p.address}` : p.address}
+                        </option>
+                      ))}
+                    </select>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Button
+            data-testid="confirm-matching"
+            className="w-full mb-3"
+            size="lg"
+            onClick={confirmMatching}
+            disabled={!allMatched}
+          >
+            Continue to confirm mortgages →
+          </Button>
+          <p className="text-center text-[11px] text-muted mt-2">
+            <a href="/properties" className="underline hover:text-ink">Register new property →</a>
+          </p>
         </div>
       </div>
     )
