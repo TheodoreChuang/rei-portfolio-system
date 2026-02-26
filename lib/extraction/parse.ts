@@ -1,8 +1,9 @@
-import { generateObject } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
+import { generateObject, createGateway } from 'ai'
 import { PDFParse } from 'pdf-parse'
 import type { ExtractionResult } from './schema'
 import { extractionResultSchema } from './schema'
+
+const gateway = createGateway()
 
 const MIN_EXTRACTABLE_TEXT_LENGTH = 50
 
@@ -24,7 +25,7 @@ export async function extractStatementData(
   assignedMonth: string
 ): Promise<ExtractionResult> {
   const { object } = await generateObject({
-    model: anthropic('claude-sonnet-4-5-20251101'),
+    model: gateway('anthropic/claude-sonnet-4-5'),
     schema: extractionResultSchema,
     system: `You are extracting structured financial data from Australian property management statements.
 Rules:

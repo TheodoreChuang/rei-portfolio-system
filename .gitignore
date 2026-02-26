@@ -2,6 +2,8 @@
 
 .claude
 .cursor
+.ralph
+.ralphrc
 
 node_modules
 

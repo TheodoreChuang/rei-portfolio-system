@@ -75,6 +75,7 @@ export async function POST(request: Request) {
     .download(doc.filePath)
 
   if (downloadError || !data) {
+    logger.error('[extract] storage download failed:', downloadError)
     return NextResponse.json(
       {
         error: 'Storage download failed',
@@ -111,6 +112,7 @@ export async function POST(request: Request) {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : String(err)
+    logger.error('[extract] extractStatementData failed:', message, err)
     return NextResponse.json(
       {
         error: 'Extraction failed',
