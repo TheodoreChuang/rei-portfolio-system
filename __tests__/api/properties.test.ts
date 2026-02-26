@@ -78,6 +78,18 @@ describe('GET /api/properties', () => {
     const json = await res.json()
     expect(json.properties).toEqual([])
   })
+
+  it('returns only the current user\'s properties (cross-user isolation)', async () => {
+    // User B is authenticated; DB returns only user B's rows (userId filter in query)
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+    const userBRow = { ...propRow, id: 'prop-B', userId: 'user-B', address: 'User B Property' }
+    mocks.mockSelectWhere.mockResolvedValue([userBRow])
+    const res = await GET()
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.properties).toHaveLength(1)
+    expect(json.properties[0].userId).toBe('user-B')
+  })
 })
 
 describe('POST /api/properties', () => {

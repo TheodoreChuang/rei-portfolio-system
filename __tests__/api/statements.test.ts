@@ -124,11 +124,19 @@ describe('POST /api/statements', () => {
     expect(mocks.mockTransaction).not.toHaveBeenCalled()
   })
 
-  it('rejects missing sourceDocumentId (400)', async () => {
+  it('rejects null sourceDocumentId without propertyId (400)', async () => {
+    // null sourceDocumentId = manual entry mode, which requires a propertyId
+    const res = await POST(makeRequest({ sourceDocumentId: null, assignedMonth: '2026-03', result: sampleResult }))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/propertyId/i)
+  })
+
+  it('rejects absent sourceDocumentId without propertyId (400)', async () => {
     const res = await POST(makeRequest({ assignedMonth: '2026-03', result: sampleResult }))
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toMatch(/sourceDocumentId/i)
+    expect(json.error).toMatch(/propertyId/i)
   })
 
   it('rejects missing assignedMonth (400)', async () => {
@@ -295,6 +303,94 @@ describe('POST /api/statements', () => {
       // default beforeEach mocks: doc found + exact property match
       const res = await POST(makeRequest(makeBody()))
       expect(res.status).toBe(200)
+    })
+  })
+
+  describe('manual entry (null sourceDocumentId)', () => {
+    const manualPropId = 'a1b2c3d4-e5f6-4789-a012-111111111111' // valid UUID
+
+    function makeManualBody(overrides: Record<string, unknown> = {}) {
+      return {
+        sourceDocumentId: null,
+        assignedMonth: '2026-03',
+        propertyId: manualPropId,
+        result: {
+          propertyAddress: propRow.address,
+          statementPeriodStart: '2026-03-01',
+          statementPeriodEnd: '2026-03-31',
+          lineItems: [{
+            lineItemDate: '2026-03-31',
+            amountCents: 210000,
+            category: 'loan_payment' as const,
+            description: 'Loan repayment March 2026',
+            confidence: 'high' as const,
+          }],
+        },
+        ...overrides,
+      }
+    }
+
+    beforeEach(() => {
+      vi.clearAllMocks()
+      mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+      // Manual entry: only one select call (property by id)
+      mocks.mockSelectLimit.mockResolvedValueOnce([propRow])
+      mocks.mockTxDeleteReturning.mockResolvedValue([])
+      mocks.mockTxInsertReturning.mockResolvedValue([{ id: 'entry-1' }])
+      mocks.mockTransaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) => {
+        const tx = {
+          delete: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({ returning: mocks.mockTxDeleteReturning }),
+          }),
+          insert: vi.fn().mockReturnValue({
+            values: vi.fn().mockReturnValue({ returning: mocks.mockTxInsertReturning }),
+          }),
+        }
+        return cb(tx)
+      })
+    })
+
+    it('accepts null sourceDocumentId with valid propertyId', async () => {
+      const res = await POST(makeRequest(makeManualBody()))
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.insertedCount).toBe(1)
+      expect(json.replacedCount).toBe(0) // no delete for manual entries
+    })
+
+    it('returns 400 when propertyId is missing for manual entry', async () => {
+      const res = await POST(makeRequest(makeManualBody({ propertyId: undefined })))
+      expect(res.status).toBe(400)
+      const json = await res.json()
+      expect(json.error).toMatch(/propertyId/i)
+      expect(mocks.mockTransaction).not.toHaveBeenCalled()
+    })
+
+    it('returns 400 when propertyId is invalid UUID for manual entry', async () => {
+      const res = await POST(makeRequest(makeManualBody({ propertyId: 'not-a-uuid' })))
+      expect(res.status).toBe(400)
+      expect(mocks.mockTransaction).not.toHaveBeenCalled()
+    })
+
+    it('returns 404 when property not found for manual entry', async () => {
+      mocks.mockSelectLimit.mockReset()
+      mocks.mockSelectLimit.mockResolvedValueOnce([]) // property not found
+      const res = await POST(makeRequest(makeManualBody()))
+      expect(res.status).toBe(404)
+      expect(mocks.mockTransaction).not.toHaveBeenCalled()
+    })
+
+    it('does not call delete in transaction (no sourceDocumentId to delete by)', async () => {
+      await POST(makeRequest(makeManualBody()))
+      expect(mocks.mockTransaction).toHaveBeenCalledOnce()
+      // replacedCount is 0 — delete was skipped
+      const callArg = mocks.mockTransaction.mock.calls[0][0]
+      expect(callArg).toBeDefined()
+    })
+
+    it('skips sourceDocument lookup (only one db.select call for property)', async () => {
+      await POST(makeRequest(makeManualBody()))
+      expect(mocks.mockSelectLimit).toHaveBeenCalledTimes(1)
     })
   })
 })

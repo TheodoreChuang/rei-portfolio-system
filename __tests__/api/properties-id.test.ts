@@ -101,6 +101,14 @@ describe('GET /api/properties/[id]', () => {
     const json = await res.json()
     expect(json.property.address).toBe('42 Wallaby Way, Sydney NSW 2000')
   })
+
+  it('returns 404 when property belongs to a different user (cross-user isolation)', async () => {
+    // User B tries to fetch user A's property — DB returns nothing due to userId filter
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+    mocks.mockSelectLimit.mockResolvedValue([])
+    const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
+    expect(res.status).toBe(404)
+  })
 })
 
 describe('PUT /api/properties/[id]', () => {
@@ -162,6 +170,13 @@ describe('PUT /api/properties/[id]', () => {
     expect(res.status).toBe(404)
   })
 
+  it('returns 404 when property belongs to a different user (cross-user isolation)', async () => {
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+    mocks.mockUpdateReturning.mockResolvedValue([])
+    const res = await PUT(makePutRequest({ address: 'new address' }), makeParams(VALID_UUID))
+    expect(res.status).toBe(404)
+  })
+
   it('updates address only', async () => {
     const updated = { ...propRow, address: '99 New St' }
     mocks.mockUpdateReturning.mockResolvedValue([updated])
@@ -209,6 +224,13 @@ describe('DELETE /api/properties/[id]', () => {
   })
 
   it('returns 404 when property does not exist', async () => {
+    mocks.mockDeleteReturning.mockResolvedValue([])
+    const res = await DELETE(makeDeleteRequest(), makeParams(VALID_UUID))
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 when property belongs to a different user (cross-user isolation)', async () => {
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
     mocks.mockDeleteReturning.mockResolvedValue([])
     const res = await DELETE(makeDeleteRequest(), makeParams(VALID_UUID))
     expect(res.status).toBe(404)

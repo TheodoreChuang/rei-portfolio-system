@@ -6,7 +6,6 @@ import { properties, sourceDocuments, ledgerEntries } from '@/db/schema'
 import type { LedgerEntry } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { extractionResultSchema } from '@/lib/extraction/schema'
-import { MARCH_STATEMENTS } from '@/lib/mock-data'
 
 const ASSIGNED_MONTH_REGEX = /^\d{4}-\d{2}$/
 
@@ -16,24 +15,27 @@ function isValidUuid(val: string): boolean {
 
 // GET /api/statements?month=2026-03
 export async function GET(request: Request) {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const month = searchParams.get('month')
-
-  if (month === '2026-03') {
-    return NextResponse.json({ statements: MARCH_STATEMENTS })
+  if (!month || !ASSIGNED_MONTH_REGEX.test(month)) {
+    return NextResponse.json({ error: 'Missing or invalid month (must be YYYY-MM)' }, { status: 400 })
   }
+
   return NextResponse.json({ statements: [] })
 }
 
-// POST /api/statements — persist extraction results as ledger entries
+// POST /api/statements — persist extraction results as ledger entries.
+// Two modes:
+//   Normal:  sourceDocumentId (UUID) present → verify doc ownership, resolve property
+//   Manual:  sourceDocumentId null/absent   → propertyId required (e.g. loan payments)
 export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let body: unknown
   try {
@@ -42,18 +44,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const raw =
-    body && typeof body === 'object'
-      ? (body as Record<string, unknown>)
-      : {}
+  const raw = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
 
-  const sourceDocumentId =
-    typeof raw.sourceDocumentId === 'string' ? raw.sourceDocumentId.trim() : ''
-  if (!sourceDocumentId) {
-    return NextResponse.json(
-      { error: 'Missing or invalid sourceDocumentId' },
-      { status: 400 }
-    )
+  // Determine mode: normal (has sourceDocumentId) vs manual (null/absent)
+  const sourceDocumentIdRaw =
+    raw.sourceDocumentId != null
+      ? (typeof raw.sourceDocumentId === 'string' ? raw.sourceDocumentId.trim() : '')
+      : null
+  const isManualEntry = sourceDocumentIdRaw === null
+
+  if (!isManualEntry && !isValidUuid(sourceDocumentIdRaw!)) {
+    return NextResponse.json({ error: 'Invalid sourceDocumentId' }, { status: 400 })
   }
 
   const assignedMonth =
@@ -78,94 +79,113 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid result' }, { status: 400 })
   }
 
-  // Verify sourceDocument ownership
-  const [doc] = await db
-    .select()
-    .from(sourceDocuments)
-    .where(
-      and(
-        eq(sourceDocuments.id, sourceDocumentId),
-        eq(sourceDocuments.userId, user.id)
-      )
-    )
-    .limit(1)
-
-  if (!doc) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
-
-  // Property lookup: explicit propertyId override or two-pass address matching
+  // ── Property resolution ──────────────────────────────────────────────────
   let property: typeof properties.$inferSelect | undefined
-
   const rawPropertyId = typeof raw.propertyId === 'string' ? raw.propertyId.trim() : ''
-  if (isValidUuid(rawPropertyId)) {
-    const rows = await db
+
+  if (isManualEntry) {
+    // Manual entries (e.g. loan_payment) must supply a valid propertyId directly
+    if (!isValidUuid(rawPropertyId)) {
+      return NextResponse.json(
+        { error: 'Manual entries require a valid propertyId' },
+        { status: 400 }
+      )
+    }
+    const [prop] = await db
       .select()
       .from(properties)
       .where(and(eq(properties.id, rawPropertyId), eq(properties.userId, user.id)))
       .limit(1)
-    property = rows[0]
-    if (!property) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!prop) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    property = prop
   } else {
-    // Pass 1: exact case-insensitive
-    const exactRows = await db
+    // PDF-backed entry: verify sourceDocument ownership first
+    const [doc] = await db
       .select()
-      .from(properties)
+      .from(sourceDocuments)
       .where(
         and(
-          eq(properties.userId, user.id),
-          sql`lower(${properties.address}) = lower(${result.propertyAddress})`
+          eq(sourceDocuments.id, sourceDocumentIdRaw!),
+          eq(sourceDocuments.userId, user.id)
         )
       )
       .limit(1)
-    property = exactRows[0]
+    if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Pass 2: ILIKE contains
-    if (!property) {
-      const ilikeRows = await db
+    // Property lookup: explicit propertyId override or two-pass address matching
+    if (isValidUuid(rawPropertyId)) {
+      const [prop] = await db
+        .select()
+        .from(properties)
+        .where(and(eq(properties.id, rawPropertyId), eq(properties.userId, user.id)))
+        .limit(1)
+      if (!prop) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      property = prop
+    } else {
+      // Pass 1: exact case-insensitive
+      const [exact] = await db
         .select()
         .from(properties)
         .where(
           and(
             eq(properties.userId, user.id),
-            sql`lower(${properties.address}) ilike ${'%' + result.propertyAddress.toLowerCase() + '%'}`
+            sql`lower(${properties.address}) = lower(${result.propertyAddress})`
           )
         )
         .limit(1)
-      property = ilikeRows[0]
-    }
+      property = exact
 
-    if (!property) {
-      return NextResponse.json(
-        {
-          error: 'property_not_matched',
-          detail: `No property found matching address: ${result.propertyAddress}`,
-        },
-        { status: 422 }
-      )
+      // Pass 2: ILIKE contains
+      if (!property) {
+        const [ilike] = await db
+          .select()
+          .from(properties)
+          .where(
+            and(
+              eq(properties.userId, user.id),
+              sql`lower(${properties.address}) ilike ${'%' + result.propertyAddress.toLowerCase() + '%'}`
+            )
+          )
+          .limit(1)
+        property = ilike
+      }
+
+      if (!property) {
+        return NextResponse.json(
+          {
+            error: 'property_not_matched',
+            detail: `No property found matching address: ${result.propertyAddress}`,
+          },
+          { status: 422 }
+        )
+      }
     }
   }
 
-  // Transaction: delete existing entries for this source doc, then insert new ones
+  // ── Transaction: delete existing + insert new ────────────────────────────
   let deleted: LedgerEntry[] = []
   let inserted: LedgerEntry[] = []
 
   try {
     await db.transaction(async (tx) => {
-      deleted = await tx
-        .delete(ledgerEntries)
-        .where(
-          and(
-            eq(ledgerEntries.sourceDocumentId, sourceDocumentId),
-            eq(ledgerEntries.userId, user.id)
+      // For PDF-backed entries, delete-then-insert is idempotent (same doc re-saved)
+      // For manual entries, skip the delete (Slice 4 handles dedup on re-generation)
+      if (!isManualEntry) {
+        deleted = await tx
+          .delete(ledgerEntries)
+          .where(
+            and(
+              eq(ledgerEntries.sourceDocumentId, sourceDocumentIdRaw!),
+              eq(ledgerEntries.userId, user.id)
+            )
           )
-        )
-        .returning()
+          .returning()
+      }
 
       const rows = result.lineItems.map((item) => ({
         userId: user.id,
-        propertyId: property.id,
-        sourceDocumentId,
+        propertyId: property!.id,
+        sourceDocumentId: sourceDocumentIdRaw, // null for manual entries
         lineItemDate: item.lineItemDate,
         amountCents: item.amountCents,
         category: item.category,
