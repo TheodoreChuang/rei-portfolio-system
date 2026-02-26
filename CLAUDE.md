@@ -63,3 +63,7 @@ __tests__/            — Vitest unit tests (*.test.ts)
 - After schema changes run `pnpm db:generate` then `pnpm db:migrate`
 - Supabase migration applied ≠ bucket visible in Studio storage browser sometimes;
   use `curl` with secret key to verify
+
+## Maintenance
+Update this file at slice boundaries when new patterns, gotchas, or architectural
+decisions are confirmed stable. Dynamic per-session notes go in memory/MEMORY.md instead.

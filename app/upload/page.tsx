@@ -11,18 +11,37 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { PROPERTIES, MONTH_LABELS, MONTHS } from '@/lib/mock-data'
+import { MONTH_LABELS, MONTHS } from '@/lib/mock-data'
+import type { Property } from '@/db/schema'
 import { cn } from '@/lib/utils'
 
 type Step = 'select' | 'processing' | 'mortgages' | 'review'
-type FileStatus = {
-  name: string; sizeMb: string
-  status: 'queued' | 'extracting' | 'done' | 'failed'
-  matchedTo?: string; progress: number
+
+type ProcessingError =
+  | { code: 'upload_failed';        message: string }
+  | { code: 'scanned_pdf';          message: string }
+  | { code: 'extraction_failed';    message: string }
+  | { code: 'property_not_matched'; extractedAddress: string }
+  | { code: 'save_failed';          message: string }
+
+type FileProcessingStatus = {
+  file:             File
+  name:             string
+  sizeMb:           string
+  status:           'queued' | 'uploading' | 'extracting' | 'saving' | 'done' | 'error'
+  progress:         number
+  sourceDocumentId: string | null
+  matchedAddress:   string | null
+  isDuplicate:      boolean
+  error:            ProcessingError | null
 }
+
 type MortgageEntry = {
-  propertyId: string; address: string; nickname: string
-  hasStatement: boolean; mortgageValue: string
+  propertyId:    string
+  address:       string
+  nickname:      string | null
+  hasStatement:  boolean
+  mortgageValue: string
 }
 
 const STEP_LABELS = ['Select month & upload', 'Confirm mortgages', 'Generate report']
@@ -54,48 +73,168 @@ function StepBar({ current }: { current: Step }) {
   )
 }
 
+function buildMortgages(props: Property[], matchedAddresses: string[]): MortgageEntry[] {
+  return props.map(p => ({
+    propertyId: p.id,
+    address: p.address,
+    nickname: p.nickname,
+    hasStatement: matchedAddresses.includes(p.address.toLowerCase()),
+    mortgageValue: '',
+  }))
+}
+
+function lastDayOfMonth(month: string): string {
+  const [year, mon] = month.split('-').map(Number)
+  const d = new Date(year, mon, 0) // day 0 of next month = last day of this month
+  return `${year}-${String(mon).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function parseCents(input: string): number {
+  const clean = input.replace(/[$,\s]/g, '')
+  const dollars = parseFloat(clean)
+  if (isNaN(dollars) || dollars <= 0) throw new Error('Invalid amount')
+  return Math.round(dollars * 100)
+}
+
 export default function UploadPage() {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<Step>('select')
   const [selectedMonth, setSelectedMonth] = useState('')
-  const [files, setFiles] = useState<FileStatus[]>([])
-  const [mortgages, setMortgages] = useState<MortgageEntry[]>(
-    PROPERTIES.map((p, i) => ({
-      propertyId: p.id, address: p.address, nickname: p.nickname,
-      hasStatement: i < 2,
-      mortgageValue: i === 0 ? '2100' : i === 2 ? '2400' : '',
-    }))
-  )
+  const [files, setFiles] = useState<FileProcessingStatus[]>([])
+  const [mortgages, setMortgages] = useState<MortgageEntry[]>([])
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     const dropped = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf')
     if (!dropped.length) { toast.error('PDF files only'); return }
-    setFiles(dropped.map(f => ({ name: f.name, sizeMb: (f.size/1024/1024).toFixed(1), status: 'queued', progress: 0 })))
+    setFiles(dropped.map(f => ({
+      file: f, name: f.name, sizeMb: (f.size / 1024 / 1024).toFixed(1),
+      status: 'queued', progress: 0,
+      sourceDocumentId: null, matchedAddress: null, isDuplicate: false, error: null,
+    })))
   }
 
   async function startProcessing() {
     if (!selectedMonth) return
-    const mockFiles: FileStatus[] = files.length ? files : [
-      { name: 'smith-st-march-2026.pdf',   sizeMb: '2.1', status: 'queued', progress: 0 },
-      { name: 'george-ave-march-2026.pdf', sizeMb: '1.8', status: 'queued', progress: 0 },
-      { name: 'riverside-march-2026.pdf',  sizeMb: '3.3', status: 'queued', progress: 0 },
-    ]
-    setFiles(mockFiles)
-    setStep('processing')
-    const matches = ['123 Smith St', '8 George Ave', '7 River Rd']
-    for (let i = 0; i < mockFiles.length; i++) {
-      setFiles(prev => prev.map((f, j) => j === i ? { ...f, status: 'extracting', progress: 0 } : f))
-      for (let p = 10; p <= 100; p += 20) {
-        await new Promise(r => setTimeout(r, 130))
-        setFiles(prev => prev.map((f, j) => j === i ? { ...f, progress: Math.min(p, 100) } : f))
-      }
-      setFiles(prev => prev.map((f, j) => j === i ? { ...f, status: 'done', progress: 100, matchedTo: matches[i] } : f))
-      await new Promise(r => setTimeout(r, 250))
+
+    // No files? Skip processing, fetch properties directly
+    if (!files.length) {
+      const propsData = await fetch('/api/properties').then(r => r.json()).catch(() => ({ properties: [] }))
+      setMortgages(buildMortgages(propsData.properties, []))
+      setStep('mortgages')
+      return
     }
-    toast.success('All files extracted successfully')
+
+    setStep('processing')
+    const local: FileProcessingStatus[] = files.map(f => ({ ...f }))
+    const update = (i: number, patch: Partial<FileProcessingStatus>) => {
+      local[i] = { ...local[i], ...patch }
+      setFiles([...local])
+    }
+
+    for (let i = 0; i < local.length; i++) {
+      // Stage 1: upload
+      update(i, { status: 'uploading', progress: 10 })
+      const form = new FormData()
+      form.append('file', local[i].file)
+      form.append('documentType', 'pm_statement')
+      form.append('assignedMonth', selectedMonth)
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: form })
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}))
+        update(i, { status: 'error', error: { code: 'upload_failed', message: err.error ?? 'Upload failed' } })
+        continue
+      }
+      const { sourceDocumentId, isDuplicate } = await uploadRes.json()
+      update(i, { progress: 33, sourceDocumentId, isDuplicate })
+
+      // Stage 2: extract
+      update(i, { status: 'extracting', progress: 50 })
+      const extractRes = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceDocumentId, assignedMonth: selectedMonth }),
+      })
+      if (!extractRes.ok) {
+        const err = await extractRes.json().catch(() => ({}))
+        const code = extractRes.status === 422 ? 'scanned_pdf' : 'extraction_failed'
+        update(i, { status: 'error', error: { code, message: err.error ?? 'Failed' } })
+        continue
+      }
+      const { result } = await extractRes.json()
+      update(i, { progress: 66, matchedAddress: result.propertyAddress })
+
+      // Stage 3: save
+      update(i, { status: 'saving', progress: 80 })
+      const saveRes = await fetch('/api/statements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceDocumentId, assignedMonth: selectedMonth, result }),
+      })
+      if (!saveRes.ok) {
+        const err = await saveRes.json().catch(() => ({}))
+        const code = saveRes.status === 422 ? 'property_not_matched' : 'save_failed'
+        const error: ProcessingError = code === 'property_not_matched'
+          ? { code, extractedAddress: result.propertyAddress }
+          : { code: 'save_failed', message: err.error ?? 'Save failed' }
+        update(i, { status: 'error', error })
+        continue
+      }
+      update(i, { status: 'done', progress: 100 })
+    }
+
+    const allErrored = local.every(f => f.status === 'error')
+    if (allErrored) return // Stay on processing step so user sees errors
+
+    const successCount = local.filter(f => f.status === 'done').length
+    if (successCount) toast.success(`${successCount} file${successCount !== 1 ? 's' : ''} extracted successfully`)
+
+    const propsData = await fetch('/api/properties').then(r => r.json()).catch(() => ({ properties: [] }))
+    const matchedAddresses = local
+      .filter(f => f.status === 'done' && f.matchedAddress)
+      .map(f => f.matchedAddress!.toLowerCase())
+    setMortgages(buildMortgages(propsData.properties, matchedAddresses))
     setTimeout(() => setStep('mortgages'), 500)
+  }
+
+  async function saveMortgagesAndContinue() {
+    const toSubmit = mortgages.filter(m => m.mortgageValue.trim() !== '')
+    try {
+      await Promise.all(toSubmit.map(m => {
+        const periodEnd = lastDayOfMonth(selectedMonth)
+        let amountCents: number
+        try {
+          amountCents = parseCents(m.mortgageValue)
+        } catch {
+          throw new Error(`Invalid mortgage amount for ${m.address}`)
+        }
+        return fetch('/api/statements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sourceDocumentId: null,
+            assignedMonth: selectedMonth,
+            result: {
+              propertyAddress: m.address,
+              statementPeriodStart: `${selectedMonth}-01`,
+              statementPeriodEnd: periodEnd,
+              lineItems: [{
+                lineItemDate: periodEnd,
+                amountCents,
+                category: 'loan_payment',
+                description: `Loan repayment ${selectedMonth}`,
+                confidence: 'high',
+              }],
+            },
+          }),
+        })
+      }))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save mortgage entries')
+      return
+    }
+    setStep('review')
   }
 
   const mortgagesEntered = mortgages.filter(m => m.mortgageValue.trim() !== '').length
@@ -112,7 +251,7 @@ export default function UploadPage() {
           <p className="text-sm font-semibold mb-2">Which month are you reporting on?</p>
           <div className="flex flex-wrap gap-2 mb-2">
             {MONTHS.map(m => (
-              <button key={m} onClick={() => setSelectedMonth(m)} className={cn(
+              <button key={m} data-testid={`month-selector-${m}`} onClick={() => setSelectedMonth(m)} className={cn(
                 'px-4 py-1.5 rounded-full text-xs font-mono border transition-colors',
                 selectedMonth === m
                   ? 'bg-ink text-white border-ink'
@@ -131,6 +270,7 @@ export default function UploadPage() {
         </div>
 
         <div
+          data-testid="dropzone"
           onDrop={handleDrop}
           onDragOver={e => e.preventDefault()}
           onClick={() => fileRef.current?.click()}
@@ -141,8 +281,10 @@ export default function UploadPage() {
           <p className="text-xs text-muted">Supports multiple files at once</p>
           <p className="text-[11px] text-muted font-mono mt-2">Max 5MB per file · PDF only</p>
           <input ref={fileRef} type="file" multiple accept=".pdf" className="hidden"
-            onChange={e => setFiles(Array.from(e.target.files||[]).map(f => ({
-              name: f.name, sizeMb: (f.size/1024/1024).toFixed(1), status: 'queued', progress: 0
+            onChange={e => setFiles(Array.from(e.target.files || []).map(f => ({
+              file: f, name: f.name, sizeMb: (f.size / 1024 / 1024).toFixed(1),
+              status: 'queued', progress: 0,
+              sourceDocumentId: null, matchedAddress: null, isDuplicate: false, error: null,
             })))} />
         </div>
 
@@ -163,7 +305,7 @@ export default function UploadPage() {
           </div>
         )}
 
-        <Button className="w-full mt-6" size="lg" onClick={startProcessing} disabled={!selectedMonth}>
+        <Button data-testid="continue-to-processing" className="w-full mt-6" size="lg" onClick={startProcessing} disabled={!selectedMonth}>
           Continue to confirm mortgages →
         </Button>
         {!selectedMonth && <p className="text-center text-[11px] text-muted mt-2">Select a month to continue</p>}
@@ -172,36 +314,81 @@ export default function UploadPage() {
   )
 
   /* ── STEP: PROCESSING ── */
-  if (step === 'processing') return (
-    <div className="min-h-screen bg-screen-bg">
-      <AppNav />
-      <StepBar current="processing" />
-      <div className="max-w-xl mx-auto px-4 py-8">
-        <p className="text-sm font-semibold mb-1">{MONTH_LABELS[selectedMonth]} — Extracting data…</p>
-        <p className="text-xs text-muted mb-5">Processing {files.length} file{files.length !== 1 ? 's' : ''}. Usually 10–20 seconds.</p>
-        <div className="space-y-2">
-          {files.map((f, i) => (
-            <Card key={i} className={cn(f.status === 'failed' && 'border-warn/40 bg-warn-light', f.status === 'queued' && 'opacity-50')}>
-              <CardContent className="py-3 flex items-center gap-3">
-                <span className="text-lg flex-shrink-0">📄</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{f.name}</p>
-                  <p className="text-[11px] text-muted font-mono">{f.matchedTo ? `→ ${f.matchedTo}` : `${f.sizeMb} MB`}</p>
-                  <Progress value={f.progress} className="mt-1.5 h-1" />
-                </div>
-                <div className="flex-shrink-0">
-                  {f.status === 'done'      && <Badge variant="green">✓ Done</Badge>}
-                  {f.status === 'extracting'&& <Badge variant="blue">Extracting…</Badge>}
-                  {f.status === 'queued'    && <Badge variant="grey">Queued</Badge>}
-                  {f.status === 'failed'    && <Badge variant="orange">⚠ Failed</Badge>}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+  if (step === 'processing') {
+    const allErrored = files.every(f => f.status === 'error')
+    const errorCount = files.filter(f => f.status === 'error').length
+    const someErrored = errorCount > 0 && !allErrored
+
+    return (
+      <div className="min-h-screen bg-screen-bg">
+        <AppNav />
+        <StepBar current="processing" />
+        <div className="max-w-xl mx-auto px-4 py-8">
+          <p className="text-sm font-semibold mb-1">{MONTH_LABELS[selectedMonth]} — Extracting data…</p>
+          <p className="text-xs text-muted mb-5">Processing {files.length} file{files.length !== 1 ? 's' : ''}. Usually 10–20 seconds.</p>
+
+          {someErrored && (
+            <div className="text-xs text-warn border border-warn/40 rounded-lg px-3 py-2 bg-warn-light mb-4">
+              ⚠ {errorCount} of {files.length} files could not be processed.
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {files.map((f, i) => (
+              <Card key={i} data-testid={`file-status-${i}`} className={cn(
+                f.status === 'error' && 'border-warn/40 bg-warn-light',
+                f.status === 'queued' && 'opacity-50'
+              )}>
+                <CardContent className="py-3 flex items-center gap-3">
+                  <span className="text-lg flex-shrink-0">📄</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{f.name}</p>
+                    <p className="text-[11px] text-muted font-mono">
+                      {f.matchedAddress ? `→ ${f.matchedAddress}` : `${f.sizeMb} MB`}
+                    </p>
+                    <Progress value={f.progress} className="mt-1.5 h-1" />
+                    {f.isDuplicate && f.status !== 'error' && (
+                      <span className="text-[11px] text-blue-500 mt-1 block">ℹ Already uploaded — using existing extraction.</span>
+                    )}
+                    {f.error && (
+                      <div data-testid={`file-error-${i}`} className="mt-1 text-[11px] text-warn">
+                        {f.error.code === 'scanned_pdf' && (
+                          <>⚠ This PDF appears to be scanned — no text could be extracted. Try a digital version.</>
+                        )}
+                        {f.error.code === 'property_not_matched' && (
+                          <>⚠ No registered property matches &ldquo;{f.error.extractedAddress}&rdquo;. <a href="/properties" className="underline">Register this property →</a></>
+                        )}
+                        {f.error.code === 'extraction_failed' && (
+                          <>⚠ Extraction failed — format may not be supported.</>
+                        )}
+                        {(f.error.code === 'upload_failed' || f.error.code === 'save_failed') && (
+                          <>⚠ {f.error.message}</>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-shrink-0">
+                    {f.status === 'done'       && <Badge variant="green">✓ Done</Badge>}
+                    {f.status === 'extracting' && <Badge variant="blue">Extracting…</Badge>}
+                    {f.status === 'uploading'  && <Badge variant="blue">Uploading…</Badge>}
+                    {f.status === 'saving'     && <Badge variant="blue">Saving…</Badge>}
+                    {f.status === 'queued'     && <Badge variant="grey">Queued</Badge>}
+                    {f.status === 'error'      && <Badge variant="orange">⚠ Failed</Badge>}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {allErrored && (
+            <div className="mt-4">
+              <Button variant="outline" onClick={() => setStep('select')}>← Back to file selection</Button>
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   /* ── STEP: MORTGAGES ── */
   if (step === 'mortgages') return (
@@ -230,6 +417,7 @@ export default function UploadPage() {
                 <div className="relative flex-1">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span>
                   <Input
+                    data-testid={`mortgage-input-${m.propertyId}`}
                     className="pl-7"
                     placeholder="e.g. 1,850"
                     value={m.mortgageValue}
@@ -243,7 +431,7 @@ export default function UploadPage() {
             </Card>
           ))}
         </div>
-        <Button className="w-full" size="lg" onClick={() => setStep('review')}>
+        <Button data-testid="continue-to-review" className="w-full" size="lg" onClick={saveMortgagesAndContinue}>
           Continue to generate report →
         </Button>
         <p className="text-center text-[11px] text-muted mt-2">You can skip all mortgages — they'll be flagged as missing.</p>
@@ -263,10 +451,10 @@ export default function UploadPage() {
         <Card className="mb-4">
           <CardHeader><CardTitle className="text-[10px] font-mono uppercase tracking-widest text-muted">Report inputs</CardTitle></CardHeader>
           {[
-            { label: 'Properties',         value: `${PROPERTIES.length} registered` },
-            { label: 'Statements',         value: `${statementsReceived} of ${PROPERTIES.length}`, warn: statementsReceived < PROPERTIES.length, warnText: `${PROPERTIES.length - statementsReceived} missing` },
-            { label: 'Mortgages entered',  value: `${mortgagesEntered} of ${PROPERTIES.length}`, warn: mortgagesEntered < PROPERTIES.length, warnText: `${PROPERTIES.length - mortgagesEntered} blank` },
-            { label: 'Report month',       value: MONTH_LABELS[selectedMonth], mono: true },
+            { label: 'Properties',        value: `${mortgages.length} registered` },
+            { label: 'Statements',        value: `${statementsReceived} of ${mortgages.length}`, warn: statementsReceived < mortgages.length, warnText: `${mortgages.length - statementsReceived} missing` },
+            { label: 'Mortgages entered', value: `${mortgagesEntered} of ${mortgages.length}`, warn: mortgagesEntered < mortgages.length, warnText: `${mortgages.length - mortgagesEntered} blank` },
+            { label: 'Report month',      value: MONTH_LABELS[selectedMonth], mono: true },
           ].map((row, i) => (
             <div key={i} className="flex items-center justify-between px-4 py-2.5 border-b border-ruled last:border-b-0 text-xs">
               <span className="text-muted">{row.label}</span>
@@ -285,6 +473,7 @@ export default function UploadPage() {
         )}
 
         <Button
+          data-testid="generate-report"
           className="w-full mb-3"
           size="lg"
           onClick={() => {

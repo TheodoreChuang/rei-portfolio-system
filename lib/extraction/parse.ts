@@ -1,13 +1,14 @@
 import { generateObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
-import pdfParse from 'pdf-parse'
+import { PDFParse } from 'pdf-parse'
 import type { ExtractionResult } from './schema'
 import { extractionResultSchema } from './schema'
 
 const MIN_EXTRACTABLE_TEXT_LENGTH = 50
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const result = await pdfParse(buffer)
+  const parser = new PDFParse({ data: buffer })
+  const result = await parser.getText()
 
   if (!result.text || result.text.trim().length < MIN_EXTRACTABLE_TEXT_LENGTH) {
     throw new Error(

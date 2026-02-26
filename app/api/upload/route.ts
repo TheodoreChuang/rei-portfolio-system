@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     const statusCode = (uploadError as { statusCode?: string }).statusCode
     if (statusCode === '409') {
       return NextResponse.json(
-        { error: 'File already exists in storage' },
+        { error: 'File already uploaded' },
         { status: 409 }
       )
     }
