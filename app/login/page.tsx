@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,11 +13,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [email, setEmail] = useState('')
+  const [showExpiredBanner, setShowExpiredBanner] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('reason') === 'expired') {
+      setShowExpiredBanner(true)
+    }
+  }, [])
 
   async function handleSend() {
     if (!email) return
     setLoading(true)
-  
+
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -25,14 +33,14 @@ export default function LoginPage() {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     })
-  
+
     setLoading(false)
-  
+
     if (error) {
       toast.error(error.message)
       return
     }
-  
+
     setSent(true)
     toast.success('Magic link sent — check your inbox')
   }
@@ -70,6 +78,21 @@ export default function LoginPage() {
     <div className="min-h-screen bg-screen-bg flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="font-serif text-2xl text-center mb-7">PropFlow</div>
+
+        {showExpiredBanner && (
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-warn/40 bg-warn-light px-4 py-3 text-sm text-[#7a3a1a]">
+            <span className="flex-shrink-0">⚠️</span>
+            <span className="flex-1">Your session expired — please sign in again.</span>
+            <button
+              onClick={() => setShowExpiredBanner(false)}
+              className="flex-shrink-0 text-[#7a3a1a] hover:opacity-70"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <Card>
           <CardContent className="pt-7 pb-7">
             <h2 className="text-lg font-semibold mb-1">Welcome back</h2>
