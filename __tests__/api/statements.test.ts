@@ -68,7 +68,8 @@ function makeGetRequest(month: string | null) {
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockSelectLimit: vi.fn(),
-  mockSelectEntries: vi.fn(), // GET path: db.select().from().where() directly awaited
+  mockSelectEntries: vi.fn(),    // GET entries path: db.select().from().where() thenable
+  mockPriorLoanLimit: vi.fn(),   // GET prior loan path: .where().orderBy().limit()
   mockTransaction: vi.fn(),
   mockTxDeleteReturning: vi.fn(),
   mockTxInsertReturning: vi.fn(),
@@ -86,9 +87,14 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
-        // POST path uses .limit(); GET path awaits .where() directly (thenable)
         where: vi.fn().mockReturnValue({
+          // POST path: .where().limit()
           limit: mocks.mockSelectLimit,
+          // GET prior loan path: .where().orderBy().limit()
+          orderBy: vi.fn().mockReturnValue({
+            limit: mocks.mockPriorLoanLimit,
+          }),
+          // GET entries path: await .where() directly (thenable)
           then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
             mocks.mockSelectEntries().then(resolve, reject),
         }),
@@ -103,6 +109,7 @@ describe('GET /api/statements', () => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockSelectEntries.mockResolvedValue([])
+    mocks.mockPriorLoanLimit.mockResolvedValue([])
   })
 
   it('returns 401 when unauthenticated', async () => {

@@ -129,11 +129,11 @@ _Foundation is working — tighten the edges._
 
 _Reduces repetitive entry; low effort, high value for monthly users._
 
-- [ ] `GET /api/statements?propertyId=&category=loan_payment&month=YYYY-MM` — return
+- [x] `GET /api/statements?propertyId=&category=loan_payment&month=YYYY-MM` — return
       the most recent `loan_payment` entry for a property before the selected month
-- [ ] Upload page mortgage step: on mount, fetch prior loan amount per property and
+- [x] Upload page mortgage step: on mount, fetch prior loan amount per property and
       pre-fill the input; user can override
-- [ ] **Tests:** API returns correct prior value; falls back to 0 when none exists
+- [x] **Tests:** API returns correct prior value; falls back to 0 when none exists
 
 ### Gaps carried from Slice 5
 - **Upload E2E test** (`playwright/tests/upload.spec.ts`) is skipped — needs a real

@@ -87,6 +87,27 @@ function buildMortgages(props: Property[], matchedAddresses: string[]): Mortgage
   }))
 }
 
+async function prefillPriorLoans(
+  mortgages: MortgageEntry[],
+  month: string,
+): Promise<MortgageEntry[]> {
+  return Promise.all(
+    mortgages.map(async (m) => {
+      try {
+        const res = await fetch(
+          `/api/statements?propertyId=${m.propertyId}&month=${month}`
+        )
+        if (!res.ok) return m
+        const json = await res.json()
+        if (!json.amountCents) return m
+        return { ...m, mortgageValue: (json.amountCents / 100).toFixed(2) }
+      } catch {
+        return m
+      }
+    })
+  )
+}
+
 function parseCents(input: string): number {
   const clean = input.replace(/[$,\s]/g, '')
   const dollars = parseFloat(clean)
@@ -125,7 +146,10 @@ export default function UploadPage() {
     // No files? Skip processing, fetch properties directly
     if (!files.length) {
       const propsData = await fetch('/api/properties').then(r => r.json()).catch(() => ({ properties: [] }))
-      setMortgages(buildMortgages(propsData.properties, []))
+      const allProps: Property[] = propsData.properties ?? []
+      setProperties(allProps)
+      const filled = await prefillPriorLoans(buildMortgages(allProps, []), selectedMonth)
+      setMortgages(filled)
       setStep('mortgages')
       return
     }
@@ -237,7 +261,8 @@ export default function UploadPage() {
       return prop ? [prop.address.toLowerCase()] : []
     })
 
-    setMortgages(buildMortgages(properties, matchedAddresses))
+    const filled = await prefillPriorLoans(buildMortgages(properties, matchedAddresses), selectedMonth)
+    setMortgages(filled)
     setStep('mortgages')
   }
 

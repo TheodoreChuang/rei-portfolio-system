@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, lt, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { db } from '@/lib/db'
@@ -15,6 +15,12 @@ function isValidUuid(val: string): boolean {
 }
 
 // GET /api/statements?month=2026-03
+//   Returns all ledger entries for the authenticated user in the given month.
+//
+// GET /api/statements?propertyId=UUID&month=2026-03
+//   Returns the most recent loan_payment entry for the property in any month
+//   strictly before the given month. Used to pre-fill the mortgage input.
+//   Response: { amountCents: number | null }
 export async function GET(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -24,6 +30,27 @@ export async function GET(request: Request) {
   const month = searchParams.get('month')
   if (!month || !ASSIGNED_MONTH_REGEX.test(month)) {
     return NextResponse.json({ error: 'Missing or invalid month (must be YYYY-MM)' }, { status: 400 })
+  }
+
+  const propertyId = searchParams.get('propertyId')
+  if (propertyId !== null) {
+    if (!isValidUuid(propertyId)) {
+      return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 })
+    }
+    const [entry] = await db
+      .select({ amountCents: ledgerEntries.amountCents })
+      .from(ledgerEntries)
+      .where(
+        and(
+          eq(ledgerEntries.userId, user.id),
+          eq(ledgerEntries.propertyId, propertyId),
+          eq(ledgerEntries.category, 'loan_payment'),
+          lt(ledgerEntries.lineItemDate, `${month}-01`),
+        )
+      )
+      .orderBy(desc(ledgerEntries.lineItemDate))
+      .limit(1)
+    return NextResponse.json({ amountCents: entry?.amountCents ?? null })
   }
 
   const startDate = `${month}-01`
