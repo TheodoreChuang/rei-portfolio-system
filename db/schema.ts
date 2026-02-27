@@ -21,7 +21,9 @@ export const properties = pgTable('properties', {
   address:   text('address').notNull(),
   nickname:  text('nickname'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+}, (t) => [
+  index('properties_user_id_idx').on(t.userId),
+])
 
 export const sourceDocuments = pgTable('source_documents', {
   id:           uuid('id').primaryKey().defaultRandom(),
@@ -66,6 +68,8 @@ export const portfolioReports = pgTable('portfolio_reports', {
   aiCommentary: text('ai_commentary'),
   version:      integer('version').notNull().default(1),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
+  updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+                  .$onUpdate(() => new Date()),
 }, (t) => [
   unique().on(t.userId, t.month),
   index('idx_reports_user_month').on(t.userId, t.month),
