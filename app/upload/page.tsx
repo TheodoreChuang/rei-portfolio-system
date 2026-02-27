@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { formatMonth, lastDayOfMonth, recentMonths } from '@/lib/format'
+import { MAX_UPLOAD_BYTES } from '@/lib/constants'
 import type { Property } from '@/db/schema'
 import type { ExtractionResult } from '@/lib/extraction/schema'
 import { cn } from '@/lib/utils'
@@ -370,7 +371,7 @@ export default function UploadPage() {
           <div className="text-3xl mb-2">📂</div>
           <p className="text-sm font-medium mb-1">Drop PDFs here or click to browse</p>
           <p className="text-xs text-muted">Supports multiple files at once</p>
-          <p className="text-[11px] text-muted font-mono mt-2">Max 5MB per file · PDF only</p>
+          <p className="text-[11px] text-muted font-mono mt-2">Max {MAX_UPLOAD_BYTES / (1024 * 1024)}MB per file · PDF only</p>
           <input ref={fileRef} type="file" multiple accept=".pdf" className="hidden"
             onChange={e => setFiles(Array.from(e.target.files || []).map(f => ({
               file: f, name: f.name, sizeMb: (f.size / 1024 / 1024).toFixed(1),

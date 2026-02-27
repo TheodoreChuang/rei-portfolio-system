@@ -5,8 +5,7 @@ import { db } from '@/lib/db'
 import { sourceDocuments } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
-
-const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10MB
+import { MAX_UPLOAD_BYTES } from '@/lib/constants'
 const ALLOWED_DOCUMENT_TYPES = ['pm_statement', 'loan_statement', 'bank_statement'] as const
 const ASSIGNED_MONTH_REGEX = /^\d{4}-\d{2}$/
 
@@ -59,9 +58,9 @@ export async function POST(request: Request) {
     )
   }
 
-  if (file.size > MAX_FILE_BYTES) {
+  if (file.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json(
-      { error: 'File exceeds 10MB' },
+      { error: 'File exceeds 1MB' },
       { status: 413 }
     )
   }

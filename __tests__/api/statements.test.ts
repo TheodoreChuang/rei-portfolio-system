@@ -183,6 +183,70 @@ describe('GET /api/statements', () => {
   })
 })
 
+describe('GET /api/statements - prior loan pre-fill', () => {
+  // Must be a valid UUID (8-4-4-4-12 hex) — propRow.id is not valid UUID format
+  const validPropId = 'a1b2c3d4-e5f6-4789-a012-111111111111'
+
+  function makePriorLoanRequest(propertyId: string | null, month: string | null) {
+    const params = new URLSearchParams()
+    if (propertyId !== null) params.set('propertyId', propertyId)
+    if (month !== null) params.set('month', month)
+    return new Request(`http://localhost/api/statements?${params}`, { method: 'GET' })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    mocks.mockPriorLoanLimit.mockResolvedValue([])
+  })
+
+  it('returns 401 when unauthenticated', async () => {
+    mocks.mockGetUser.mockResolvedValue({ data: { user: null } })
+    const res = await GET(makePriorLoanRequest(validPropId, '2026-03'))
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 400 when month is missing even with propertyId', async () => {
+    const res = await GET(makePriorLoanRequest(validPropId, null))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/month/i)
+  })
+
+  it('returns 400 for invalid propertyId', async () => {
+    const res = await GET(makePriorLoanRequest('not-a-uuid', '2026-03'))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/propertyId/i)
+  })
+
+  it('returns amountCents: null when no prior loan exists', async () => {
+    mocks.mockPriorLoanLimit.mockResolvedValueOnce([])
+    const res = await GET(makePriorLoanRequest(validPropId, '2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.amountCents).toBeNull()
+  })
+
+  it('returns the most recent prior loan amountCents', async () => {
+    mocks.mockPriorLoanLimit.mockResolvedValueOnce([{ amountCents: 210000 }])
+    const res = await GET(makePriorLoanRequest(validPropId, '2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.amountCents).toBe(210000)
+  })
+
+  it('does not expose another user\'s prior loans (RLS)', async () => {
+    // User B is authenticated; DB returns no rows for their userId (correct isolation)
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+    mocks.mockPriorLoanLimit.mockResolvedValueOnce([])
+    const res = await GET(makePriorLoanRequest(validPropId, '2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.amountCents).toBeNull()
+  })
+})
+
 describe('POST /api/statements', () => {
   beforeEach(() => {
     vi.clearAllMocks()

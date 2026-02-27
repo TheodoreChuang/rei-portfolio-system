@@ -99,15 +99,25 @@ describe('POST /api/upload', () => {
     expect(mocks.mockUpload).not.toHaveBeenCalled()
   })
 
-  it('rejects files over 10MB (413)', async () => {
-    const tenMbPlus = 10 * 1024 * 1024 + 1
+  it('rejects files over 1MB (413)', async () => {
+    const oneMbPlus = 1 * 1024 * 1024 + 1
     const form = formDataWithFile({
-      fileContent: new Blob([new Uint8Array(tenMbPlus)]),
-      size: tenMbPlus,
+      fileContent: new Blob([new Uint8Array(oneMbPlus)]),
+      size: oneMbPlus,
     })
     const res = await POST(new Request('http://localhost/api/upload', { method: 'POST', body: form }))
     expect(res.status).toBe(413)
     expect(mocks.mockUpload).not.toHaveBeenCalled()
+  })
+
+  it('accepts files at exactly 1MB (413 boundary)', async () => {
+    const exactlyOneMb = 1 * 1024 * 1024
+    const form = formDataWithFile({
+      fileContent: new Blob([new Uint8Array(exactlyOneMb)]),
+      size: exactlyOneMb,
+    })
+    const res = await POST(new Request('http://localhost/api/upload', { method: 'POST', body: form }))
+    expect(res.status).toBe(200)
   })
 
   it('rejects invalid documentType (400)', async () => {
