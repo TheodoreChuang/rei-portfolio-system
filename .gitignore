@@ -19,3 +19,7 @@ test-pm-statements
 supabase/.temp
 .env.*
 !.env.example
+
+# Playwright auth state
+playwright/.auth/
+test-results/
