@@ -3,7 +3,8 @@ import { GET, POST } from '@/app/api/reports/route'
 
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
-  mockSelectWhere: vi.fn(),
+  mockSelectWhere: vi.fn(),    // GET by month + POST: db.select().from().where() awaited directly
+  mockSelectOrderBy: vi.fn(), // GET list: db.select().from().where().orderBy()
   mockInsertReturning: vi.fn(),
   mockGenerateCommentary: vi.fn(),
 }))
@@ -18,7 +19,13 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: mocks.mockSelectWhere,
+        // GET by month + POST: awaited directly (thenable)
+        // GET list: .orderBy() chained after .where()
+        where: vi.fn().mockImplementation(() => ({
+          then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+            mocks.mockSelectWhere().then(resolve, reject),
+          orderBy: vi.fn().mockImplementation(() => mocks.mockSelectOrderBy()),
+        })),
       }),
     }),
     insert: vi.fn().mockReturnValue({
@@ -86,6 +93,8 @@ describe('GET /api/reports (list)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    mocks.mockSelectWhere.mockResolvedValue([])    // safe default for by-month / POST paths
+    mocks.mockSelectOrderBy.mockResolvedValue([])  // safe default for list path
   })
 
   it('returns 401 when not authenticated', async () => {
@@ -95,7 +104,7 @@ describe('GET /api/reports (list)', () => {
   })
 
   it('returns empty list when no reports exist', async () => {
-    mocks.mockSelectWhere.mockResolvedValueOnce([])
+    mocks.mockSelectOrderBy.mockResolvedValueOnce([])
     const res = await GET(makeGetRequest())
     expect(res.status).toBe(200)
     const json = await res.json()
@@ -103,7 +112,7 @@ describe('GET /api/reports (list)', () => {
   })
 
   it('returns list of reports for authenticated user', async () => {
-    mocks.mockSelectWhere.mockResolvedValueOnce([
+    mocks.mockSelectOrderBy.mockResolvedValueOnce([
       { month: '2026-03', createdAt: reportRow.createdAt },
     ])
     const res = await GET(makeGetRequest())
@@ -112,12 +121,28 @@ describe('GET /api/reports (list)', () => {
     expect(json.reports).toHaveLength(1)
     expect(json.reports[0].month).toBe('2026-03')
   })
+
+  it('returns reports in descending month order (newest first)', async () => {
+    mocks.mockSelectOrderBy.mockResolvedValueOnce([
+      { month: '2026-03', createdAt: reportRow.createdAt },
+      { month: '2026-02', createdAt: reportRow.createdAt },
+      { month: '2026-01', createdAt: reportRow.createdAt },
+    ])
+    const res = await GET(makeGetRequest())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.reports[0].month).toBe('2026-03')
+    expect(json.reports[1].month).toBe('2026-02')
+    expect(json.reports[2].month).toBe('2026-01')
+  })
 })
 
 describe('GET /api/reports?month=', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    mocks.mockSelectWhere.mockResolvedValue([])
+    mocks.mockSelectOrderBy.mockResolvedValue([])
   })
 
   it('returns 401 when not authenticated', async () => {
@@ -150,6 +175,7 @@ describe('POST /api/reports', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    mocks.mockSelectOrderBy.mockResolvedValue([]) // safe default; POST doesn't use orderBy
     // First select: ledgerEntries, second: properties
     mocks.mockSelectWhere
       .mockResolvedValueOnce([entryRow])

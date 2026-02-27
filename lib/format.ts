@@ -20,3 +20,14 @@ export function lastDayOfMonth(month: string): string {
   const d = new Date(year, mon, 0)
   return `${year}-${String(mon).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+// Returns the last `count` months from today, newest first, as 'YYYY-MM' strings.
+export function recentMonths(count: number): string[] {
+  const months: string[] = []
+  const now = new Date()
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+  return months
+}

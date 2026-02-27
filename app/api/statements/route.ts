@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, gte, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { db } from '@/lib/db'
@@ -6,6 +6,7 @@ import { properties, sourceDocuments, ledgerEntries } from '@/db/schema'
 import type { LedgerEntry } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { extractionResultSchema } from '@/lib/extraction/schema'
+import { lastDayOfMonth } from '@/lib/format'
 
 const ASSIGNED_MONTH_REGEX = /^\d{4}-\d{2}$/
 
@@ -25,7 +26,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing or invalid month (must be YYYY-MM)' }, { status: 400 })
   }
 
-  return NextResponse.json({ statements: [] })
+  const startDate = `${month}-01`
+  const endDate = lastDayOfMonth(month)
+  const entries = await db
+    .select()
+    .from(ledgerEntries)
+    .where(
+      and(
+        eq(ledgerEntries.userId, user.id),
+        gte(ledgerEntries.lineItemDate, startDate),
+        lte(ledgerEntries.lineItemDate, endDate),
+      )
+    )
+  return NextResponse.json({ entries })
 }
 
 // POST /api/statements — persist extraction results as ledger entries.
@@ -168,9 +181,25 @@ export async function POST(request: Request) {
 
   try {
     await db.transaction(async (tx) => {
-      // For PDF-backed entries, delete-then-insert is idempotent (same doc re-saved)
-      // For manual entries, skip the delete (Slice 4 handles dedup on re-generation)
-      if (!isManualEntry) {
+      if (isManualEntry) {
+        // Delete existing loan_payment entries for this user+property+month before
+        // reinserting — makes mortgage saves idempotent on re-generation.
+        const startDate = `${assignedMonth}-01`
+        const endDate = lastDayOfMonth(assignedMonth)
+        deleted = await tx
+          .delete(ledgerEntries)
+          .where(
+            and(
+              eq(ledgerEntries.userId, user.id),
+              eq(ledgerEntries.propertyId, property!.id),
+              eq(ledgerEntries.category, 'loan_payment'),
+              gte(ledgerEntries.lineItemDate, startDate),
+              lte(ledgerEntries.lineItemDate, endDate),
+            )
+          )
+          .returning()
+      } else {
+        // PDF-backed entries: delete by sourceDocumentId (idempotent re-save)
         deleted = await tx
           .delete(ledgerEntries)
           .where(

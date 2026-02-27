@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { ledgerEntries, portfolioReports, properties } from '@/db/schema'
@@ -32,11 +32,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ report })
   }
 
-  // No month param — return list
+  // No month param — return list, newest first
   const rows = await db
     .select({ month: portfolioReports.month, createdAt: portfolioReports.createdAt })
     .from(portfolioReports)
     .where(eq(portfolioReports.userId, user.id))
+    .orderBy(desc(portfolioReports.month))
   return NextResponse.json({ reports: rows })
 }
 

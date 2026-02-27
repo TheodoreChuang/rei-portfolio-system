@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { POST } from '@/app/api/statements/route'
+import { GET, POST } from '@/app/api/statements/route'
 
 const docRow = {
   id: 'a1b2c3d4-e5f6-4789-a012-345678901234',
@@ -58,9 +58,17 @@ function makeRequest(body: unknown) {
   })
 }
 
+function makeGetRequest(month: string | null) {
+  const url = month
+    ? `http://localhost/api/statements?month=${month}`
+    : 'http://localhost/api/statements'
+  return new Request(url, { method: 'GET' })
+}
+
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockSelectLimit: vi.fn(),
+  mockSelectEntries: vi.fn(), // GET path: db.select().from().where() directly awaited
   mockTransaction: vi.fn(),
   mockTxDeleteReturning: vi.fn(),
   mockTxInsertReturning: vi.fn(),
@@ -78,16 +86,73 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({ limit: mocks.mockSelectLimit }),
+        // POST path uses .limit(); GET path awaits .where() directly (thenable)
+        where: vi.fn().mockReturnValue({
+          limit: mocks.mockSelectLimit,
+          then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+            mocks.mockSelectEntries().then(resolve, reject),
+        }),
       }),
     }),
     transaction: mocks.mockTransaction,
   },
 }))
 
+describe('GET /api/statements', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    mocks.mockSelectEntries.mockResolvedValue([])
+  })
+
+  it('returns 401 when unauthenticated', async () => {
+    mocks.mockGetUser.mockResolvedValue({ data: { user: null } })
+    const res = await GET(makeGetRequest('2026-03'))
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 400 when month param is missing', async () => {
+    const res = await GET(makeGetRequest(null))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/month/i)
+  })
+
+  it('returns 400 for invalid month format', async () => {
+    const res = await GET(makeGetRequest('march-2026'))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/month/i)
+  })
+
+  it('returns empty entries when none exist', async () => {
+    mocks.mockSelectEntries.mockResolvedValueOnce([])
+    const res = await GET(makeGetRequest('2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.entries).toEqual([])
+  })
+
+  it('returns entries for the authenticated user', async () => {
+    const entry = {
+      id: 'e1', userId: 'user-123', propertyId: 'prop-1',
+      sourceDocumentId: null, lineItemDate: '2026-03-31',
+      amountCents: 400000, category: 'rent',
+      description: 'Rent', userNotes: null, createdAt: new Date(),
+    }
+    mocks.mockSelectEntries.mockResolvedValueOnce([entry])
+    const res = await GET(makeGetRequest('2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.entries).toHaveLength(1)
+    expect(json.entries[0].id).toBe('e1')
+  })
+})
+
 describe('POST /api/statements', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.mockSelectEntries.mockResolvedValue([]) // safe default for GET thenable path
 
     mocks.mockGetUser.mockResolvedValue({
       data: { user: { id: 'user-123' } },
@@ -355,7 +420,7 @@ describe('POST /api/statements', () => {
       expect(res.status).toBe(200)
       const json = await res.json()
       expect(json.insertedCount).toBe(1)
-      expect(json.replacedCount).toBe(0) // no delete for manual entries
+      expect(json.replacedCount).toBe(0) // no prior entries in beforeEach
     })
 
     it('returns 400 when propertyId is missing for manual entry', async () => {
@@ -380,12 +445,21 @@ describe('POST /api/statements', () => {
       expect(mocks.mockTransaction).not.toHaveBeenCalled()
     })
 
-    it('does not call delete in transaction (no sourceDocumentId to delete by)', async () => {
-      await POST(makeRequest(makeManualBody()))
-      expect(mocks.mockTransaction).toHaveBeenCalledOnce()
-      // replacedCount is 0 — delete was skipped
-      const callArg = mocks.mockTransaction.mock.calls[0][0]
-      expect(callArg).toBeDefined()
+    it('deletes prior loan_payment entries in transaction (idempotent)', async () => {
+      mocks.mockTxDeleteReturning.mockResolvedValue([{ id: 'old-loan-1' }])
+      const res = await POST(makeRequest(makeManualBody()))
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.replacedCount).toBe(1)
+      expect(json.insertedCount).toBe(1)
+    })
+
+    it('returns replacedCount = 0 on first save (no prior entries)', async () => {
+      // beforeEach has mockTxDeleteReturning returning []
+      const res = await POST(makeRequest(makeManualBody()))
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.replacedCount).toBe(0)
     })
 
     it('skips sourceDocument lookup (only one db.select call for property)', async () => {
