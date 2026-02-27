@@ -24,6 +24,8 @@ type Report = {
   updatedAt: string | null
 }
 
+type DocEntry = { id: string; fileName: string; propertyId: string }
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center px-5 py-3 border-b border-border">
@@ -32,7 +34,15 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-function PropertyCard({ p }: { p: PropertyTotals }) {
+function PropertyCard({
+  p,
+  docEntries,
+  onDelete,
+}: {
+  p: PropertyTotals
+  docEntries: DocEntry[]
+  onDelete: (id: string) => void
+}) {
   const netSign = p.netCents >= 0 ? '+' : '−'
   const netAbs = formatCents(Math.abs(p.netCents))
   const isComplete = p.hasStatement && p.hasMortgage
@@ -49,6 +59,20 @@ function PropertyCard({ p }: { p: PropertyTotals }) {
               ? `Statement received · ${p.hasMortgage ? 'Mortgage provided' : 'No mortgage entered'}`
               : `No statement · ${p.hasMortgage ? `Mortgage: ${formatCents(p.mortgageCents)}` : 'No mortgage'}`}
           </p>
+          {docEntries.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {docEntries.map(d => (
+                <span key={d.id} className="inline-flex items-center gap-1 text-[10px] font-mono bg-screen-bg border border-border rounded px-1.5 py-0.5">
+                  {d.fileName}
+                  <button
+                    onClick={() => onDelete(d.id)}
+                    title="Delete statement"
+                    className="text-muted hover:text-warn"
+                  >×</button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <Badge variant={isComplete ? 'green' : 'orange'}>
           {isComplete ? 'Complete' : isPartial ? 'Partial' : 'Missing'}
@@ -91,18 +115,46 @@ export default function ReportPage() {
   const [report, setReport] = useState<Report | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [docs, setDocs] = useState<DocEntry[]>([])
+  const [reportList, setReportList] = useState<{ month: string }[]>([])
+  const [stale, setStale] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/reports?month=${month}`)
-      .then(r => {
-        if (r.status === 404) { setNotFound(true); return null }
-        if (!r.ok) throw new Error()
-        return r.json()
+    Promise.all([
+      fetch(`/api/reports?month=${month}`),
+      fetch(`/api/documents?month=${month}`),
+      fetch('/api/reports'),
+    ])
+      .then(async ([reportRes, docsRes, listRes]) => {
+        if (reportRes.status === 404) { setNotFound(true); return }
+        if (!reportRes.ok) throw new Error()
+        const [reportData, docsData, listData] = await Promise.all([
+          reportRes.json(),
+          docsRes.ok ? docsRes.json() : { documents: [] },
+          listRes.ok ? listRes.json() : { reports: [] },
+        ])
+        setReport(reportData.report)
+        setDocs(docsData.documents ?? [])
+        setReportList(listData.reports ?? [])
       })
-      .then(data => { if (data) setReport(data.report) })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
   }, [month])
+
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this statement? This will remove all extracted line items.')) return
+    const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setDocs(prev => prev.filter(d => d.id !== id))
+      setStale(true)
+    }
+  }
+
+  // Prev/next navigation from the reports list (newest first)
+  const months = reportList.map(r => r.month)
+  const currentIndex = months.indexOf(month)
+  const prevMonth = months[currentIndex + 1] ?? null  // older
+  const nextMonth = months[currentIndex - 1] ?? null  // newer
 
   if (loading) return (
     <div className="min-h-screen bg-screen-bg">
@@ -126,9 +178,28 @@ export default function ReportPage() {
     day: 'numeric', month: 'short', year: 'numeric',
   })
 
+  // Build map: propertyId → DocEntry[]
+  const docsByProperty = new Map<string, DocEntry[]>()
+  docs.forEach(d => {
+    const existing = docsByProperty.get(d.propertyId) ?? []
+    existing.push(d)
+    docsByProperty.set(d.propertyId, existing)
+  })
+
   return (
     <div className="min-h-screen bg-screen-bg">
       <AppNav />
+
+      {stale && (
+        <div className="bg-warn-light border-b border-warn px-6 py-3 flex items-center justify-between">
+          <span className="text-sm text-warn font-medium">Statement deleted — regenerate to update totals</span>
+          <div className="flex items-center gap-2">
+            <Link href="/upload"><Button variant="outline" size="sm">Regenerate report</Button></Link>
+            <button onClick={() => setStale(false)} className="text-warn hover:text-warn text-sm px-1">✕</button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border-b border-border px-6 py-4 flex items-start justify-between">
         <div>
           <h1 className="font-serif text-xl">{formatMonth(month)} Portfolio Report</h1>
@@ -145,6 +216,16 @@ export default function ReportPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {prevMonth && (
+            <Button variant="outline" size="sm" onClick={() => router.push(`/reports/${prevMonth}`)}>
+              ← {formatMonth(prevMonth)}
+            </Button>
+          )}
+          {nextMonth && (
+            <Button variant="outline" size="sm" onClick={() => router.push(`/reports/${nextMonth}`)}>
+              {formatMonth(nextMonth)} →
+            </Button>
+          )}
           <Link href="/upload"><Button variant="outline" size="sm">↻ Regenerate</Button></Link>
         </div>
       </div>
@@ -204,7 +285,14 @@ export default function ReportPage() {
           {/* Section 2 */}
           <SectionLabel>Section 2 — Property Breakdown</SectionLabel>
           <div className="border-b border-border">
-            {totals.properties.map(p => <PropertyCard key={p.propertyId} p={p} />)}
+            {totals.properties.map(p => (
+              <PropertyCard
+                key={p.propertyId}
+                p={p}
+                docEntries={docsByProperty.get(p.propertyId) ?? []}
+                onDelete={handleDelete}
+              />
+            ))}
           </div>
 
           {/* Section 3 */}
