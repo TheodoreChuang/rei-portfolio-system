@@ -19,8 +19,9 @@ type Report = {
   totals: ReportTotals
   flags: { missingStatements: string[]; missingMortgages: string[] }
   aiCommentary: string | null
-  createdAt: string
   version: number
+  createdAt: string
+  updatedAt: string | null
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -135,6 +136,11 @@ export default function ReportPage() {
             Generated {generatedDate} · {totals.statementsReceived} of {totals.propertyCount} statements ·{' '}
             {totals.propertyCount - totals.statementsReceived > 0 && (
               <span className="text-warn">{totals.propertyCount - totals.statementsReceived} missing</span>
+            )}
+            {report.version > 1 && report.updatedAt && (
+              <span className="ml-2 text-accent">
+                · Last updated {new Date(report.updatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
             )}
           </p>
         </div>

@@ -51,6 +51,7 @@ const reportRow = {
   aiCommentary: 'Commentary text.',
   version: 1,
   createdAt: new Date(),
+  updatedAt: new Date(),
 }
 
 const propRow = {
@@ -240,5 +241,48 @@ describe('POST /api/reports', () => {
     mocks.mockGenerateCommentary.mockResolvedValue('')
     const res = await POST(makePostRequest({ month: '2026-03' }))
     expect(res.status).toBe(200)
+  })
+
+  it('returns updatedAt in report response', async () => {
+    const updatedAt = new Date('2026-03-20T10:00:00Z')
+    mocks.mockInsertReturning.mockResolvedValue([{ ...reportRow, version: 2, updatedAt }])
+    const res = await POST(makePostRequest({ month: '2026-03' }))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.report.updatedAt).toBeDefined()
+  })
+})
+
+describe('GET /api/reports — RLS cross-user isolation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    mocks.mockSelectWhere.mockResolvedValue([])
+    mocks.mockSelectOrderBy.mockResolvedValue([])
+  })
+
+  it('GET list returns only caller reports — user B gets empty list (RLS)', async () => {
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+    mocks.mockSelectOrderBy.mockResolvedValueOnce([]) // no reports for user B
+    const res = await GET(makeGetRequest())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.reports).toEqual([])
+  })
+
+  it('GET by month returns only caller report — user B gets 404 for user A month (RLS)', async () => {
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+    mocks.mockSelectWhere.mockResolvedValueOnce([]) // no report for user B's month query
+    const res = await GET(makeGetRequest('2026-03'))
+    expect(res.status).toBe(404)
+  })
+
+  it('POST uses caller userId — user B cannot read user A data via report generation (RLS)', async () => {
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+    mocks.mockSelectWhere
+      .mockResolvedValueOnce([])   // entries: none for user B
+      .mockResolvedValueOnce([])   // properties: none for user B
+    const res = await POST(makePostRequest({ month: '2026-03' }))
+    expect(res.status).toBe(422) // no properties found
   })
 })

@@ -102,6 +102,7 @@ export async function POST(request: Request) {
         flags: flags as unknown as Record<string, unknown>,
         aiCommentary,
         version: sql`${portfolioReports.version} + 1`,
+        updatedAt: new Date(),
       },
     })
     .returning()

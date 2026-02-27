@@ -18,7 +18,9 @@ type Report = {
   month: string
   totals: ReportTotals
   aiCommentary: string | null
+  version: number
   createdAt: string
+  updatedAt: string | null
 }
 
 function DashboardContent() {
@@ -163,6 +165,7 @@ function DashboardContent() {
               { title: 'Generated', rows: [
                 { label: 'Date',  value: new Date(report.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) },
                 { label: 'Month', value: formatMonth(month) },
+                ...(report.version > 1 && report.updatedAt ? [{ label: 'Last updated', value: new Date(report.updatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) }] : []),
               ]},
             ].map(block => (
               <div key={block.title} className="px-4 py-4 border-b border-border">
