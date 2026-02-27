@@ -1,5 +1,6 @@
 import { generateText, createGateway } from 'ai'
 import { formatCents, formatMonth } from '@/lib/format'
+import { logger } from '@/lib/logger'
 import type { ReportTotals } from './compute'
 
 const gateway = createGateway()
@@ -33,7 +34,8 @@ Note missing data, unusual expense items, and overall portfolio health. Be conci
       prompt,
     })
     return text
-  } catch {
+  } catch (err) {
+    logger.error('[commentary] generateCommentary failed:', err)
     return ''
   }
 }
