@@ -75,6 +75,7 @@ Optimised for:
 - Cross-month pro-rata allocation
 - Combined multi-month reports
 - Report version history
+- PDF/print export (use browser print if needed)
 
 ---
 
@@ -120,7 +121,6 @@ Minimum required:
 - Statement end date
 - Rent collected
 - Total operating expenses
-- Arrears indicator (if present)
 
 If required fields missing → extraction fails.
 
@@ -136,11 +136,6 @@ No historical reconciliation.
 - Always list missing properties
 - Always show warning if incomplete
 - Never assume missing equals zero rent without flagging
-
-If <50% properties uploaded:
-
-- Still generate report
-- Strong incomplete warning
 
 Transparency over perfection.
 
@@ -196,8 +191,8 @@ AI Rules:
 # Regeneration Rule
 
 - One report per (user, month)
-- Regenerating overwrites existing report
-- No versioning in V1
+- Regenerating overwrites the existing report; the version counter increments and the "last updated" timestamp is refreshed
+- No version history in V1 — only the current version is stored
 
 ---
 
@@ -206,7 +201,7 @@ AI Rules:
 - All monetary values stored as integer cents
 - Supabase Auth user ID used directly
 - No separate users table
-- Total monthly loan payment stored against property
+- Loan payments stored as `loan_payment` ledger entries scoped to property and month (not as a field on the property record)
 
 Lean. Deterministic. End-to-end functional.
 
@@ -233,9 +228,9 @@ System generates:
 
 ### Accountant View
 
-• Total Rent Collected: $12,400  
-• Property Expenses: $3,250  
-• Loan Payments: $6,800  
+• Total Rent Collected: $12,400
+• Property Expenses: $3,250
+• Loan Payments: $6,800
 • Net Cash Flow: $3,350
 
 ⚠ Loan expense not included for 1 property.

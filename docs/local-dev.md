@@ -78,6 +78,28 @@ supabase status          # show URLs + keys for running stack
 supabase logs --service auth   # debug auth issues
 ```
 
+## E2E tests (Playwright)
+
+Playwright tests run against a live local stack. Make sure `supabase start` and
+`pnpm dev` are both running before executing tests.
+
+```bash
+pnpm exec playwright test           # run all E2E tests
+pnpm exec playwright test --ui      # open Playwright UI mode
+```
+
+The setup project (`playwright/setup.ts`) creates a throw-away test user via the
+Supabase admin API and saves the auth cookie to `playwright/.auth/user.json`
+(git-ignored). It runs automatically before the main test suite.
+
+**Required env vars** (already in `.env.local` from `supabase start`):
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase API URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Anon/publishable key |
+| `SUPABASE_SECRET_KEY` | Service-role key (admin API, test setup only) |
+
 ## Further reading
 
 - [Supabase local dev guide](https://supabase.com/docs/guides/cli/local-development)

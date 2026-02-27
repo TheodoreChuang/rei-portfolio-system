@@ -1,4 +1,4 @@
-# Technial Specification Document
+# Technical Specification Document
 
 # Tech Stack
 
@@ -16,7 +16,7 @@
 - **API Layer**: Next.js API routes (serverless)
 - **ORM**: Drizzle ORM
 - **Database**: Supabase Postgres
-- **Auth**: Supabase Auth (magic link)
+- **Auth**: Supabase Auth (magic link / OTP)
 - **Storage**: Supabase Storage (PDFs)
 
 Notes:
@@ -26,7 +26,9 @@ Notes:
 
 ## AI & Parsing
 
-- **LLM Provider**: OpenAI
+- **LLM Provider**: Anthropic (via Vercel AI SDK gateway)
+  - Extraction: `anthropic/claude-sonnet-4-5`
+  - Commentary: `claude-haiku-4-5-20251001`
 - **Integration**: Vercel AI SDK
   - `generateObject()` → structured PDF extraction
   - `generateText()` → commentary
@@ -37,7 +39,7 @@ Notes:
 
 Constraints:
 
-- Enforce PDF size limit (e.g. 5MB max) at upload.
+- Enforce PDF size limit (10MB max) at upload.
 - Hard validation: required fields must be present or extraction fails.
 
 ## Deployment & Infra
@@ -57,26 +59,38 @@ Single Next.js app:
 ```
 /app
   /dashboard
-  /reports
+  /reports/[month]
   /upload
+  /properties
+  /onboarding
+  /login
+  /auth/callback
   /api
+    /upload
+    /extract
     /statements
     /reports
-    /extract
+    /properties
+    /auth/signout
 /lib
-  /db
-  /llm
-  /parsing
-  /reporting
-  /validation
+  /extraction/      — PDF text extraction + LLM schema + parse
+  /reports/         — compute.ts (totals/flags), commentary.ts (AI narrative)
+  /supabase/        — browser + server clients
+  db.ts             — Drizzle client
+  format.ts         — formatCents, formatMonth, recentMonths
+  logger.ts         — LOG_LEVEL-gated debug/info/error
 /components
-  /ui
-  /reports
-  /upload
+  /ui               — shadcn primitives
+  app-nav.tsx       — top nav with user avatar + sign-out
+/db
+  schema.ts         — Drizzle table definitions + exported types
 /drizzle
-  schema.ts
-  migrations/
-/types
+  migrations/       — SQL files applied via pnpm db:migrate
+/playwright
+  setup.ts          — auth setup (creates test user, saves storageState)
+  fixtures.ts       — createTestUser / deleteTestUser / getTestSession helpers
+  /tests            — E2E specs
+/__tests__          — Vitest unit tests (*.test.ts)
 ```
 
 Clear boundary:
@@ -97,7 +111,7 @@ sequenceDiagram
     participant DB
 
     User->>WebApp: Upload PDF
-    WebApp->>WebApp: Validate file size
+    WebApp->>WebApp: Validate file size (10MB max)
     WebApp->>Storage: Store file
     WebApp->>API: Notify upload
 
@@ -147,23 +161,17 @@ Tables:
 
 Notes:
 
-- (Row Level Security)[https://supabase.com/docs/guides/database/postgres/row-level-security] enabled.
+- [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security) enabled.
 - All monetary values stored as positive **integer cents**, including expenses.
-- Regenerating a report overwrites the existing `(user_id, month)` record.
+- Regenerating a report overwrites the existing `(user_id, month)` record; `version` increments and `updated_at` is refreshed. No version history is stored.
 
 # Supabase Bucket Structure
-
-Example:
 
 ```
 documents/
   {userId}/
     pm_statements/
       smith-st-march-2026.pdf
-    loan_statements/
-      westpac-march-2026.pdf
-    bank_statements/
-      anz-march-2026.pdf
 ```
 
 # Key Logic Rules
@@ -176,24 +184,26 @@ No start/end active tracking in V1.
 
 ## Loan Payment Logic
 
-- User will input total loan payment amount per property per month.
-- Stretch: pre-fill the input from the most recent payment
+- User inputs total loan payment amount per property per month on the upload page.
+- Loan payments are stored as `loan_payment` ledger entries scoped to the property and month — not as a field on the property record.
 - If 0 → explicitly flagged in report.
+- **Potential enhancement:** pre-fill the loan input from the most recent saved payment for that property, reducing repetitive entry each month.
 
 ## Month Assignment
 
-- User selects month.
+- User selects month on the upload page.
 
 ## Report Regeneration
 
 - If report exists for `(user_id, month)` → overwrite.
-- Reports are not versioned in V1.
+- `version` counter increments on each regeneration; `updated_at` timestamp is refreshed.
+- No version history in V1 — only the latest generated version is stored.
 
 ---
 
 # Upload & Extraction Flow (Serverless Safe)
 
-- Enforce PDF size limit before storage.
+- Enforce PDF size limit (10MB) before storage.
 - Parse PDF → extract structured object via LLM.
 - Validate required fields.
 - If validation fails → return explicit error.

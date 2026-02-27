@@ -125,12 +125,15 @@ _Foundation is working — tighten the edges._
       needs `playwright/fixtures/sample-statement.pdf`); 5 of 6 tests passing
       (`pnpm exec playwright test`)
 
-## Slice 6 — PDF Report Export
+## Slice 6 — Loan Pre-fill
 
-_Nice to have, low risk, good demo value._
+_Reduces repetitive entry; low effort, high value for monthly users._
 
-- [ ] Generate downloadable PDF from report data
-- [ ] **Tests:** output structure
+- [ ] `GET /api/statements?propertyId=&category=loan_payment&month=YYYY-MM` — return
+      the most recent `loan_payment` entry for a property before the selected month
+- [ ] Upload page mortgage step: on mount, fetch prior loan amount per property and
+      pre-fill the input; user can override
+- [ ] **Tests:** API returns correct prior value; falls back to 0 when none exists
 
 ### Gaps carried from Slice 5
 - **Upload E2E test** (`playwright/tests/upload.spec.ts`) is skipped — needs a real
