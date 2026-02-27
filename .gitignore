@@ -23,3 +23,4 @@ supabase/.temp
 # Playwright auth state
 playwright/.auth/
 test-results/
+playwright-report/
