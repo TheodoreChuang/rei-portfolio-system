@@ -30,6 +30,11 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // Check for a stale session cookie before getUser() might clear it
+  const hadSessionCookie = request.cookies.getAll().some(
+    c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token') && c.value.length > 0
+  )
+
   // Refresh session — required, do not remove
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -38,7 +43,9 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = AUTH_ROUTES.some(r => path.startsWith(r))
 
   if (isProtected && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const loginUrl = new URL('/login', request.url)
+    if (hadSessionCookie) loginUrl.searchParams.set('reason', 'expired')
+    return NextResponse.redirect(loginUrl)
   }
 
   if (isAuthRoute && user) {
