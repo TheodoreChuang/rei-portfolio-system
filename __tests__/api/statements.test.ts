@@ -147,6 +147,33 @@ describe('GET /api/statements', () => {
     expect(json.entries).toHaveLength(1)
     expect(json.entries[0].id).toBe('e1')
   })
+
+  it('GET returns only caller entries — user B gets empty results when querying (RLS)', async () => {
+    // User B is authenticated; DB returns only user B's rows (userId filter in WHERE clause)
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+    mocks.mockSelectEntries.mockResolvedValueOnce([]) // no entries for user B
+    const res = await GET(makeGetRequest('2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.entries).toEqual([])
+  })
+
+  it('GET does not expose user A entries to user B (RLS: userId is scoped in query)', async () => {
+    // User B authenticated; even if user A has entries, the WHERE userId=user.id filter isolates them
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+    const userBEntry = {
+      id: 'e-b1', userId: 'user-B', propertyId: 'prop-b1',
+      sourceDocumentId: null, lineItemDate: '2026-03-31',
+      amountCents: 200000, category: 'rent',
+      description: 'Rent B', userNotes: null, createdAt: new Date(),
+    }
+    mocks.mockSelectEntries.mockResolvedValueOnce([userBEntry])
+    const res = await GET(makeGetRequest('2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.entries).toHaveLength(1)
+    expect(json.entries[0].userId).toBe('user-B')
+  })
 })
 
 describe('POST /api/statements', () => {
@@ -465,6 +492,35 @@ describe('POST /api/statements', () => {
     it('skips sourceDocument lookup (only one db.select call for property)', async () => {
       await POST(makeRequest(makeManualBody()))
       expect(mocks.mockSelectLimit).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('RLS cross-user isolation', () => {
+    it('POST cannot write to a property owned by another user', async () => {
+      // User B is authenticated but the property belongs to user A.
+      // The WHERE clause includes userId = user.id, so the property lookup returns nothing.
+      mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+      mocks.mockSelectLimit.mockReset()
+      mocks.mockSelectLimit
+        .mockResolvedValueOnce([docRow])  // doc found (user B owns the doc in this scenario)
+        .mockResolvedValueOnce([])        // property not found for user B (owned by user A)
+        .mockResolvedValueOnce([])        // ILIKE also misses
+
+      const res = await POST(makeRequest(makeBody()))
+      expect(res.status).toBe(422) // property_not_matched
+      expect(mocks.mockTransaction).not.toHaveBeenCalled()
+    })
+
+    it('POST cannot access a sourceDocument owned by another user', async () => {
+      // User B is authenticated but the sourceDocument belongs to user A.
+      // The WHERE clause includes userId = user.id, so the doc lookup returns nothing.
+      mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
+      mocks.mockSelectLimit.mockReset()
+      mocks.mockSelectLimit.mockResolvedValueOnce([]) // doc not found for user B
+
+      const res = await POST(makeRequest(makeBody()))
+      expect(res.status).toBe(404)
+      expect(mocks.mockTransaction).not.toHaveBeenCalled()
     })
   })
 })

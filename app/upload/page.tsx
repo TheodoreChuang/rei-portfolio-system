@@ -204,6 +204,7 @@ export default function UploadPage() {
   async function confirmMatching() {
     const toSave = files.filter(f => f.extractionResult !== null && f.selectedPropertyId !== null)
 
+    let failCount = 0
     for (const f of toSave) {
       const saveRes = await fetch('/api/statements', {
         method: 'POST',
@@ -216,6 +217,7 @@ export default function UploadPage() {
         }),
       })
       if (!saveRes.ok) {
+        failCount++
         const err = await saveRes.json().catch(() => ({}))
         setFiles(prev => prev.map(x =>
           x.sourceDocumentId === f.sourceDocumentId
@@ -223,6 +225,11 @@ export default function UploadPage() {
             : x
         ))
       }
+    }
+
+    if (failCount > 0) {
+      toast.error(`Failed to save ${failCount} statement${failCount !== 1 ? 's' : ''} — fix the errors above before continuing`)
+      return
     }
 
     const matchedAddresses = toSave.flatMap(f => {
