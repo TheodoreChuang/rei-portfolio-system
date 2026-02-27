@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, gte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sourceDocuments } from '@/db/schema'
@@ -22,6 +22,25 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const EXTRACT_DAILY_LIMIT = 20
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const [{ count }] = await db
+    .select({ count: sql<number>`cast(count(*) as int)` })
+    .from(sourceDocuments)
+    .where(
+      and(
+        eq(sourceDocuments.userId, user.id),
+        gte(sourceDocuments.uploadedAt, oneDayAgo)
+      )
+    )
+
+  if (count >= EXTRACT_DAILY_LIMIT) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Maximum 20 extractions per 24 hours.' },
+      { status: 429 }
+    )
   }
 
   let body: unknown
