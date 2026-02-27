@@ -96,19 +96,34 @@ idempotent. The `replacedCount` in the response should reflect actual deletes.
 - **RLS isolation tests** — `statements.test.ts` and `reports.test.ts` have no
   cross-user tests verifying that user A cannot read/write user B's entries.
 
-## Slice 5 — Auth Polish
+## Slice 5 — Auth Polish ✓ COMPLETE (140 unit tests + 5 E2E passing)
 
 _Foundation is working — tighten the edges._
 
-- [ ] Redirect to onboarding after first sign-in (no properties yet)
-- [ ] Sign out
-- [ ] Handle expired sessions gracefully
-- [ ] **`portfolioReports.updatedAt`** — add column (migration), set in upsert,
-      show "Last updated" date in dashboard + report page when `version > 1`
-- [ ] **`confirmMatching()` blocking error** — halt flow when statement save fails
-- [ ] **RLS tests** — cross-user isolation for `/api/statements` and `/api/reports`
-- [ ] **Tests:** middleware route protection, callback flow
-- [ ] **E2E:** add Playwright here once auth is stable (see below)
+- [x] **`portfolioReports.updatedAt`** — migration `0003_perpetual_terrax.sql` adds
+      `updated_at` column; upsert sets `updatedAt: new Date()` explicitly in
+      `onConflictDoUpdate` set block (Drizzle `$onUpdate` doesn't fire on upsert);
+      dashboard + report page show "Last updated" date when `version > 1`
+- [x] **`confirmMatching()` blocking error** — loop counts failures; returns early with
+      a blocking toast before advancing to mortgages step
+- [x] **RLS tests** — cross-user isolation added to `statements.test.ts` (2 tests) and
+      `reports.test.ts` (2 tests)
+- [x] **Sign out** — `AppNav` dropdown with user initials avatar; `supabase.auth.signOut()`
+      client-side then `router.push('/login')`; server route `POST /api/auth/signout` also
+      added; `data-testid="user-avatar"` for E2E
+- [x] **Expired session handling** — middleware detects stale `sb-*-auth-token` cookie
+      before `getUser()` returns null; redirects to `/login?reason=expired`; login page
+      shows banner "Your session expired — please sign in again."
+- [x] **First-login redirect** — `app/auth/callback/route.ts` checks property count after
+      code exchange; redirects to `/onboarding` if 0 properties, else `/dashboard`
+- [x] **Onboarding added to protected routes** — middleware now guards `/onboarding`
+- [x] **Tests:** `auth-callback.test.ts` (4 tests), `signout.test.ts` (2 tests),
+      RLS tests in `statements.test.ts` + `reports.test.ts`; 140 unit tests passing
+- [x] **E2E — Playwright bootstrap:** `playwright.config.ts`, `playwright/setup.ts`,
+      `playwright/fixtures.ts`, `playwright/tests/auth.spec.ts`,
+      `playwright/tests/rls.spec.ts`, `playwright/tests/upload.spec.ts` (skipped —
+      needs `playwright/fixtures/sample-statement.pdf`); 5 of 6 tests passing
+      (`pnpm exec playwright test`)
 
 ## Slice 6 — PDF Report Export
 
@@ -116,6 +131,11 @@ _Nice to have, low risk, good demo value._
 
 - [ ] Generate downloadable PDF from report data
 - [ ] **Tests:** output structure
+
+### Gaps carried from Slice 5
+- **Upload E2E test** (`playwright/tests/upload.spec.ts`) is skipped — needs a real
+  PDF fixture at `playwright/fixtures/sample-statement.pdf` to run; add it here
+  once a sample statement is available.
 
 ---
 
