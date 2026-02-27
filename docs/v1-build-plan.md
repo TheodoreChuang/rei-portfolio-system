@@ -54,20 +54,47 @@ _Simple but needed before any real data can exist._
 - [x] **lib/format.ts** — `formatCents`, `formatMonth`, `lastDayOfMonth` shared utilities
 - [x] **Tests:** 119 passing (`pnpm test`)
 
-## Slice 4 — Re-generation Correctness
+## Slice 4 — Re-generation Correctness ✓ COMPLETE (126 tests passing)
 
-_First-time generation works after Slice 3. This slice makes re-generation safe._
+_First-time generation works after Slice 3. This slice makes re-generation safe and
+removes the last mock-data dependency from the upload flow._
 
-The problem: clicking "Generate" for a month that already has a report will duplicate
-the mortgage ledger entries (loan_payment rows), causing inflated mortgage totals.
-The `portfolioReports` upsert is safe (unique constraint), but `ledgerEntries` is not.
+### Chunk 1 — Fix mortgage dedup (main correctness bug)
+File: `app/api/statements/route.ts`
 
-- [ ] In `saveMortgagesAndContinue()`: before inserting mortgage entries, delete
-      existing `loan_payment` ledger entries for the same user+month+property
-      (or do this server-side in the statements route using a sentinel marker)
-- [ ] Clean up `/api/statements` GET stub — replace mock with real Drizzle query
-      (returns ledger entries for a given month, grouped by property)
-- [ ] **Tests:** re-generation path, duplicate prevention, idempotent mortgage save
+**Problem:** The `isManualEntry` (mortgage) path skips the delete step, so calling
+`saveMortgagesAndContinue()` a second time for the same month+property appends a new
+`loan_payment` row rather than replacing the old one. Report totals inflate on every
+re-generation.
+
+**Fix:** In the `isManualEntry` transaction branch, before inserting, delete existing
+`loan_payment` entries scoped to `userId + propertyId + lineItemDate BETWEEN
+'{assignedMonth}-01' AND lastDayOfMonth(assignedMonth)`.
+
+This mirrors the PDF-backed delete-then-insert pattern and makes mortgage saves
+idempotent. The `replacedCount` in the response should reflect actual deletes.
+
+- [x] **Chunk 1** — Mortgage dedup: `isManualEntry` transaction path now deletes prior
+      `loan_payment` entries scoped to `userId + propertyId + category + month range`
+      before inserting; idempotent on re-generation; 2 new tests
+- [x] **Chunk 2** — Reports list ordering: `GET /api/reports` adds `orderBy(desc(month))`;
+      dashboard default-selects the newest month reliably; 1 new test
+- [x] **Chunk 3** — Real `GET /api/statements`: replaces stub with Drizzle query using
+      `gte`/`lte` on `lineItemDate`; returns `{ entries: LedgerEntry[] }`; 5 new tests
+- [x] **Chunk 4** — Dynamic month selector: `recentMonths(12)` added to `lib/format.ts`;
+      upload page uses it; local `lastDayOfMonth` duplicate removed; `lib/mock-data.ts` deleted
+- [x] **Tests:** 126 passing (`pnpm test`)
+
+### Gaps noted → Slice 5
+- **`portfolioReports.updatedAt`** — schema is missing an `updated_at` column; on
+  re-generation `createdAt` never changes so the "Generated" date displayed is always
+  the original. Fix: add `updatedAt` column (migration), set in upsert, display "Last
+  updated" in UI when `version > 1`.
+- **`confirmMatching()` silent error** — if any `/api/statements` POST fails, the file
+  is correctly marked errored but `setStep('mortgages')` still fires. Should halt or
+  show a blocking error message before proceeding.
+- **RLS isolation tests** — `statements.test.ts` and `reports.test.ts` have no
+  cross-user tests verifying that user A cannot read/write user B's entries.
 
 ## Slice 5 — Auth Polish
 
@@ -76,6 +103,10 @@ _Foundation is working — tighten the edges._
 - [ ] Redirect to onboarding after first sign-in (no properties yet)
 - [ ] Sign out
 - [ ] Handle expired sessions gracefully
+- [ ] **`portfolioReports.updatedAt`** — add column (migration), set in upsert,
+      show "Last updated" date in dashboard + report page when `version > 1`
+- [ ] **`confirmMatching()` blocking error** — halt flow when statement save fails
+- [ ] **RLS tests** — cross-user isolation for `/api/statements` and `/api/reports`
 - [ ] **Tests:** middleware route protection, callback flow
 - [ ] **E2E:** add Playwright here once auth is stable (see below)
 

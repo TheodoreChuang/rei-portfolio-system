@@ -11,8 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { MONTHS } from '@/lib/mock-data'
-import { formatMonth } from '@/lib/format'
+import { formatMonth, lastDayOfMonth, recentMonths } from '@/lib/format'
 import type { Property } from '@/db/schema'
 import type { ExtractionResult } from '@/lib/extraction/schema'
 import { cn } from '@/lib/utils'
@@ -86,12 +85,6 @@ function buildMortgages(props: Property[], matchedAddresses: string[]): Mortgage
     hasStatement: matchedAddresses.includes(p.address.toLowerCase()),
     mortgageValue: '',
   }))
-}
-
-function lastDayOfMonth(month: string): string {
-  const [year, mon] = month.split('-').map(Number)
-  const d = new Date(year, mon, 0) // day 0 of next month = last day of this month
-  return `${year}-${String(mon).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function parseCents(input: string): number {
@@ -316,7 +309,7 @@ export default function UploadPage() {
         <div className="mb-6">
           <p className="text-sm font-semibold mb-2">Which month are you reporting on?</p>
           <div className="flex flex-wrap gap-2 mb-2">
-            {MONTHS.map(m => (
+            {recentMonths(12).map(m => (
               <button key={m} data-testid={`month-selector-${m}`} onClick={() => setSelectedMonth(m)} className={cn(
                 'px-4 py-1.5 rounded-full text-xs font-mono border transition-colors',
                 selectedMonth === m
