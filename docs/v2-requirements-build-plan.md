@@ -7,9 +7,6 @@ ledger entries → portfolio report. V2 improves data accuracy (loan accounts),
 extends the ledger (manual entries), surfaces granular data (drill-down), and
 adds historical context (trends).
 
-The schema changes in V2 also lay groundwork for future ownership analysis
-without requiring a rework later.
-
 ---
 
 ## Functional Requirements
@@ -38,7 +35,7 @@ the last day of the assigned month but is editable.
 the most recent `loan_payment` ledger entry for that loan account. Falls back
 to empty if no prior entry exists.
 
-**FR-1.7** Loan payments are saved as `ledger_entries` with `category:
+**FR-1.7** Loan payments are saved as `property_ledger_entries` with `category:
 loan_payment` and `loanAccountId` set. This replaces the current per-property
 loan payment entry.
 
@@ -106,111 +103,91 @@ retroactive recalculations.
 
 ---
 
-### FR-5 — Schema Foundations (no user-facing UI)
-
-**FR-5.1** An `entities` table is introduced representing legal ownership
-structures: individual, joint, trust, company, superannuation.
-
-**FR-5.2** On first sign-in (auth callback), a default `individual` entity is
-auto-created for the user. This entity is the implicit owner of all properties
-and loans until the user adds more entities.
-
-**FR-5.3** `loan_accounts` carries a nullable `entityId` (the borrowing
-entity). Defaults to the user's default entity.
-
-**FR-5.4** `ledger_entries.propertyId` becomes nullable to support future
-entity-level transactions (e.g. land tax). All current entries retain their
-`propertyId`.
-
-**FR-5.5** `ledger_entries` adds nullable `entityId` and `loanAccountId`
-foreign keys.
-
-**FR-5.6** `properties` adds nullable `entityId` (the owning entity). Defaults
-to the user's default entity.
-
-**FR-5.7** No entity management UI is built in V2. Entities exist in the data
-model only, populated via auto-creation.
-
----
-
 ## Data Model Changes
 
 ### New tables
 
 ```
-entities          id, userId, name, type (enum), createdAt
-loan_accounts     id, userId, propertyId, entityId (nullable),
+loan_accounts     id, userId, propertyId (FK → properties),
                   lender, nickname, isActive, createdAt
 ```
 
 ### Modified tables
 
 ```
-properties        + entityId (nullable FK → entities)
-
-loan_accounts     (new — see above)
-
-ledger_entries    + loanAccountId (nullable FK → loan_accounts)
-                  + entityId (nullable FK → entities)
-                  propertyId → nullable (was notNull)
+property_ledger_entries    + loanAccountId (nullable FK → loan_accounts)
+                  propertyId stays notNull — no change
 ```
 
-### Enum additions
+### No other schema changes in V2
 
-```
-entity_type       individual | joint | trust | company | superannuation
-```
-
-### Deferred (V3+)
-
-```
-property_ownerships   entity + property + ownershipPct
-loan_borrowers        entity + loan + borrowerPct
-entity management UI
-ownership-based analysis and tax treatment
-```
+`entities`, `property_ownerships`, `loan_borrowers`, and nullable `propertyId`
+are all deferred. See "Deferred Design Decisions" below.
 
 ---
 
 ## Build Plan
 
-### Slice 1 — Schema Foundations + Loan Accounts
+### Pre-step — Rename `ledger_entries` → `property_ledger_entries`
+
+_Do this before any Slice 1 code. Clean naming before new code is added._
+
+Rename the table and all references throughout the codebase. This is the right
+time — post-V1, pre-new-features, while the codebase is small. Once
+`entity_ledger_entries` exists in V3, the old name would be ambiguous.
+
+Scope of changes:
+
+- `db/schema.ts` — rename table and Drizzle export (`ledgerEntries` →
+  `propertyLedgerEntries`, `LedgerEntry` → `PropertyLedgerEntry`)
+- Drizzle migration — `ALTER TABLE ledger_entries RENAME TO property_ledger_entries`
+- RLS policy in migration SQL — drop and recreate under new name
+- All API routes that import or query `ledgerEntries`
+- `lib/reports/compute.ts`
+- `scripts/seed.ts`
+- All test files referencing the table or type
+
+Verify: `grep -r "ledger_entries\|ledgerEntries\|LedgerEntry" --include="*.ts" .`
+should return zero results (excluding the migration files themselves and this
+doc) before moving on to Slice 1.
+
+---
+
+### Slice 1 — Loan Accounts
 
 _Prerequisite for everything. Fixes the main data accuracy issue._
 
-Schema (breaking changes, fine pre-launch):
+Schema:
 
-- Add `entities` table + `entity_type` enum
-- Add `loan_accounts` table
-- Modify `ledger_entries`: nullable `propertyId`, add `loanAccountId`,
-  add `entityId`
-- Modify `properties`: add nullable `entityId`
-- Drizzle migrations + updated RLS policies for new tables
-- Auth callback: auto-create default entity on first sign-in
+- Add `loan_accounts` table + migration
+- Add `loanAccountId` (nullable) to `property_ledger_entries` + migration
+- RLS policies for `loan_accounts`
+- Reset local data (see Technical Notes)
 
 API:
 
 - `GET/POST /api/properties/[id]/loans` — list + create loan accounts
 - `PATCH/DELETE /api/properties/[id]/loans/[loanId]` — update + deactivate
 - Update `GET /api/statements` pre-fill to query by `loanAccountId`
-- Update `POST /api/statements` mortgage path to accept `loanAccountId`
+- Update `POST /api/statements` mortgage path to accept + require
+  `loanAccountId` on `loan_payment` entries
 - Update report generation: missing data flags per loan account
 
 UI:
 
-- Property detail page: "Loans" section — list active/inactive accounts,
-  add/deactivate
-- Upload mortgage step: rows by loan account; redirect to property page if
-  no loans registered; date input per row; pre-fill per loan account
+- Property detail page: "Loans" section — list active/inactive, add/deactivate
+- Upload mortgage step: one row per active loan account per property; redirect
+  to property page if no loan accounts registered; date input per row;
+  pre-fill per loan account
 - Report flags: "No payment entered for [Westpac — Investment loan]"
 
 Tests:
 
 - Loan account CRUD + RLS
 - Pre-fill with multiple loans on one property
-- Upload mortgage step with zero loan accounts
+- Upload mortgage step with zero loan accounts (redirect)
 - Report flags identify correct missing loan accounts
-- Entity auto-creation on first sign-in
+- `loan_payment` entries without `loanAccountId` rejected at API level
 
 ---
 
@@ -236,9 +213,9 @@ UI:
 Tests:
 
 - Create manual entry — appears in report totals on regeneration
-- Cannot delete PDF-extracted entry via this route
+- Cannot delete PDF-extracted entry via this route (403)
 - RLS isolation
-- Category validation (loan_payment rejected)
+- Category validation (`loan_payment` rejected)
 
 ---
 
@@ -249,8 +226,8 @@ _Surfaces the granular data the model was designed to hold._
 API:
 
 - Extend `GET /api/reports/[month]` or add
-  `GET /api/statements?month=YYYY-MM&propertyId=` to return line items
-  with loan account details joined
+  `GET /api/statements?month=YYYY-MM&propertyId=` returning line items
+  with `loan_accounts` joined for lender/nickname
 
 UI:
 
@@ -263,7 +240,7 @@ UI:
 Tests:
 
 - Entries grouped and ordered correctly
-- Loan account name displayed on loan_payment entries
+- Loan account name displayed on `loan_payment` entries
 - Manual entries distinguished from extracted entries
 - Empty state (property with no entries for the month)
 
@@ -296,13 +273,13 @@ Tests:
 
 ## What's Not in V2
 
-To be explicit about scope boundaries:
-
-- Entity management UI (add/edit/delete entities)
+- Entities table or ownership structures
+- Entity management UI
 - Property ownership percentages
 - Loan borrower details
 - Ownership-based portfolio filtering or analysis
 - Tax treatment calculations (negative gearing, CGT)
+- Entity-level ledger entries (land tax, accounting fees)
 - CSV/Excel export
 - Bank statement or loan statement PDF parsing
 - Mobile layout improvements
@@ -312,32 +289,88 @@ To be explicit about scope boundaries:
 
 ## Technical Notes for Claude Code
 
-These are non-obvious implementation details that functional requirements don't
-capture. Review before starting each slice.
-
 ### Slice 1
 
-**`propertyId` nullable migration — audit all existing queries**
-Making `propertyId` nullable on `ledger_entries` is a breaking schema change.
-Every existing query that filters or groups by `propertyId` assumes it is always
-present. Before writing any new code, audit these files:
+**Reset local data before starting**
+`loan_payment` entries must always have a `loanAccountId` — no legacy null
+case is supported. The app is not live so local data can be wiped cleanly:
 
-- `lib/reports/compute.ts` — groups entries by property to compute totals;
-  needs to handle `propertyId: null` as a separate "entity-level" bucket even
-  though no null entries will exist yet
-- `app/api/statements/route.ts` — filters by `propertyId`; confirm null case
-  doesn't silently drop entries
-- Any Drizzle query using `eq(ledgerEntries.propertyId, ...)` — `eq` with null
-  produces `= NULL` not `IS NULL`; use `isNull()` where needed
+```bash
+supabase db reset
+pnpm db:migrate    # applies new schema
+pnpm seed          # restores test data with proper loan accounts
+```
 
-**Entity auto-creation must be idempotent**
-`app/auth/callback/route.ts` can fire more than once for the same user due to
-network retries or browser back-navigation. Entity creation must be an upsert,
-not a plain insert. Do not rely on Drizzle's `$onUpdate` — it does not fire on
-conflict:
+The seed script needs updating to create loan accounts before inserting
+`loan_payment` ledger entries and to set `loanAccountId` on those entries.
+
+**Enforce `loanAccountId` at the API layer, not the DB column**
+The `loanAccountId` column on `property_ledger_entries` is nullable because other
+categories (`rent`, `repairs`, etc.) have no loan account. Enforce the not-null
+rule in `POST /api/statements`: if `category === 'loan_payment'` and
+`loanAccountId` is null or missing, reject with 400.
+
+### Slice 2
+
+**Delete guard on `DELETE /api/ledger/[id]`**
+Manual entries (`sourceDocumentId: null`) can be deleted freely. PDF-extracted
+entries (`sourceDocumentId` is not null) must be rejected with 403 —
+deletion of extracted entries happens at the statement level (existing
+behaviour). Implement this guard explicitly rather than relying on the caller.
+
+### Slice 4
+
+**Trends use report snapshots, not live ledger queries**
+`GET /api/reports/trends` must read from `portfolio_reports.totals` (the JSONB
+snapshot), not aggregate `property_ledger_entries` directly. This ensures trends reflect
+what was reported each month, not a retroactive recalculation. The distinction
+between a missing report (`null`) and a zero-income month must be preserved —
+do not coerce nulls to zero in the query or API response.
+
+---
+
+## Deferred Design Decisions (V3+)
+
+These decisions were considered for V2 and deliberately deferred. Notes
+recorded here so context is not lost.
+
+### `entities` table
+
+**What it is:** A table representing legal ownership structures (individual,
+joint, trust, company, superannuation). Would allow portfolio analysis by
+ownership entity and support different tax treatment per structure.
+
+**Why deferred:** Every table already has `userId` which serves as the implicit
+entity for now. The only V2 benefit would have been a nullable `entityId` FK on
+`loan_accounts` — but that FK can be backfilled trivially when `entities` is
+introduced in V3:
+
+```sql
+-- Future V3 migration
+ALTER TABLE loan_accounts ADD COLUMN entity_id uuid REFERENCES entities(id);
+UPDATE loan_accounts
+  SET entity_id = (
+    SELECT id FROM entities
+    WHERE user_id = loan_accounts.user_id AND type = 'individual'
+    LIMIT 1
+  );
+```
+
+Adding `entities` in V2 would have required: new table, new enum, new RLS
+policy, idempotent auto-creation in auth callback, updated seed script, and
+every future Claude Code session reasoning about a table with no UI or queries.
+Cost outweighed benefit.
+
+**When to introduce:** When ownership-based analysis becomes a real requirement
+— filtering the portfolio by entity, or applying different tax rules per
+structure. At that point also introduce `property_ownerships` (entity +
+property + ownershipPct) and `loan_borrowers` (entity + loan + borrowerPct).
+
+**Idempotency note for when it is built:** `app/auth/callback/route.ts` can
+fire more than once due to network retries. Entity auto-creation must be a
+guarded insert, not a plain insert:
 
 ```typescript
-// Check before insert — safe and explicit
 const existing = await db
   .select()
   .from(entities)
@@ -348,34 +381,25 @@ if (!existing.length) {
 }
 ```
 
-**`loan_payment` entries require `loanAccountId` — reset local data**
-The app is not live. Rather than handling legacy `loan_payment` entries with
-`loanAccountId: null`, enforce `loanAccountId` as `notNull` on `ledger_entries`
-for the `loan_payment` category at the application level (the column stays
-nullable for other categories). Before starting Slice 1:
+### `property_ledger_entries.propertyId` nullable
 
-- Run `supabase db reset` to wipe local data
-- Re-run `pnpm db:migrate` with the new schema
-- Re-run `pnpm seed` to restore test data with proper loan accounts
+**What it is:** Making `propertyId` nullable on `property_ledger_entries` to support
+entity-level transactions that don't belong to a specific property — land tax
+(levied per ownership entity per state), accounting fees, entity-level income.
 
-This removes all legacy null-case handling from pre-fill logic and report
-generation flags. Both can assume every `loan_payment` entry has a valid
-`loanAccountId`.
+**Why deferred:** Impact is pervasive. Every query that filters or groups by
+`propertyId` assumes it is always present — every groupBy, filter, join, RLS
+rule, aggregation, and test. "Soft polymorphism via null" was judged too costly
+for a feature not needed until V3+.
 
-### Slice 2
+**Preferred V3+ approach:** Introduce a separate `entity_ledger_entries` table
+for entity-level transactions rather than making `propertyId` nullable. This
+keeps the table clean and all existing queries unaffected. The V3
+portfolio totals view becomes a union of both tables — explicit and auditable.
+Property-level and entity-level entries behave differently (different report
+sections, different aggregation, potentially different RLS) so separate tables
+is the right model, not a nullable FK.
 
-**Delete guard on `DELETE /api/ledger/[id]`**
-Manual entries (`sourceDocumentId: null`) can be deleted freely. PDF-extracted
-entries (`sourceDocumentId` is not null) must be rejected with 403 —
-deletion of extracted entries happens at the statement level (existing
-behaviour), not the individual entry level. Implement this guard explicitly.
-
-### Slice 4
-
-**Trends use report snapshots, not live ledger queries**
-`GET /api/reports/trends` must read from `portfolio_reports.totals` (the JSONB
-snapshot), not aggregate `ledger_entries` directly. This ensures trends reflect
-what was reported each month, not a retroactive recalculation that could differ
-if entries were edited after the report was generated. The distinction between
-a missing report (`null`) and a zero-income month must be preserved — do not
-coerce nulls to zero in the query or API response.
+**Land tax specifics:** Land tax is assessed on total land value per ownership
+entity per state, not per property. It cannot be meaningfully allocated to a
+single property. It belongs in `entity_ledger_entries` when that table exists.
