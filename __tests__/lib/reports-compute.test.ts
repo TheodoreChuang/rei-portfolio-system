@@ -19,6 +19,7 @@ function makeEntry(overrides: Partial<PropertyLedgerEntry> = {}): PropertyLedger
     userId: 'user-1',
     propertyId: 'prop-1',
     sourceDocumentId: 'doc-1',
+    loanAccountId: null,
     lineItemDate: '2026-03-31',
     amountCents: 100,
     category: 'rent',

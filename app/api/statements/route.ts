@@ -2,7 +2,7 @@ import { and, desc, eq, gte, lt, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { db } from '@/lib/db'
-import { properties, sourceDocuments, propertyLedgerEntries } from '@/db/schema'
+import { properties, sourceDocuments, propertyLedgerEntries, loanAccounts } from '@/db/schema'
 import type { PropertyLedgerEntry } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { extractionResultSchema } from '@/lib/extraction/schema'
@@ -17,9 +17,9 @@ function isValidUuid(val: string): boolean {
 // GET /api/statements?month=2026-03
 //   Returns all ledger entries for the authenticated user in the given month.
 //
-// GET /api/statements?propertyId=UUID&month=2026-03
-//   Returns the most recent loan_payment entry for the property in any month
-//   strictly before the given month. Used to pre-fill the mortgage input.
+// GET /api/statements?loanAccountId=UUID&month=2026-03
+//   Returns the most recent loan_payment entry for the loan account in any month
+//   strictly before the given month. Used to pre-fill the mortgage input per loan.
 //   Response: { amountCents: number | null }
 export async function GET(request: Request) {
   const supabase = await createServerSupabaseClient()
@@ -32,10 +32,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing or invalid month (must be YYYY-MM)' }, { status: 400 })
   }
 
-  const propertyId = searchParams.get('propertyId')
-  if (propertyId !== null) {
-    if (!isValidUuid(propertyId)) {
-      return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 })
+  const loanAccountId = searchParams.get('loanAccountId')
+  if (loanAccountId !== null) {
+    if (!isValidUuid(loanAccountId)) {
+      return NextResponse.json({ error: 'Invalid loanAccountId' }, { status: 400 })
     }
     const [entry] = await db
       .select({ amountCents: propertyLedgerEntries.amountCents })
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(propertyLedgerEntries.userId, user.id),
-          eq(propertyLedgerEntries.propertyId, propertyId),
+          eq(propertyLedgerEntries.loanAccountId, loanAccountId),
           eq(propertyLedgerEntries.category, 'loan_payment'),
           lt(propertyLedgerEntries.lineItemDate, `${month}-01`),
         )
@@ -72,6 +72,8 @@ export async function GET(request: Request) {
 // Two modes:
 //   Normal:  sourceDocumentId (UUID) present → verify doc ownership, resolve property
 //   Manual:  sourceDocumentId null/absent   → propertyId required (e.g. loan payments)
+//
+// Manual loan_payment entries must include loanAccountId on each loan_payment line item.
 export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -202,6 +204,36 @@ export async function POST(request: Request) {
     }
   }
 
+  // ── loanAccountId validation for manual loan_payment entries ─────────────
+  // Each loan_payment line item must include a valid loanAccountId that belongs
+  // to this property+user. Enforcement is API-level (column is nullable in DB).
+  if (isManualEntry) {
+    const loanPaymentItems = result.lineItems.filter(item => item.category === 'loan_payment')
+    if (loanPaymentItems.some(item => !item.loanAccountId)) {
+      return NextResponse.json(
+        { error: 'loan_payment entries require a loanAccountId' },
+        { status: 400 }
+      )
+    }
+    if (loanPaymentItems.length > 0) {
+      const firstLoanAccountId = loanPaymentItems[0].loanAccountId!
+      const [validLoan] = await db
+        .select({ id: loanAccounts.id })
+        .from(loanAccounts)
+        .where(
+          and(
+            eq(loanAccounts.id, firstLoanAccountId),
+            eq(loanAccounts.propertyId, property!.id),
+            eq(loanAccounts.userId, user.id),
+          )
+        )
+        .limit(1)
+      if (!validLoan) {
+        return NextResponse.json({ error: 'Loan account not found' }, { status: 404 })
+      }
+    }
+  }
+
   // ── Transaction: delete existing + insert new ────────────────────────────
   let deleted: PropertyLedgerEntry[] = []
   let inserted: PropertyLedgerEntry[] = []
@@ -209,10 +241,11 @@ export async function POST(request: Request) {
   try {
     await db.transaction(async (tx) => {
       if (isManualEntry) {
-        // Delete existing loan_payment entries for this user+property+month before
-        // reinserting — makes mortgage saves idempotent on re-generation.
+        // Delete existing loan_payment entries for this user+property+loanAccount+month
+        // before reinserting — makes mortgage saves idempotent on re-generation.
         const startDate = `${assignedMonth}-01`
         const endDate = lastDayOfMonth(assignedMonth)
+        const manualLoanAccountId = result.lineItems.find(i => i.category === 'loan_payment')?.loanAccountId ?? null
         deleted = await tx
           .delete(propertyLedgerEntries)
           .where(
@@ -220,6 +253,7 @@ export async function POST(request: Request) {
               eq(propertyLedgerEntries.userId, user.id),
               eq(propertyLedgerEntries.propertyId, property!.id),
               eq(propertyLedgerEntries.category, 'loan_payment'),
+              manualLoanAccountId ? eq(propertyLedgerEntries.loanAccountId, manualLoanAccountId) : undefined,
               gte(propertyLedgerEntries.lineItemDate, startDate),
               lte(propertyLedgerEntries.lineItemDate, endDate),
             )
@@ -242,6 +276,7 @@ export async function POST(request: Request) {
         userId: user.id,
         propertyId: property!.id,
         sourceDocumentId: sourceDocumentIdRaw, // null for manual entries
+        loanAccountId: item.loanAccountId ?? null,
         lineItemDate: item.lineItemDate,
         amountCents: item.amountCents,
         category: item.category,

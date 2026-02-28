@@ -19,6 +19,7 @@ export const extractedLineItemSchema = z.object({
   category: z.enum(CATEGORIES),
   description: z.string().max(500),
   confidence: z.enum(['high', 'medium', 'low']),
+  loanAccountId: z.string().uuid().optional(),
 })
 
 export const extractionResultSchema = z.object({

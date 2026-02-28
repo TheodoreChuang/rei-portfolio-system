@@ -183,13 +183,12 @@ describe('GET /api/statements', () => {
   })
 })
 
-describe('GET /api/statements - prior loan pre-fill', () => {
-  // Must be a valid UUID (8-4-4-4-12 hex) — propRow.id is not valid UUID format
-  const validPropId = 'a1b2c3d4-e5f6-4789-a012-111111111111'
+describe('GET /api/statements - loan pre-fill', () => {
+  const validLoanId = 'c3d4e5f6-a7b8-4901-c234-333333333333'
 
-  function makePriorLoanRequest(propertyId: string | null, month: string | null) {
+  function makePrefillRequest(loanAccountId: string | null, month: string | null) {
     const params = new URLSearchParams()
-    if (propertyId !== null) params.set('propertyId', propertyId)
+    if (loanAccountId !== null) params.set('loanAccountId', loanAccountId)
     if (month !== null) params.set('month', month)
     return new Request(`http://localhost/api/statements?${params}`, { method: 'GET' })
   }
@@ -202,45 +201,44 @@ describe('GET /api/statements - prior loan pre-fill', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: null } })
-    const res = await GET(makePriorLoanRequest(validPropId, '2026-03'))
+    const res = await GET(makePrefillRequest(validLoanId, '2026-03'))
     expect(res.status).toBe(401)
   })
 
-  it('returns 400 when month is missing even with propertyId', async () => {
-    const res = await GET(makePriorLoanRequest(validPropId, null))
+  it('returns 400 when month is missing', async () => {
+    const res = await GET(makePrefillRequest(validLoanId, null))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/month/i)
   })
 
-  it('returns 400 for invalid propertyId', async () => {
-    const res = await GET(makePriorLoanRequest('not-a-uuid', '2026-03'))
+  it('returns 400 for invalid loanAccountId', async () => {
+    const res = await GET(makePrefillRequest('not-a-uuid', '2026-03'))
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toMatch(/propertyId/i)
+    expect(json.error).toMatch(/loanAccountId/i)
   })
 
-  it('returns amountCents: null when no prior loan exists', async () => {
+  it('returns amountCents: null when no prior entry exists', async () => {
     mocks.mockPriorLoanLimit.mockResolvedValueOnce([])
-    const res = await GET(makePriorLoanRequest(validPropId, '2026-03'))
+    const res = await GET(makePrefillRequest(validLoanId, '2026-03'))
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.amountCents).toBeNull()
   })
 
-  it('returns the most recent prior loan amountCents', async () => {
+  it('returns the most recent prior amountCents', async () => {
     mocks.mockPriorLoanLimit.mockResolvedValueOnce([{ amountCents: 210000 }])
-    const res = await GET(makePriorLoanRequest(validPropId, '2026-03'))
+    const res = await GET(makePrefillRequest(validLoanId, '2026-03'))
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.amountCents).toBe(210000)
   })
 
-  it('does not expose another user\'s prior loans (RLS)', async () => {
-    // User B is authenticated; DB returns no rows for their userId (correct isolation)
+  it('does not expose another user\'s prior loan (RLS)', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
     mocks.mockPriorLoanLimit.mockResolvedValueOnce([])
-    const res = await GET(makePriorLoanRequest(validPropId, '2026-03'))
+    const res = await GET(makePrefillRequest(validLoanId, '2026-03'))
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.amountCents).toBeNull()
@@ -471,6 +469,7 @@ describe('POST /api/statements', () => {
 
   describe('manual entry (null sourceDocumentId)', () => {
     const manualPropId = 'a1b2c3d4-e5f6-4789-a012-111111111111' // valid UUID
+    const manualLoanId = 'c3d4e5f6-a7b8-4901-c234-333333333333' // valid UUID
 
     function makeManualBody(overrides: Record<string, unknown> = {}) {
       return {
@@ -487,6 +486,7 @@ describe('POST /api/statements', () => {
             category: 'loan_payment' as const,
             description: 'Loan repayment March 2026',
             confidence: 'high' as const,
+            loanAccountId: manualLoanId,
           }],
         },
         ...overrides,
@@ -496,8 +496,10 @@ describe('POST /api/statements', () => {
     beforeEach(() => {
       vi.clearAllMocks()
       mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
-      // Manual entry: only one select call (property by id)
-      mocks.mockSelectLimit.mockResolvedValueOnce([propRow])
+      // Manual entry: call 1 = property by id, call 2 = loan account verification
+      mocks.mockSelectLimit
+        .mockResolvedValueOnce([propRow])
+        .mockResolvedValueOnce([{ id: manualLoanId }])
       mocks.mockTxDeleteReturning.mockResolvedValue([])
       mocks.mockTxInsertReturning.mockResolvedValue([{ id: 'entry-1' }])
       mocks.mockTransaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) => {
@@ -513,7 +515,7 @@ describe('POST /api/statements', () => {
       })
     })
 
-    it('accepts null sourceDocumentId with valid propertyId', async () => {
+    it('accepts null sourceDocumentId with valid propertyId and loanAccountId', async () => {
       const res = await POST(makeRequest(makeManualBody()))
       expect(res.status).toBe(200)
       const json = await res.json()
@@ -543,6 +545,44 @@ describe('POST /api/statements', () => {
       expect(mocks.mockTransaction).not.toHaveBeenCalled()
     })
 
+    it('returns 400 when loan_payment line item is missing loanAccountId', async () => {
+      const body = makeManualBody({
+        result: {
+          propertyAddress: propRow.address,
+          statementPeriodStart: '2026-03-01',
+          statementPeriodEnd: '2026-03-31',
+          lineItems: [{
+            lineItemDate: '2026-03-31',
+            amountCents: 210000,
+            category: 'loan_payment',
+            description: 'Loan repayment',
+            confidence: 'high',
+            // loanAccountId intentionally absent
+          }],
+        },
+      })
+      // reset so loan account mock is not consumed (shouldn't be reached)
+      mocks.mockSelectLimit.mockReset()
+      mocks.mockSelectLimit
+        .mockResolvedValueOnce([propRow]) // property found
+        // loan account check should never be reached
+      const res = await POST(makeRequest(body))
+      expect(res.status).toBe(400)
+      const json = await res.json()
+      expect(json.error).toMatch(/loanAccountId/i)
+      expect(mocks.mockTransaction).not.toHaveBeenCalled()
+    })
+
+    it('returns 404 when loanAccountId not found for the property', async () => {
+      mocks.mockSelectLimit.mockReset()
+      mocks.mockSelectLimit
+        .mockResolvedValueOnce([propRow])  // property found
+        .mockResolvedValueOnce([])         // loan account not found
+      const res = await POST(makeRequest(makeManualBody()))
+      expect(res.status).toBe(404)
+      expect(mocks.mockTransaction).not.toHaveBeenCalled()
+    })
+
     it('deletes prior loan_payment entries in transaction (idempotent)', async () => {
       mocks.mockTxDeleteReturning.mockResolvedValue([{ id: 'old-loan-1' }])
       const res = await POST(makeRequest(makeManualBody()))
@@ -560,9 +600,9 @@ describe('POST /api/statements', () => {
       expect(json.replacedCount).toBe(0)
     })
 
-    it('skips sourceDocument lookup (only one db.select call for property)', async () => {
+    it('skips sourceDocument lookup (property + loan account = 2 db.select calls)', async () => {
       await POST(makeRequest(makeManualBody()))
-      expect(mocks.mockSelectLimit).toHaveBeenCalledTimes(1)
+      expect(mocks.mockSelectLimit).toHaveBeenCalledTimes(2)
     })
   })
 
