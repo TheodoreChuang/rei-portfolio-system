@@ -1,7 +1,7 @@
 import { and, eq, gte, isNotNull, lte } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { ledgerEntries, sourceDocuments } from '@/db/schema'
+import { propertyLedgerEntries, sourceDocuments } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { lastDayOfMonth } from '@/lib/format'
 
@@ -29,22 +29,22 @@ export async function GET(request: Request) {
 
   const docs = await db
     .selectDistinctOn(
-      [ledgerEntries.propertyId, ledgerEntries.sourceDocumentId],
+      [propertyLedgerEntries.propertyId, propertyLedgerEntries.sourceDocumentId],
       {
         id: sourceDocuments.id,
         fileName: sourceDocuments.fileName,
-        propertyId: ledgerEntries.propertyId,
+        propertyId: propertyLedgerEntries.propertyId,
         uploadedAt: sourceDocuments.uploadedAt,
       }
     )
-    .from(ledgerEntries)
-    .innerJoin(sourceDocuments, eq(ledgerEntries.sourceDocumentId, sourceDocuments.id))
+    .from(propertyLedgerEntries)
+    .innerJoin(sourceDocuments, eq(propertyLedgerEntries.sourceDocumentId, sourceDocuments.id))
     .where(
       and(
-        eq(ledgerEntries.userId, user.id),
-        gte(ledgerEntries.lineItemDate, startDate),
-        lte(ledgerEntries.lineItemDate, endDate),
-        isNotNull(ledgerEntries.sourceDocumentId),
+        eq(propertyLedgerEntries.userId, user.id),
+        gte(propertyLedgerEntries.lineItemDate, startDate),
+        lte(propertyLedgerEntries.lineItemDate, endDate),
+        isNotNull(propertyLedgerEntries.sourceDocumentId),
       )
     )
 

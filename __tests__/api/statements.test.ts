@@ -377,7 +377,7 @@ describe('POST /api/statements', () => {
     expect(json.insertedCount).toBe(2)
   })
 
-  it('inserts correct number of ledger_entries rows', async () => {
+  it('inserts correct number of property_ledger_entries rows', async () => {
     mocks.mockTxInsertReturning.mockResolvedValue([
       { id: 'entry-1' },
       { id: 'entry-2' },

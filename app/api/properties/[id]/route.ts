@@ -92,7 +92,7 @@ export async function PUT(
   return NextResponse.json({ property: updated })
 }
 
-// DELETE /api/properties/[id] — delete a property (cascades to ledger_entries)
+// DELETE /api/properties/[id] — delete a property (cascades to property_ledger_entries)
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }

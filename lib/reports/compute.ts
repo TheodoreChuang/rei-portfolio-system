@@ -1,4 +1,4 @@
-import type { LedgerEntry, Property } from '@/db/schema'
+import type { PropertyLedgerEntry, Property } from '@/db/schema'
 
 export type PropertyTotals = {
   propertyId: string
@@ -40,7 +40,7 @@ const EXPENSE_CATEGORIES = new Set([
 ])
 
 export function computeReport(
-  entries: LedgerEntry[],
+  entries: PropertyLedgerEntry[],
   properties: Property[],
 ): { totals: ReportTotals; flags: ReportFlags } {
   const propertyTotals: PropertyTotals[] = properties.map((p) => {

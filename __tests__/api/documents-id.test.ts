@@ -70,7 +70,7 @@ describe('DELETE /api/documents/[id]', () => {
         delete: vi.fn().mockImplementation(() => {
           deleteCallCount++
           if (deleteCallCount === 1) {
-            // First delete: ledgerEntries — has .returning()
+            // First delete: propertyLedgerEntries — has .returning()
             return {
               where: vi.fn().mockReturnValue({
                 returning: mocks.mockDeleteEntries,
@@ -124,7 +124,7 @@ describe('DELETE /api/documents/[id]', () => {
     expect(typeof json.entriesDeleted).toBe('number')
   })
 
-  it('calls DELETE on ledger_entries (first) before source_documents (second)', async () => {
+  it('calls DELETE on property_ledger_entries (first) before source_documents (second)', async () => {
     const callOrder: string[] = []
     mocks.mockDeleteEntries.mockImplementation(() => {
       callOrder.push('entries')

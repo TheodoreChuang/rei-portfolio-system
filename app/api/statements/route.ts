@@ -2,8 +2,8 @@ import { and, desc, eq, gte, lt, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { db } from '@/lib/db'
-import { properties, sourceDocuments, ledgerEntries } from '@/db/schema'
-import type { LedgerEntry } from '@/db/schema'
+import { properties, sourceDocuments, propertyLedgerEntries } from '@/db/schema'
+import type { PropertyLedgerEntry } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { extractionResultSchema } from '@/lib/extraction/schema'
 import { lastDayOfMonth } from '@/lib/format'
@@ -38,17 +38,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 })
     }
     const [entry] = await db
-      .select({ amountCents: ledgerEntries.amountCents })
-      .from(ledgerEntries)
+      .select({ amountCents: propertyLedgerEntries.amountCents })
+      .from(propertyLedgerEntries)
       .where(
         and(
-          eq(ledgerEntries.userId, user.id),
-          eq(ledgerEntries.propertyId, propertyId),
-          eq(ledgerEntries.category, 'loan_payment'),
-          lt(ledgerEntries.lineItemDate, `${month}-01`),
+          eq(propertyLedgerEntries.userId, user.id),
+          eq(propertyLedgerEntries.propertyId, propertyId),
+          eq(propertyLedgerEntries.category, 'loan_payment'),
+          lt(propertyLedgerEntries.lineItemDate, `${month}-01`),
         )
       )
-      .orderBy(desc(ledgerEntries.lineItemDate))
+      .orderBy(desc(propertyLedgerEntries.lineItemDate))
       .limit(1)
     return NextResponse.json({ amountCents: entry?.amountCents ?? null })
   }
@@ -57,12 +57,12 @@ export async function GET(request: Request) {
   const endDate = lastDayOfMonth(month)
   const entries = await db
     .select()
-    .from(ledgerEntries)
+    .from(propertyLedgerEntries)
     .where(
       and(
-        eq(ledgerEntries.userId, user.id),
-        gte(ledgerEntries.lineItemDate, startDate),
-        lte(ledgerEntries.lineItemDate, endDate),
+        eq(propertyLedgerEntries.userId, user.id),
+        gte(propertyLedgerEntries.lineItemDate, startDate),
+        lte(propertyLedgerEntries.lineItemDate, endDate),
       )
     )
   return NextResponse.json({ entries })
@@ -203,8 +203,8 @@ export async function POST(request: Request) {
   }
 
   // ── Transaction: delete existing + insert new ────────────────────────────
-  let deleted: LedgerEntry[] = []
-  let inserted: LedgerEntry[] = []
+  let deleted: PropertyLedgerEntry[] = []
+  let inserted: PropertyLedgerEntry[] = []
 
   try {
     await db.transaction(async (tx) => {
@@ -214,25 +214,25 @@ export async function POST(request: Request) {
         const startDate = `${assignedMonth}-01`
         const endDate = lastDayOfMonth(assignedMonth)
         deleted = await tx
-          .delete(ledgerEntries)
+          .delete(propertyLedgerEntries)
           .where(
             and(
-              eq(ledgerEntries.userId, user.id),
-              eq(ledgerEntries.propertyId, property!.id),
-              eq(ledgerEntries.category, 'loan_payment'),
-              gte(ledgerEntries.lineItemDate, startDate),
-              lte(ledgerEntries.lineItemDate, endDate),
+              eq(propertyLedgerEntries.userId, user.id),
+              eq(propertyLedgerEntries.propertyId, property!.id),
+              eq(propertyLedgerEntries.category, 'loan_payment'),
+              gte(propertyLedgerEntries.lineItemDate, startDate),
+              lte(propertyLedgerEntries.lineItemDate, endDate),
             )
           )
           .returning()
       } else {
         // PDF-backed entries: delete by sourceDocumentId (idempotent re-save)
         deleted = await tx
-          .delete(ledgerEntries)
+          .delete(propertyLedgerEntries)
           .where(
             and(
-              eq(ledgerEntries.sourceDocumentId, sourceDocumentIdRaw!),
-              eq(ledgerEntries.userId, user.id)
+              eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentIdRaw!),
+              eq(propertyLedgerEntries.userId, user.id)
             )
           )
           .returning()
@@ -248,7 +248,7 @@ export async function POST(request: Request) {
         description: item.description,
       }))
 
-      inserted = await tx.insert(ledgerEntries).values(rows).returning()
+      inserted = await tx.insert(propertyLedgerEntries).values(rows).returning()
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

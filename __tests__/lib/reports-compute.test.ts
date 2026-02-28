@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeReport } from '@/lib/reports/compute'
-import type { LedgerEntry, Property } from '@/db/schema'
+import type { PropertyLedgerEntry, Property } from '@/db/schema'
 
 function makeProperty(overrides: Partial<Property> = {}): Property {
   return {
@@ -13,7 +13,7 @@ function makeProperty(overrides: Partial<Property> = {}): Property {
   }
 }
 
-function makeEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
+function makeEntry(overrides: Partial<PropertyLedgerEntry> = {}): PropertyLedgerEntry {
   return {
     id: 'entry-1',
     userId: 'user-1',

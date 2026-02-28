@@ -14,7 +14,7 @@ import postgres from 'postgres'
 import {
   properties,
   sourceDocuments,
-  ledgerEntries,
+  propertyLedgerEntries,
   portfolioReports,
 } from '../db/schema'
 
@@ -90,7 +90,7 @@ async function seedOwner(userId: string) {
   // - Riverside: loan payment only (manual entry, no statement) — tests missing-statement UI
   // - George Ave: no loan payment — tests missing-loan UI
   console.log('  → ledger entries')
-  await db.insert(ledgerEntries).values([
+  await db.insert(propertyLedgerEntries).values([
 
     // ── Smith St ──────────────────────────────────────────────────────────────
     {

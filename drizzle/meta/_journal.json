@@ -29,6 +29,13 @@
       "when": 1772157559134,
       "tag": "0003_perpetual_terrax",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772157559135,
+      "tag": "0004_rename_ledger_to_property_ledger",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { properties, sourceDocuments, ledgerEntries } from '@/db/schema'
+import { properties, sourceDocuments, propertyLedgerEntries } from '@/db/schema'
 
 const refs = vi.hoisted(() => ({
   cookieStore: [] as { name: string; value: string }[],
@@ -163,16 +163,16 @@ describe('POST /api/statements (integration)', () => {
 
   afterAll(async () => {
     if (!hasEnv) return
-    // Delete ledger entries first (FK constraints)
+    // Delete property ledger entries first (FK constraints)
     if (sourceDocumentId) {
       await db
-        .delete(ledgerEntries)
-        .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentId))
+        .delete(propertyLedgerEntries)
+        .where(eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentId))
     }
     if (sourceDocumentBId) {
       await db
-        .delete(ledgerEntries)
-        .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentBId))
+        .delete(propertyLedgerEntries)
+        .where(eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentBId))
     }
     if (sourceDocumentId) {
       await db
@@ -197,7 +197,7 @@ describe('POST /api/statements (integration)', () => {
     return POST(makeRequest(body))
   }
 
-  it('inserts ledger_entries for a matched property', async () => {
+  it('inserts property_ledger_entries for a matched property', async () => {
     if (!hasEnv) return
 
     const res = await postStatements({
@@ -218,8 +218,8 @@ describe('POST /api/statements (integration)', () => {
     // Verify rows in DB
     const rows = await db
       .select()
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentId))
+      .from(propertyLedgerEntries)
+      .where(eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentId))
     expect(rows).toHaveLength(sampleResult.lineItems.length)
     expect(rows.every((r) => r.userId === userId)).toBe(true)
     expect(rows.every((r) => r.propertyId === propertyId)).toBe(true)
@@ -243,8 +243,8 @@ describe('POST /api/statements (integration)', () => {
     // Confirm no duplicates
     const rows = await db
       .select()
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentId))
+      .from(propertyLedgerEntries)
+      .where(eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentId))
     expect(rows).toHaveLength(sampleResult.lineItems.length)
   })
 
@@ -253,8 +253,8 @@ describe('POST /api/statements (integration)', () => {
 
     const rows = await db
       .select()
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentId))
+      .from(propertyLedgerEntries)
+      .where(eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentId))
     for (const row of rows) {
       expect(row.userId).toBe(userId)
       expect(row.propertyId).toBe(propertyId)
@@ -278,7 +278,7 @@ describe('POST /api/statements (integration)', () => {
     expect(json.error).toBe('property_not_matched')
   })
 
-  it('RLS: user A cannot affect user B ledger entries via user B sourceDocumentId', async () => {
+  it('RLS: user A cannot affect user B property ledger entries via user B sourceDocumentId', async () => {
     if (!hasEnv || !hasUserB || !sourceDocumentBId) return
 
     // User A is currently signed in; attempt to post using user B's sourceDocumentId
@@ -293,11 +293,11 @@ describe('POST /api/statements (integration)', () => {
     // Should 404 because the WHERE clause includes userId = user A's id
     expect(res.status).toBe(404)
 
-    // Confirm no ledger entries were inserted for user B's doc
+    // Confirm no property ledger entries were inserted for user B's doc
     const rows = await db
       .select()
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.sourceDocumentId, sourceDocumentBId))
+      .from(propertyLedgerEntries)
+      .where(eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentBId))
     expect(rows).toHaveLength(0)
   })
 })

@@ -1,5 +1,5 @@
 // scripts/storage-clear.ts
-// Clears uploaded storage files and the source_documents / ledger_entries rows they
+// Clears uploaded storage files and the source_documents / property_ledger_entries rows they
 // created, without touching seeded properties, reports, or manually-entered ledger rows.
 //
 // Real uploads land at  documents/<userId>/...   (filePath starts with 'documents/')
@@ -14,7 +14,7 @@ import { config } from 'dotenv'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { like, inArray } from 'drizzle-orm'
 import postgres from 'postgres'
-import { ledgerEntries, sourceDocuments } from '../db/schema'
+import { propertyLedgerEntries, sourceDocuments } from '../db/schema'
 
 config({ path: '.env.local' })
 
@@ -50,11 +50,11 @@ async function main() {
 
   const docIds = uploadedDocs.map(d => d.id)
 
-  // ── 3. Delete ledger_entries that came from these uploads ────────────────────
+  // ── 3. Delete property_ledger_entries that came from these uploads ────────────────────
   const deleted = await db
-    .delete(ledgerEntries)
-    .where(inArray(ledgerEntries.sourceDocumentId, docIds))
-    .returning({ id: ledgerEntries.id })
+    .delete(propertyLedgerEntries)
+    .where(inArray(propertyLedgerEntries.sourceDocumentId, docIds))
+    .returning({ id: propertyLedgerEntries.id })
   console.log(`  ✓ ${deleted.length} ledger entr${deleted.length === 1 ? 'y' : 'ies'} removed`)
 
   // ── 4. Delete the source_document rows themselves ────────────────────────────

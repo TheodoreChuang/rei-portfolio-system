@@ -37,7 +37,7 @@ export const sourceDocuments = pgTable('source_documents', {
   unique().on(t.userId, t.fileHash),
 ])
 
-export const ledgerEntries = pgTable('ledger_entries', {
+export const propertyLedgerEntries = pgTable('property_ledger_entries', {
   id:               uuid('id').primaryKey().defaultRandom(),
   userId:           uuid('user_id').notNull(),
   propertyId:       uuid('property_id').notNull()
@@ -77,6 +77,6 @@ export const portfolioReports = pgTable('portfolio_reports', {
 
 export type Property        = typeof properties.$inferSelect
 export type SourceDocument  = typeof sourceDocuments.$inferSelect
-export type LedgerEntry     = typeof ledgerEntries.$inferSelect
+export type PropertyLedgerEntry = typeof propertyLedgerEntries.$inferSelect
 export type PortfolioReport = typeof portfolioReports.$inferSelect
 export type LedgerCategory  = typeof ledgerCategoryEnum.enumValues[number]
