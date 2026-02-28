@@ -29,7 +29,8 @@ directed to the property page to add one. They can also skip (no mortgage for
 this property).
 
 **FR-1.5** Each loan payment input captures amount and date. Date defaults to
-the last day of the assigned month but is editable.
+the most recent `loan_payment` ledger entry for that loan account but is editable.
+Falls back to the last day of the month if no prior entry exists.
 
 **FR-1.6** Pre-fill: each loan account input is pre-filled with the amount from
 the most recent `loan_payment` ledger entry for that loan account. Falls back

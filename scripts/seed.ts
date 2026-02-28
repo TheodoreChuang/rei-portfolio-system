@@ -14,6 +14,7 @@ import postgres from 'postgres'
 import {
   properties,
   sourceDocuments,
+  loanAccounts,
   propertyLedgerEntries,
   portfolioReports,
 } from '../db/schema'
@@ -84,6 +85,18 @@ async function seedOwner(userId: string) {
     ])
     .returning()
 
+  // Loan accounts — one per property
+  // George Ave loan has no payment this month — tests missing-loan UI
+  console.log('  → loan accounts')
+  const [smithLoan, georgeLoan, riversideLoan] = await db
+    .insert(loanAccounts)
+    .values([
+      { userId, propertyId: smithSt.id,   lender: 'Westpac', nickname: 'Investment loan', isActive: true },
+      { userId, propertyId: georgeAve.id, lender: 'ANZ',     nickname: 'Main loan',       isActive: true },
+      { userId, propertyId: riverside.id, lender: 'CBA',     nickname: 'Mortgage',         isActive: true },
+    ])
+    .returning()
+
   // Ledger entries
   // - Smith St: complete data, normal month
   // - George Ave: complete data, high expenses due to one-off repair
@@ -124,6 +137,7 @@ async function seedOwner(userId: string) {
       userId,
       propertyId:       smithSt.id,
       sourceDocumentId: null, // manual entry
+      loanAccountId:    smithLoan.id,
       lineItemDate:     '2026-03-01',
       amountCents:      210_000,
       category:         'loan_payment',
@@ -158,7 +172,7 @@ async function seedOwner(userId: string) {
       category:         'repairs',
       description:      'Emergency plumbing repair — burst pipe',
     },
-    // No loan_payment for George Ave — tests missing-loan UI
+    // No loan_payment for George Ave (georgeLoan) — tests missing-loan UI
 
     // ── Riverside ─────────────────────────────────────────────────────────────
     // No statement — only a manual loan payment entry
@@ -166,6 +180,7 @@ async function seedOwner(userId: string) {
       userId,
       propertyId:       riverside.id,
       sourceDocumentId: null, // manual entry, no PDF
+      loanAccountId:    riversideLoan.id,
       lineItemDate:     '2026-03-01',
       amountCents:      240_000,
       category:         'loan_payment',
@@ -173,6 +188,9 @@ async function seedOwner(userId: string) {
     },
 
   ])
+
+  // Keep a reference to georgeLoan for the flags
+  void georgeLoan
 
   // Portfolio report — totals are a snapshot computed from the ledger above
   // Income:   Smith St $4,000 + George Ave $8,400             = $12,400

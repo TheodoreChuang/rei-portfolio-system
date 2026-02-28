@@ -36,6 +36,34 @@
       "when": 1772157559135,
       "tag": "0004_rename_ledger_to_property_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772500000000,
+      "tag": "0005_fix_rls_trigger",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772500000001,
+      "tag": "0006_loan_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772500000002,
+      "tag": "0007_ledger_loan_account_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772500000003,
+      "tag": "0008_loan_accounts_rls",
+      "breakpoints": true
     }
   ]
 }

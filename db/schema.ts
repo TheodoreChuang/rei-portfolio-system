@@ -1,5 +1,5 @@
 import {
-  pgTable, text, integer, timestamp,
+  pgTable, text, integer, timestamp, boolean,
   date, pgEnum, varchar, uuid, unique, index, jsonb,
 } from 'drizzle-orm/pg-core'
 
@@ -37,6 +37,20 @@ export const sourceDocuments = pgTable('source_documents', {
   unique().on(t.userId, t.fileHash),
 ])
 
+export const loanAccounts = pgTable('loan_accounts', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  userId:     uuid('user_id').notNull(),
+  propertyId: uuid('property_id').notNull()
+                .references(() => properties.id, { onDelete: 'cascade' }),
+  lender:     text('lender').notNull(),
+  nickname:   text('nickname'),
+  isActive:   boolean('is_active').notNull().default(true),
+  createdAt:  timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('idx_loan_accounts_user').on(t.userId),
+  index('idx_loan_accounts_property').on(t.propertyId),
+])
+
 export const propertyLedgerEntries = pgTable('property_ledger_entries', {
   id:               uuid('id').primaryKey().defaultRandom(),
   userId:           uuid('user_id').notNull(),
@@ -45,6 +59,8 @@ export const propertyLedgerEntries = pgTable('property_ledger_entries', {
   sourceDocumentId: uuid('source_document_id')
                       .references(() => sourceDocuments.id, { onDelete: 'set null' }),
                       // null = manually entered (e.g. loan payment)
+  loanAccountId:    uuid('loan_account_id')
+                      .references(() => loanAccounts.id, { onDelete: 'set null' }),
   lineItemDate:     date('line_item_date').notNull(),
                     // date from the PM statement — may be period end, not cash date
   amountCents:      integer('amount_cents').notNull(),
@@ -75,8 +91,9 @@ export const portfolioReports = pgTable('portfolio_reports', {
   index('idx_reports_user_month').on(t.userId, t.month),
 ])
 
-export type Property        = typeof properties.$inferSelect
-export type SourceDocument  = typeof sourceDocuments.$inferSelect
+export type Property            = typeof properties.$inferSelect
+export type SourceDocument      = typeof sourceDocuments.$inferSelect
+export type LoanAccount         = typeof loanAccounts.$inferSelect
 export type PropertyLedgerEntry = typeof propertyLedgerEntries.$inferSelect
-export type PortfolioReport = typeof portfolioReports.$inferSelect
-export type LedgerCategory  = typeof ledgerCategoryEnum.enumValues[number]
+export type PortfolioReport     = typeof portfolioReports.$inferSelect
+export type LedgerCategory      = typeof ledgerCategoryEnum.enumValues[number]
