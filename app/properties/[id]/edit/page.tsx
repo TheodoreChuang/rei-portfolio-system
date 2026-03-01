@@ -7,13 +7,17 @@ import { AppNav } from '@/components/app-nav'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter, DialogClose,
 } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 import type { Property } from '@/db/schema'
+
+type LoanRow = { id: string; lender: string; nickname: string | null; isActive: boolean }
 
 export default function EditPropertyPage() {
   const router = useRouter()
@@ -24,20 +28,25 @@ export default function EditPropertyPage() {
   const [address, setAddress] = useState('')
   const [nickname, setNickname] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [loans, setLoans] = useState<LoanRow[]>([])
+  const [newLender, setNewLender] = useState('')
+  const [newNickname, setNewNickname] = useState('')
+  const [addingLoan, setAddingLoan] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/properties/${id}`)
-      .then(r => {
-        if (r.status === 404) { setNotFound(true); return null }
-        if (!r.ok) throw new Error()
-        return r.json()
-      })
-      .then(data => {
-        if (!data) return
-        const p: Property = data.property
+    Promise.all([
+      fetch(`/api/properties/${id}`),
+      fetch(`/api/properties/${id}/loans`),
+    ])
+      .then(async ([propRes, loansRes]) => {
+        if (propRes.status === 404) { setNotFound(true); return }
+        if (!propRes.ok || !loansRes.ok) throw new Error()
+        const [propData, loansData] = await Promise.all([propRes.json(), loansRes.json()])
+        const p: Property = propData.property
         setAddress(p.address)
         setNickname(p.nickname ?? '')
         setOriginalAddress(p.address)
+        setLoans(loansData.loans ?? [])
       })
       .catch(() => toast.error('Failed to load property'))
       .finally(() => setLoading(false))
@@ -67,6 +76,33 @@ export default function EditPropertyPage() {
     }
     toast.success('Property deleted')
     router.push('/properties')
+  }
+
+  async function handleAddLoan() {
+    if (!newLender.trim()) return
+    setAddingLoan(true)
+    const res = await fetch(`/api/properties/${id}/loans`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lender: newLender.trim(), nickname: newNickname.trim() || null }),
+    })
+    setAddingLoan(false)
+    if (!res.ok) { toast.error((await res.json().catch(() => ({}))).error ?? 'Failed to add loan'); return }
+    const { loan } = await res.json()
+    setLoans(prev => [...prev, loan])
+    setNewLender('')
+    setNewNickname('')
+  }
+
+  async function handleToggleLoan(loanId: string, isCurrentlyActive: boolean) {
+    const res = await fetch(`/api/properties/${id}/loans/${loanId}`,
+      isCurrentlyActive
+        ? { method: 'DELETE' }
+        : { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: true }) }
+    )
+    if (!res.ok) { toast.error('Failed to update loan'); return }
+    const { loan } = await res.json()
+    setLoans(prev => prev.map(l => l.id === loanId ? loan : l))
   }
 
   if (loading) return (
@@ -118,7 +154,49 @@ export default function EditPropertyPage() {
           </CardContent>
         </Card>
 
-        <Card className="text-[11px] text-muted leading-relaxed">
+        <div className="mt-8">
+          <h2 className="font-semibold text-sm mb-3">Loan accounts</h2>
+          <div className="space-y-2 mb-4">
+            {[...loans.filter(l => l.isActive), ...loans.filter(l => !l.isActive)].map(loan => (
+              <Card key={loan.id} className={cn(!loan.isActive && 'opacity-60')}>
+                <CardContent className="py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{loan.lender}</p>
+                    {loan.nickname && <p className="text-[11px] text-muted">{loan.nickname}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={loan.isActive ? 'green' : 'grey'}>
+                      {loan.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                    <Button variant="outline" size="sm" onClick={() => handleToggleLoan(loan.id, loan.isActive)}>
+                      {loan.isActive ? 'Deactivate' : 'Reactivate'}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {loans.length === 0 && <p className="text-sm text-muted">No loan accounts yet.</p>}
+          </div>
+
+          <Card>
+            <CardContent className="pt-4 pb-4 space-y-3">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-muted">Add loan account</p>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-lender">Lender</Label>
+                <Input id="new-lender" placeholder="e.g. Westpac" value={newLender} onChange={e => setNewLender(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-nickname">Nickname <span className="font-normal text-muted">(optional)</span></Label>
+                <Input id="new-nickname" placeholder="e.g. Investment loan" value={newNickname} onChange={e => setNewNickname(e.target.value)} />
+              </div>
+              <Button onClick={handleAddLoan} disabled={!newLender.trim() || addingLoan}>
+                {addingLoan ? 'Adding…' : 'Add loan account'}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="text-[11px] text-muted leading-relaxed mt-4">
           <CardContent className="py-3">
             ⚠ Deleting a property does not delete historical statements. Past reports will retain the data as generated.
           </CardContent>

@@ -39,12 +39,18 @@ type FileProcessingStatus = {
   error:              ProcessingError | null
 }
 
-type MortgageEntry = {
-  propertyId:    string
-  address:       string
-  nickname:      string | null
-  hasStatement:  boolean
-  mortgageValue: string
+type LoanRow = { id: string; lender: string; nickname: string | null; isActive: boolean }
+
+type LoanEntry = {
+  loanAccountId:   string
+  propertyId:      string
+  propertyAddress: string
+  propertyNickname: string | null
+  lender:          string
+  nickname:        string | null
+  hasStatement:    boolean
+  amountValue:     string
+  dateValue:       string
 }
 
 const STEP_LABELS = ['Select month & upload', 'Confirm mortgages', 'Generate report']
@@ -78,35 +84,44 @@ function StepBar({ current }: { current: Step }) {
   )
 }
 
-function buildMortgages(props: Property[], matchedAddresses: string[]): MortgageEntry[] {
-  return props.map(p => ({
-    propertyId: p.id,
-    address: p.address,
-    nickname: p.nickname,
-    hasStatement: matchedAddresses.includes(p.address.toLowerCase()),
-    mortgageValue: '',
-  }))
-}
-
-async function prefillPriorLoans(
-  mortgages: MortgageEntry[],
+async function buildLoanEntries(
+  props: Property[],
+  matchedAddresses: string[],
   month: string,
-): Promise<MortgageEntry[]> {
-  return Promise.all(
-    mortgages.map(async (m) => {
+): Promise<LoanEntry[]> {
+  const entries: LoanEntry[] = []
+  await Promise.all(props.map(async (p) => {
+    const loansRes = await fetch(`/api/properties/${p.id}/loans`)
+    if (!loansRes.ok) return
+    const { loans }: { loans: LoanRow[] } = await loansRes.json()
+    const activeLoans = loans.filter(l => l.isActive)
+    const hasStatement = matchedAddresses.includes(p.address.toLowerCase())
+    await Promise.all(activeLoans.map(async (loan) => {
+      let amountValue = ''
       try {
-        const res = await fetch(
-          `/api/statements?propertyId=${m.propertyId}&month=${month}`
-        )
-        if (!res.ok) return m
-        const json = await res.json()
-        if (!json.amountCents) return m
-        return { ...m, mortgageValue: (json.amountCents / 100).toFixed(2) }
-      } catch {
-        return m
-      }
-    })
+        const prefillRes = await fetch(`/api/statements?loanAccountId=${loan.id}&month=${month}`)
+        if (prefillRes.ok) {
+          const { amountCents } = await prefillRes.json()
+          if (amountCents) amountValue = (amountCents / 100).toFixed(2)
+        }
+      } catch { /* leave blank */ }
+      entries.push({
+        loanAccountId: loan.id,
+        propertyId: p.id,
+        propertyAddress: p.address,
+        propertyNickname: p.nickname,
+        lender: loan.lender,
+        nickname: loan.nickname,
+        hasStatement,
+        amountValue,
+        dateValue: lastDayOfMonth(month),
+      })
+    }))
+  }))
+  entries.sort((a, b) =>
+    a.propertyAddress.localeCompare(b.propertyAddress) || a.lender.localeCompare(b.lender)
   )
+  return entries
 }
 
 function parseCents(input: string): number {
@@ -122,7 +137,7 @@ export default function UploadPage() {
   const [step, setStep] = useState<Step>('select')
   const [selectedMonth, setSelectedMonth] = useState('')
   const [files, setFiles] = useState<FileProcessingStatus[]>([])
-  const [mortgages, setMortgages] = useState<MortgageEntry[]>([])
+  const [loanEntries, setLoanEntries] = useState<LoanEntry[]>([])
   const [properties, setProperties] = useState<Property[]>([])
   const [generating, setGenerating] = useState(false)
   const [showInlineAdd, setShowInlineAdd] = useState<number | null>(null)
@@ -149,8 +164,8 @@ export default function UploadPage() {
       const propsData = await fetch('/api/properties').then(r => r.json()).catch(() => ({ properties: [] }))
       const allProps: Property[] = propsData.properties ?? []
       setProperties(allProps)
-      const filled = await prefillPriorLoans(buildMortgages(allProps, []), selectedMonth)
-      setMortgages(filled)
+      const entries = await buildLoanEntries(allProps, [], selectedMonth)
+      setLoanEntries(entries)
       setStep('mortgages')
       return
     }
@@ -262,48 +277,54 @@ export default function UploadPage() {
       return prop ? [prop.address.toLowerCase()] : []
     })
 
-    const filled = await prefillPriorLoans(buildMortgages(properties, matchedAddresses), selectedMonth)
-    setMortgages(filled)
+    const entries = await buildLoanEntries(properties, matchedAddresses, selectedMonth)
+    setLoanEntries(entries)
     setStep('mortgages')
   }
 
   async function saveMortgagesAndContinue() {
-    const toSubmit = mortgages.filter(m => m.mortgageValue.trim() !== '')
-    for (const m of toSubmit) {
-      const periodEnd = lastDayOfMonth(selectedMonth)
+    const toSubmit = loanEntries.filter(e => e.amountValue.trim() !== '')
+    const failed: string[] = []
+
+    for (const e of toSubmit) {
+      const effectiveDate = e.dateValue || lastDayOfMonth(selectedMonth)
       let amountCents: number
-      try {
-        amountCents = parseCents(m.mortgageValue)
-      } catch {
-        toast.error(`Invalid mortgage amount for ${m.address}`)
-        return
+      try { amountCents = parseCents(e.amountValue) }
+      catch {
+        failed.push(`${e.lender} (${e.propertyAddress}) — invalid amount`)
+        continue
       }
       const res = await fetch('/api/statements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sourceDocumentId: null,
-          propertyId: m.propertyId,
+          propertyId: e.propertyId,
           assignedMonth: selectedMonth,
           result: {
-            propertyAddress: m.address,
+            propertyAddress: e.propertyAddress,
             statementPeriodStart: `${selectedMonth}-01`,
-            statementPeriodEnd: periodEnd,
+            statementPeriodEnd: effectiveDate,
             lineItems: [{
-              lineItemDate: periodEnd,
+              lineItemDate: effectiveDate,
               amountCents,
               category: 'loan_payment',
-              description: `Loan repayment ${selectedMonth}`,
+              description: `${e.lender}${e.nickname ? ` — ${e.nickname}` : ''} repayment ${selectedMonth}`,
               confidence: 'high',
+              loanAccountId: e.loanAccountId,
             }],
           },
         }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        toast.error(err.error ?? `Failed to save mortgage for ${m.address}`)
-        return
+        const detail = err.detail ? ` (${JSON.stringify(err.detail)})` : ''
+        failed.push(`${e.lender} (${e.propertyAddress}) — ${err.error ?? 'save failed'}${detail}`)
       }
+    }
+
+    if (failed.length > 0) {
+      toast.error(`${failed.length} loan payment${failed.length > 1 ? 's' : ''} could not be saved: ${failed.join('; ')}`)
     }
     setStep('review')
   }
@@ -329,9 +350,12 @@ export default function UploadPage() {
     setShowInlineAdd(null)
   }
 
-  const mortgagesEntered = mortgages.filter(m => m.mortgageValue.trim() !== '').length
-  const statementsReceived = mortgages.filter(m => m.hasStatement).length
-  const missing = mortgages.filter(m => !m.hasStatement)
+  const loansEntered = loanEntries.filter(e => e.amountValue.trim() !== '').length
+  const totalLoans = loanEntries.length
+  const propertiesWithStatement = new Set(loanEntries.filter(e => e.hasStatement).map(e => e.propertyId))
+  const statementsReceived = propertiesWithStatement.size
+  const missingPropertyIds = new Set(loanEntries.filter(e => !e.hasStatement).map(e => e.propertyId))
+  const missing = properties.filter(p => missingPropertyIds.has(p.id))
 
   /* ── STEP: SELECT ── */
   if (step === 'select') return (
@@ -583,45 +607,78 @@ export default function UploadPage() {
       <AppNav />
       <StepBar current="mortgages" />
       <div className="max-w-xl mx-auto px-4 py-8">
-        <p className="text-sm font-semibold mb-1">{formatMonth(selectedMonth)} — Mortgage amounts</p>
-        <p className="text-xs text-muted mb-5 leading-relaxed">Enter each property's mortgage for this month. Leave blank to exclude — it will be flagged.</p>
+        <p className="text-sm font-semibold mb-1">{formatMonth(selectedMonth)} — Loan repayments</p>
+        <p className="text-xs text-muted mb-5 leading-relaxed">Enter each loan account's repayment for this month. Leave blank to exclude — it will be flagged.</p>
+
+        {loanEntries.length === 0 && (
+          <div className="border border-border rounded-lg p-6 text-center text-sm text-muted mb-6">
+            No active loan accounts registered.{' '}
+            <a href="/properties" target="_blank" rel="noopener noreferrer" className="underline text-accent">
+              Add loan accounts on your property pages →
+            </a>
+          </div>
+        )}
+
         <div className="space-y-3 mb-6">
-          {mortgages.map(m => (
-            <Card key={m.propertyId} className={cn(!m.hasStatement && 'border-warn/50')}>
-              <CardHeader className={cn(!m.hasStatement && 'bg-warn-light')}>
-                <div>
-                  <CardTitle>{m.address}</CardTitle>
-                  <CardDescription className={cn(!m.hasStatement && 'text-warn')}>
-                    Statement: {m.hasStatement ? '✓ received' : '✗ not uploaded'}
-                  </CardDescription>
-                </div>
-                <Badge variant={m.hasStatement ? 'green' : 'orange'}>
-                  {m.hasStatement ? 'Has statement' : 'Missing'}
-                </Badge>
-              </CardHeader>
-              <CardContent className="flex items-center gap-3 py-3">
-                <Label className="whitespace-nowrap text-muted font-normal">Mortgage this month</Label>
-                <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span>
-                  <Input
-                    data-testid={`mortgage-input-${m.propertyId}`}
-                    className="pl-7"
-                    placeholder="e.g. 1,850"
-                    value={m.mortgageValue}
-                    onChange={e => setMortgages(prev => prev.map(x => x.propertyId === m.propertyId ? { ...x, mortgageValue: e.target.value } : x))}
-                  />
-                </div>
-              </CardContent>
-              {!m.hasStatement && (
-                <div className="px-4 pb-3 text-[11px] text-warn">Rent assumed $0. Mortgage still included in report.</div>
-              )}
-            </Card>
-          ))}
+          {Object.entries(
+            loanEntries.reduce<Record<string, LoanEntry[]>>((acc, e) => {
+              ;(acc[e.propertyId] ??= []).push(e)
+              return acc
+            }, {})
+          ).map(([propId, entries]) => {
+            const first = entries[0]
+            return (
+              <Card key={propId} className={cn(!first.hasStatement && 'border-warn/50')}>
+                <CardHeader className={cn(!first.hasStatement && 'bg-warn-light')}>
+                  <div>
+                    <CardTitle>{first.propertyNickname ?? first.propertyAddress}</CardTitle>
+                    <CardDescription className={cn(!first.hasStatement && 'text-warn')}>
+                      Statement: {first.hasStatement ? '✓ received' : '✗ not uploaded'}
+                    </CardDescription>
+                  </div>
+                  <Badge variant={first.hasStatement ? 'green' : 'orange'}>
+                    {first.hasStatement ? 'Has statement' : 'Missing'}
+                  </Badge>
+                </CardHeader>
+                <CardContent className="py-3 space-y-3">
+                  {entries.map(e => (
+                    <div key={e.loanAccountId} className="space-y-1">
+                      <Label className="text-muted font-normal text-xs">
+                        {e.lender}{e.nickname ? ` — ${e.nickname}` : ''}
+                      </Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span>
+                          <Input
+                            className="pl-7"
+                            placeholder="e.g. 1,850"
+                            value={e.amountValue}
+                            onChange={ev => setLoanEntries(prev => prev.map(x =>
+                              x.loanAccountId === e.loanAccountId ? { ...x, amountValue: ev.target.value } : x
+                            ))}
+                          />
+                        </div>
+                        <Input
+                          type="date"
+                          className="w-36"
+                          value={e.dateValue}
+                          onChange={ev => setLoanEntries(prev => prev.map(x =>
+                            x.loanAccountId === e.loanAccountId ? { ...x, dateValue: ev.target.value } : x
+                          ))}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
+
         <Button data-testid="continue-to-review" className="w-full" size="lg" onClick={saveMortgagesAndContinue}>
           Continue to generate report →
         </Button>
-        <p className="text-center text-[11px] text-muted mt-2">You can skip all mortgages — they'll be flagged as missing.</p>
+        <p className="text-center text-[11px] text-muted mt-2">You can skip all loans — they'll be flagged as missing.</p>
       </div>
     </div>
   )
@@ -638,10 +695,10 @@ export default function UploadPage() {
         <Card className="mb-4">
           <CardHeader><CardTitle className="text-[10px] font-mono uppercase tracking-widest text-muted">Report inputs</CardTitle></CardHeader>
           {[
-            { label: 'Properties',        value: `${mortgages.length} registered` },
-            { label: 'Statements',        value: `${statementsReceived} of ${mortgages.length}`, warn: statementsReceived < mortgages.length, warnText: `${mortgages.length - statementsReceived} missing` },
-            { label: 'Mortgages entered', value: `${mortgagesEntered} of ${mortgages.length}`, warn: mortgagesEntered < mortgages.length, warnText: `${mortgages.length - mortgagesEntered} blank` },
-            { label: 'Report month',      value: formatMonth(selectedMonth), mono: true },
+            { label: 'Properties',      value: `${properties.length} registered` },
+            { label: 'Statements',      value: `${statementsReceived} of ${properties.length}`, warn: statementsReceived < properties.length, warnText: `${properties.length - statementsReceived} missing` },
+            { label: 'Loans entered',   value: `${loansEntered} of ${totalLoans}`, warn: loansEntered < totalLoans, warnText: `${totalLoans - loansEntered} blank` },
+            { label: 'Report month',    value: formatMonth(selectedMonth), mono: true },
           ].map((row, i) => (
             <div key={i} className="flex items-center justify-between px-4 py-2.5 border-b border-ruled last:border-b-0 text-xs">
               <span className="text-muted">{row.label}</span>
@@ -688,7 +745,7 @@ export default function UploadPage() {
           {generating ? 'Generating report…' : `Generate ${formatMonth(selectedMonth)} report →`}
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" size="sm" onClick={() => setStep('mortgages')}>← Edit mortgages</Button>
+          <Button variant="outline" className="flex-1" size="sm" onClick={() => setStep('mortgages')}>← Edit loans</Button>
           <Button variant="outline" className="flex-1" size="sm" onClick={() => setStep('select')}>+ Upload more files</Button>
         </div>
       </div>
