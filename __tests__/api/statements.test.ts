@@ -70,6 +70,7 @@ const mocks = vi.hoisted(() => ({
   mockSelectLimit: vi.fn(),
   mockSelectEntries: vi.fn(),    // GET entries path: db.select().from().where() thenable
   mockPriorLoanLimit: vi.fn(),   // GET prior loan path: .where().orderBy().limit()
+  mockPropertyEntries: vi.fn(),  // GET propertyId path: .where().orderBy() thenable
   mockTransaction: vi.fn(),
   mockTxDeleteReturning: vi.fn(),
   mockTxInsertReturning: vi.fn(),
@@ -91,8 +92,11 @@ vi.mock('@/lib/db', () => ({
           // POST path: .where().limit()
           limit: mocks.mockSelectLimit,
           // GET prior loan path: .where().orderBy().limit()
+          // GET propertyId path: .where().orderBy() thenable (no .limit())
           orderBy: vi.fn().mockReturnValue({
             limit: mocks.mockPriorLoanLimit,
+            then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+              mocks.mockPropertyEntries().then(resolve, reject),
           }),
           // GET entries path: await .where() directly (thenable)
           then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
@@ -110,6 +114,7 @@ describe('GET /api/statements', () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockSelectEntries.mockResolvedValue([])
     mocks.mockPriorLoanLimit.mockResolvedValue([])
+    mocks.mockPropertyEntries.mockResolvedValue([])
   })
 
   it('returns 401 when unauthenticated', async () => {
@@ -197,6 +202,7 @@ describe('GET /api/statements - loan pre-fill', () => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockPriorLoanLimit.mockResolvedValue([])
+    mocks.mockPropertyEntries.mockResolvedValue([])
   })
 
   it('returns 401 when unauthenticated', async () => {
@@ -242,6 +248,63 @@ describe('GET /api/statements - loan pre-fill', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.amountCents).toBeNull()
+  })
+})
+
+describe('GET /api/statements - propertyId filter', () => {
+  const validPropertyId = 'aaaaaaaa-1111-4111-a111-111111111111'
+
+  function makePropertyRequest(propertyId: string | null, month: string | null) {
+    const params = new URLSearchParams()
+    if (propertyId !== null) params.set('propertyId', propertyId)
+    if (month !== null) params.set('month', month)
+    return new Request(`http://localhost/api/statements?${params}`, { method: 'GET' })
+  }
+
+  const entryRow = {
+    id: 'e1111111-1111-4111-a111-111111111111',
+    userId: 'user-123',
+    propertyId: 'aaaaaaaa-1111-4111-a111-111111111111',
+    sourceDocumentId: null,
+    loanAccountId: null,
+    lineItemDate: '2026-03-15',
+    amountCents: 120000,
+    category: 'insurance',
+    description: 'Building insurance',
+    userNotes: null,
+    createdAt: new Date(),
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    mocks.mockPropertyEntries.mockResolvedValue([entryRow])
+    mocks.mockPriorLoanLimit.mockResolvedValue([])
+    mocks.mockSelectEntries.mockResolvedValue([])
+  })
+
+  it('returns entries for the given property and month', async () => {
+    const res = await GET(makePropertyRequest(validPropertyId, '2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.entries).toHaveLength(1)
+    expect(json.entries[0].propertyId).toBe(validPropertyId)
+    expect(json.entries[0].category).toBe('insurance')
+  })
+
+  it('returns empty array when no entries exist for the property/month', async () => {
+    mocks.mockPropertyEntries.mockResolvedValueOnce([])
+    const res = await GET(makePropertyRequest(validPropertyId, '2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.entries).toEqual([])
+  })
+
+  it('returns 400 for invalid propertyId (non-UUID)', async () => {
+    const res = await GET(makePropertyRequest('not-a-uuid', '2026-03'))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/propertyId/i)
   })
 })
 

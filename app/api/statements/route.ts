@@ -21,6 +21,11 @@ function isValidUuid(val: string): boolean {
 //   Returns the most recent loan_payment entry for the loan account in any month
 //   strictly before the given month. Used to pre-fill the mortgage input per loan.
 //   Response: { amountCents: number | null }
+//
+// GET /api/statements?propertyId=UUID&month=2026-03
+//   Returns all ledger entries for a specific property in the given month,
+//   sorted by lineItemDate DESC. Used by the property detail page Transactions section.
+//   Response: { entries: PropertyLedgerEntry[] }
 export async function GET(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,6 +36,9 @@ export async function GET(request: Request) {
   if (!month || !ASSIGNED_MONTH_REGEX.test(month)) {
     return NextResponse.json({ error: 'Missing or invalid month (must be YYYY-MM)' }, { status: 400 })
   }
+
+  const startDate = `${month}-01`
+  const endDate = lastDayOfMonth(month)
 
   const loanAccountId = searchParams.get('loanAccountId')
   if (loanAccountId !== null) {
@@ -53,8 +61,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ amountCents: entry?.amountCents ?? null })
   }
 
-  const startDate = `${month}-01`
-  const endDate = lastDayOfMonth(month)
+  const propertyId = searchParams.get('propertyId')
+  if (propertyId !== null) {
+    if (!isValidUuid(propertyId)) {
+      return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 })
+    }
+    const entries = await db
+      .select()
+      .from(propertyLedgerEntries)
+      .where(
+        and(
+          eq(propertyLedgerEntries.userId, user.id),
+          eq(propertyLedgerEntries.propertyId, propertyId),
+          gte(propertyLedgerEntries.lineItemDate, startDate),
+          lte(propertyLedgerEntries.lineItemDate, endDate),
+        )
+      )
+      .orderBy(desc(propertyLedgerEntries.lineItemDate))
+    return NextResponse.json({ entries })
+  }
+
   const entries = await db
     .select()
     .from(propertyLedgerEntries)
