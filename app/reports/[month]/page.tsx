@@ -10,14 +10,14 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { formatCents, formatMonth } from '@/lib/format'
-import type { ReportTotals, PropertyTotals } from '@/lib/reports/compute'
+import type { ReportTotals, PropertyTotals, MissingMortgage } from '@/lib/reports/compute'
 import { cn } from '@/lib/utils'
 
 type Report = {
   id: string
   month: string
   totals: ReportTotals
-  flags: { missingStatements: string[]; missingMortgages: string[] }
+  flags: { missingStatements: string[]; missingMortgages: MissingMortgage[] }
   aiCommentary: string | null
   version: number
   createdAt: string
@@ -255,31 +255,34 @@ export default function ReportPage() {
           <SectionLabel>Flags &amp; Warnings</SectionLabel>
           <div className="border-b border-border">
             {totals.properties.map(p => {
-              if (!p.hasStatement && !p.hasMortgage) return (
-                <div key={p.propertyId} className="flex items-start gap-3 px-5 py-3 border-b border-ruled last:border-b-0 text-xs leading-relaxed">
-                  <span className="text-sm flex-shrink-0 mt-0.5">⚠️</span>
-                  <div className="text-muted"><strong>{p.address}</strong> — No statement and no mortgage entered. Rent and mortgage assumed $0.</div>
-                </div>
-              )
               if (!p.hasStatement) return (
                 <div key={p.propertyId} className="flex items-start gap-3 px-5 py-3 border-b border-ruled last:border-b-0 text-xs leading-relaxed">
                   <span className="text-sm flex-shrink-0 mt-0.5">⚠️</span>
                   <div className="text-muted"><strong>{p.address}</strong> — No statement received for {formatMonth(month)}. Rent assumed $0. {p.hasMortgage ? `Mortgage of ${formatCents(p.mortgageCents)} still applied.` : 'No mortgage entered.'}</div>
                 </div>
               )
-              if (!p.hasMortgage) return (
-                <div key={p.propertyId} className="flex items-start gap-3 px-5 py-3 border-b border-ruled last:border-b-0 text-xs leading-relaxed">
-                  <span className="text-sm flex-shrink-0 mt-0.5">⚠️</span>
-                  <div className="text-muted"><strong>{p.address}</strong> — No monthly mortgage entered. Cash flow may be overstated.</div>
-                </div>
-              )
               return (
                 <div key={p.propertyId} className="flex items-start gap-3 px-5 py-3 border-b border-ruled last:border-b-0 text-xs leading-relaxed">
                   <span className="text-sm flex-shrink-0 mt-0.5">✓</span>
-                  <div className="text-muted"><span className="text-accent"><strong>{p.address}</strong> — Statement received. Mortgage provided. Complete data.</span></div>
+                  <div className="text-muted"><span className="text-accent"><strong>{p.address}</strong> — Statement received.</span></div>
                 </div>
               )
             })}
+            {report.flags.missingMortgages.map(m => (
+              <div key={m.loanAccountId} className="flex items-start gap-3 px-5 py-3 border-b border-ruled last:border-b-0 text-xs leading-relaxed">
+                <span className="text-sm flex-shrink-0 mt-0.5">⚠️</span>
+                <div className="text-muted">
+                  <strong>{m.lender}{m.nickname ? ` — ${m.nickname}` : ''}</strong>
+                  {' '}({m.address}) — No payment entered for {formatMonth(month)}. Cash flow may be overstated.
+                </div>
+              </div>
+            ))}
+            {totals.properties.every(p => p.hasStatement) && report.flags.missingMortgages.length === 0 && (
+              <div className="flex items-start gap-3 px-5 py-3 text-xs leading-relaxed">
+                <span className="text-sm flex-shrink-0 mt-0.5">✓</span>
+                <div className="text-muted"><span className="text-accent">All statements and loan payments received. Complete data.</span></div>
+              </div>
+            )}
           </div>
 
           {/* Section 2 */}

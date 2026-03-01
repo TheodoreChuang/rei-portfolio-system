@@ -177,10 +177,11 @@ describe('POST /api/reports', () => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockSelectOrderBy.mockResolvedValue([]) // safe default; POST doesn't use orderBy
-    // First select: propertyLedgerEntries, second: properties
+    // First select: propertyLedgerEntries, second: properties, third: loanAccounts
     mocks.mockSelectWhere
       .mockResolvedValueOnce([entryRow])
       .mockResolvedValueOnce([propRow])
+      .mockResolvedValueOnce([])
     mocks.mockInsertReturning.mockResolvedValue([reportRow])
     mocks.mockGenerateCommentary.mockResolvedValue('Test commentary')
   })
@@ -218,6 +219,7 @@ describe('POST /api/reports', () => {
       .mockReset()
       .mockResolvedValueOnce([])   // entries
       .mockResolvedValueOnce([])   // properties
+      .mockResolvedValueOnce([])   // loanAccounts
     const res = await POST(makePostRequest({ month: '2026-03' }))
     expect(res.status).toBe(422)
   })
@@ -282,6 +284,7 @@ describe('GET /api/reports — RLS cross-user isolation', () => {
     mocks.mockSelectWhere
       .mockResolvedValueOnce([])   // entries: none for user B
       .mockResolvedValueOnce([])   // properties: none for user B
+      .mockResolvedValueOnce([])   // loanAccounts: none for user B
     const res = await POST(makePostRequest({ month: '2026-03' }))
     expect(res.status).toBe(422) // no properties found
   })

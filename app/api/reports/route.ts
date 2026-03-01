@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { propertyLedgerEntries, portfolioReports, properties } from '@/db/schema'
+import { propertyLedgerEntries, portfolioReports, properties, loanAccounts } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { computeReport } from '@/lib/reports/compute'
 import { generateCommentary } from '@/lib/reports/commentary'
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   const startDate = `${month}-01`
   const endDate = lastDayOfMonth(month)
 
-  const [entries, props] = await Promise.all([
+  const [entries, props, loans] = await Promise.all([
     db.select()
       .from(propertyLedgerEntries)
       .where(
@@ -77,13 +77,16 @@ export async function POST(request: Request) {
     db.select()
       .from(properties)
       .where(eq(properties.userId, user.id)),
+    db.select()
+      .from(loanAccounts)
+      .where(eq(loanAccounts.userId, user.id)),
   ])
 
   if (props.length === 0) {
     return NextResponse.json({ error: 'No properties found — add a property before generating a report' }, { status: 422 })
   }
 
-  const { totals, flags } = computeReport(entries, props)
+  const { totals, flags } = computeReport(entries, props, loans)
   const aiCommentary = await generateCommentary(totals, month)
 
   const [report] = await db
