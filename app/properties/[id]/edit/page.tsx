@@ -15,9 +15,28 @@ import {
   DialogDescription, DialogFooter, DialogClose,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import type { Property } from '@/db/schema'
+import { formatMonth, formatCents, recentMonths } from '@/lib/format'
+import type { Property, PropertyLedgerEntry } from '@/db/schema'
 
 type LoanRow = { id: string; lender: string; nickname: string | null; isActive: boolean }
+
+const MANUAL_CATEGORIES = [
+  'rent', 'insurance', 'rates', 'repairs',
+  'property_management', 'utilities', 'strata_fees', 'other_expense',
+] as const
+
+const CATEGORY_LABELS: Record<string, string> = {
+  rent: 'Rent', insurance: 'Insurance', rates: 'Rates', repairs: 'Repairs',
+  property_management: 'Mgmt fee', utilities: 'Utilities',
+  strata_fees: 'Strata', other_expense: 'Other',
+}
+
+function parseCents(input: string): number {
+  const clean = input.replace(/[$,\s]/g, '')
+  const dollars = parseFloat(clean)
+  if (isNaN(dollars) || dollars <= 0) throw new Error('Invalid amount')
+  return Math.round(dollars * 100)
+}
 
 export default function EditPropertyPage() {
   const router = useRouter()
@@ -32,6 +51,16 @@ export default function EditPropertyPage() {
   const [newLender, setNewLender] = useState('')
   const [newNickname, setNewNickname] = useState('')
   const [addingLoan, setAddingLoan] = useState(false)
+  const [txMonth, setTxMonth] = useState(() => recentMonths(1)[0])
+  const [entries, setEntries] = useState<PropertyLedgerEntry[]>([])
+  const [entriesLoading, setEntriesLoading] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [entryDate, setEntryDate] = useState('')
+  const [entryAmount, setEntryAmount] = useState('')
+  const [entryCategory, setEntryCategory] = useState('')
+  const [entryDesc, setEntryDesc] = useState('')
+  const [savingEntry, setSavingEntry] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<PropertyLedgerEntry | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -51,6 +80,47 @@ export default function EditPropertyPage() {
       .catch(() => toast.error('Failed to load property'))
       .finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    setEntriesLoading(true)
+    fetch(`/api/statements?propertyId=${id}&month=${txMonth}`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => setEntries(data.entries ?? []))
+      .catch(() => toast.error('Failed to load transactions'))
+      .finally(() => setEntriesLoading(false))
+  }, [id, txMonth])
+
+  async function handleAddEntry() {
+    let amountCents: number
+    try { amountCents = parseCents(entryAmount) }
+    catch { toast.error('Invalid amount'); return }
+
+    setSavingEntry(true)
+    const res = await fetch(`/api/properties/${id}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lineItemDate: entryDate,
+        amountCents,
+        category: entryCategory,
+        description: entryDesc.trim() || null,
+      }),
+    })
+    setSavingEntry(false)
+    if (!res.ok) { toast.error((await res.json().catch(() => ({}))).error ?? 'Failed to add transaction'); return }
+    const { entry } = await res.json()
+    setEntries(prev => [entry, ...prev])
+    setEntryDate(''); setEntryAmount(''); setEntryCategory(''); setEntryDesc('')
+    setShowAddForm(false)
+  }
+
+  async function handleDeleteEntry(entry: PropertyLedgerEntry) {
+    const res = await fetch(`/api/ledger/${entry.id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete transaction'); return }
+    setEntries(prev => prev.filter(e => e.id !== entry.id))
+    setConfirmDelete(null)
+  }
 
   async function handleSave() {
     const res = await fetch(`/api/properties/${id}`, {
@@ -196,6 +266,106 @@ export default function EditPropertyPage() {
           </Card>
         </div>
 
+        <div className="mt-8">
+          <h2 className="font-semibold text-sm mb-3">Transactions</h2>
+
+          {/* Month selector */}
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {recentMonths(12).map(m => (
+              <button key={m} onClick={() => setTxMonth(m)} className={cn(
+                'px-3 py-1 rounded-full text-xs font-mono border transition-colors',
+                txMonth === m
+                  ? 'bg-ink text-white border-ink'
+                  : 'bg-white text-muted border-border hover:border-ink hover:text-ink'
+              )}>{formatMonth(m)}</button>
+            ))}
+          </div>
+
+          {/* Entry list */}
+          <div className="space-y-1.5 mb-4">
+            {entriesLoading && <p className="text-sm text-muted">Loading…</p>}
+            {!entriesLoading && entries.length === 0 && (
+              <p className="text-sm text-muted">No transactions for {formatMonth(txMonth)}.</p>
+            )}
+            {entries.map(e => (
+              <Card key={e.id}>
+                <CardContent className="py-2.5 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <Badge variant={e.category === 'rent' ? 'green' : 'grey'}>
+                        {CATEGORY_LABELS[e.category] ?? e.category}
+                      </Badge>
+                      {!e.sourceDocumentId && (
+                        <span className="text-[10px] text-muted font-mono">Manual</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted truncate">{e.description ?? '—'}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-semibold">{formatCents(e.amountCents)}</p>
+                    <p className="text-[11px] text-muted font-mono">{e.lineItemDate}</p>
+                  </div>
+                  {!e.sourceDocumentId && (
+                    <Button variant="outline" size="sm" className="text-warn border-warn/50 hover:bg-warn-light"
+                      onClick={() => setConfirmDelete(e)}>
+                      Delete
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Add form toggle */}
+          {!showAddForm ? (
+            <Button variant="outline" size="sm" onClick={() => { setShowAddForm(true); setEntryDate(new Date().toISOString().slice(0, 10)) }}>
+              + Add transaction
+            </Button>
+          ) : (
+            <Card>
+              <CardContent className="pt-4 pb-4 space-y-3">
+                <p className="text-[10px] font-mono uppercase tracking-widest text-muted">Add transaction</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="entry-date">Date</Label>
+                    <Input id="entry-date" type="date" value={entryDate}
+                      onChange={e => setEntryDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="entry-amount">Amount</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span>
+                      <Input id="entry-amount" className="pl-7" placeholder="e.g. 1,200"
+                        value={entryAmount} onChange={e => setEntryAmount(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="entry-cat">Category</Label>
+                  <select id="entry-cat" value={entryCategory}
+                    onChange={e => setEntryCategory(e.target.value)}
+                    className="w-full border border-border rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent">
+                    <option value="">— select —</option>
+                    {MANUAL_CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="entry-desc">Description <span className="font-normal text-muted">(optional)</span></Label>
+                  <Input id="entry-desc" placeholder="e.g. Building insurance renewal"
+                    value={entryDesc} onChange={e => setEntryDesc(e.target.value)} />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleAddEntry}
+                    disabled={!entryDate || !entryAmount || !entryCategory || savingEntry}>
+                    {savingEntry ? 'Adding…' : 'Add transaction'}
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
         <Card className="text-[11px] text-muted leading-relaxed mt-4">
           <CardContent className="py-3">
             ⚠ Deleting a property does not delete historical statements. Past reports will retain the data as generated.
@@ -215,6 +385,28 @@ export default function EditPropertyPage() {
             <DialogFooter>
               <Button variant="destructive" className="flex-1" onClick={handleDelete}>
                 Delete property
+              </Button>
+              <DialogClose asChild>
+                <Button variant="outline" className="flex-1">Cancel</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!confirmDelete} onOpenChange={open => !open && setConfirmDelete(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete transaction?</DialogTitle>
+              <DialogDescription>
+                This will permanently remove the{' '}
+                <strong>{CATEGORY_LABELS[confirmDelete?.category ?? ''] ?? confirmDelete?.category}</strong>{' '}
+                entry of <strong>{confirmDelete ? formatCents(confirmDelete.amountCents) : ''}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="destructive" className="flex-1"
+                onClick={() => confirmDelete && handleDeleteEntry(confirmDelete)}>
+                Delete transaction
               </Button>
               <DialogClose asChild>
                 <Button variant="outline" className="flex-1">Cancel</Button>
