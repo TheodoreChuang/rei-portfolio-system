@@ -29,8 +29,7 @@ directed to the property page to add one. They can also skip (no mortgage for
 this property).
 
 **FR-1.5** Each loan payment input captures amount and date. Date defaults to
-the most recent `loan_payment` ledger entry for that loan account but is editable.
-Falls back to the last day of the month if no prior entry exists.
+the last day of the assigned month but is editable.
 
 **FR-1.6** Pre-fill: each loan account input is pre-filled with the amount from
 the most recent `loan_payment` ledger entry for that loan account. Falls back
@@ -107,21 +106,18 @@ retroactive recalculations.
 ## Data Model Changes
 
 ### New tables
-
 ```
 loan_accounts     id, userId, propertyId (FK → properties),
                   lender, nickname, isActive, createdAt
 ```
 
 ### Modified tables
-
 ```
 property_ledger_entries    + loanAccountId (nullable FK → loan_accounts)
                   propertyId stays notNull — no change
 ```
 
 ### No other schema changes in V2
-
 `entities`, `property_ownerships`, `loan_borrowers`, and nullable `propertyId`
 are all deferred. See "Deferred Design Decisions" below.
 
@@ -131,14 +127,13 @@ are all deferred. See "Deferred Design Decisions" below.
 
 ### Pre-step — Rename `ledger_entries` → `property_ledger_entries`
 
-_Do this before any Slice 1 code. Clean naming before new code is added._
+*Do this before any Slice 1 code. Clean naming before new code is added.*
 
 Rename the table and all references throughout the codebase. This is the right
 time — post-V1, pre-new-features, while the codebase is small. Once
 `entity_ledger_entries` exists in V3, the old name would be ambiguous.
 
 Scope of changes:
-
 - `db/schema.ts` — rename table and Drizzle export (`ledgerEntries` →
   `propertyLedgerEntries`, `LedgerEntry` → `PropertyLedgerEntry`)
 - Drizzle migration — `ALTER TABLE ledger_entries RENAME TO property_ledger_entries`
@@ -156,17 +151,15 @@ doc) before moving on to Slice 1.
 
 ### Slice 1 — Loan Accounts
 
-_Prerequisite for everything. Fixes the main data accuracy issue._
+*Prerequisite for everything. Fixes the main data accuracy issue.*
 
 Schema:
-
 - Add `loan_accounts` table + migration
 - Add `loanAccountId` (nullable) to `property_ledger_entries` + migration
 - RLS policies for `loan_accounts`
 - Reset local data (see Technical Notes)
 
 API:
-
 - `GET/POST /api/properties/[id]/loans` — list + create loan accounts
 - `PATCH/DELETE /api/properties/[id]/loans/[loanId]` — update + deactivate
 - Update `GET /api/statements` pre-fill to query by `loanAccountId`
@@ -175,7 +168,6 @@ API:
 - Update report generation: missing data flags per loan account
 
 UI:
-
 - Property detail page: "Loans" section — list active/inactive, add/deactivate
 - Upload mortgage step: one row per active loan account per property; redirect
   to property page if no loan accounts registered; date input per row;
@@ -183,7 +175,6 @@ UI:
 - Report flags: "No payment entered for [Westpac — Investment loan]"
 
 Tests:
-
 - Loan account CRUD + RLS
 - Pre-fill with multiple loans on one property
 - Upload mortgage step with zero loan accounts (redirect)
@@ -194,16 +185,14 @@ Tests:
 
 ### Slice 2 — Manual Ledger Entries
 
-_Extends the ledger beyond PM statements._
+*Extends the ledger beyond PM statements.*
 
 API:
-
 - `POST /api/properties/[id]/entries` — create manual entry
 - `DELETE /api/ledger/[id]` — delete manual entry (guard: reject if
   `sourceDocumentId` is not null)
 
 UI:
-
 - Property detail page: "Transactions" section — list entries for selected
   month, "Add transaction" button opens inline form
 - Form fields: date, amount, category (all except `loan_payment`), description
@@ -212,7 +201,6 @@ UI:
 - Delete confirmation for manual entries
 
 Tests:
-
 - Create manual entry — appears in report totals on regeneration
 - Cannot delete PDF-extracted entry via this route (403)
 - RLS isolation
@@ -222,16 +210,14 @@ Tests:
 
 ### Slice 3 — Ledger Drill-Down
 
-_Surfaces the granular data the model was designed to hold._
+*Surfaces the granular data the model was designed to hold.*
 
 API:
-
 - Extend `GET /api/reports/[month]` or add
   `GET /api/statements?month=YYYY-MM&propertyId=` returning line items
   with `loan_accounts` joined for lender/nickname
 
 UI:
-
 - Detailed report page: each property section has expand/collapse toggle
 - Expanded view: entries grouped by category, sorted by date
 - Loan entries: show lender + nickname from `loan_accounts`
@@ -239,7 +225,6 @@ UI:
 - Collapsed by default; state not persisted
 
 Tests:
-
 - Entries grouped and ordered correctly
 - Loan account name displayed on `loan_payment` entries
 - Manual entries distinguished from extracted entries
@@ -249,26 +234,51 @@ Tests:
 
 ### Slice 4 — Multi-Month Trends
 
-_Historical context for the portfolio._
+*Historical context for the portfolio.*
+
+**Charting library: Tremor**
+Tremor v3 ships as pure Tailwind-based chart components with no UI framework
+dependency — compatible with the existing Radix UI components, no conflicts.
+Install: `pnpm add @tremor/react`. Design aesthetic is clean and minimal,
+consistent with PropFlow's tone. Compatible with a future shadcn migration.
+
+Note: do not migrate existing Radix UI components as part of this slice.
+Tremor is additive — charts only.
+
+**Default window: 12 months**
+Property expenses are seasonal (insurance renewals, council rates, annual
+maintenance). 6 months cuts the year in half and makes predictable expense
+spikes look abnormal. 12 months provides the natural unit for property
+investors. API supports `?months=N` for flexibility; UI defaults to 12.
 
 API:
+- `GET /api/reports/trends?months=12` — returns last N months of report
+  snapshots ordered ascending (oldest → newest, for chart rendering);
+  months with no report returned as `null` (not zero)
+- Response shape per month:
+  `{ month, totalRentCents, totalExpensesCents, totalMortgageCents, netCents } | null`
 
-- `GET /api/reports/trends?months=6` — returns last N months of report
-  snapshots; months with no report returned as `null` (not zero)
+UI — View 1: Portfolio cash flow trend (primary)
+- Stacked bar chart per month: rent (positive), expenses + mortgage (negative)
+- Net cash flow as a line overlay on the same chart
+- Immediately answers: "Am I positively or negatively geared and is it
+  improving?"
+- Null months rendered as empty bars with a "No report" label beneath
+- Clicking a bar navigates to that month's report
+- Positive net shown in accent colour, negative in warn colour
 
-UI:
-
-- Dashboard: trends section below existing summary
-- Chart showing last 6 months: rent, expenses, net cash flow
-- Charting library decided at build time
-- Null months shown as gap or "No report" marker
-- Clicking a month navigates to that report
+UI — View 2: Expense ratio (secondary)
+- Inline stat below or beside the chart: expenses as % of rent
+- Current month vs prior month — arrow indicator (up/down/flat)
+- No separate chart — a single figure with trend direction is sufficient
+- Only shown when at least 2 months of data exist
 
 Tests:
-
-- Trends endpoint returns correct month range
-- Null months returned for missing reports (not zero)
-- Months ordered descending
+- Trends endpoint returns correct 12-month range
+- Months ordered ascending in response (for chart rendering)
+- Null returned for months with no report (not zero)
+- Response correctly derives `netCents` from snapshot totals
+- Expense ratio calculated correctly from current and prior month
 
 ---
 
@@ -285,6 +295,8 @@ Tests:
 - Bank statement or loan statement PDF parsing
 - Mobile layout improvements
 - Multi-user / accountant access
+- shadcn UI migration (evaluate post-V2; Tremor in Slice 4 is compatible
+  with a future shadcn migration and does not block it)
 
 ---
 
@@ -295,13 +307,11 @@ Tests:
 **Reset local data before starting**
 `loan_payment` entries must always have a `loanAccountId` — no legacy null
 case is supported. The app is not live so local data can be wiped cleanly:
-
 ```bash
 supabase db reset
 pnpm db:migrate    # applies new schema
 pnpm seed          # restores test data with proper loan accounts
 ```
-
 The seed script needs updating to create loan accounts before inserting
 `loan_payment` ledger entries and to set `loanAccountId` on those entries.
 
@@ -320,6 +330,18 @@ deletion of extracted entries happens at the statement level (existing
 behaviour). Implement this guard explicitly rather than relying on the caller.
 
 ### Slice 4
+
+**Install Tremor before writing any chart code**
+```bash
+pnpm add @tremor/react
+```
+Tremor v3 requires Tailwind v3+. Confirm `tailwind.config` includes Tremor's
+content path:
+```js
+content: ['./node_modules/@tremor/**/*.{js,ts,jsx,tsx}']
+```
+Do not install `@shadcn/ui` as part of this slice — that is a separate future
+migration. Tremor works standalone.
 
 **Trends use report snapshots, not live ledger queries**
 `GET /api/reports/trends` must read from `portfolio_reports.totals` (the JSONB
@@ -345,7 +367,6 @@ ownership entity and support different tax treatment per structure.
 entity for now. The only V2 benefit would have been a nullable `entityId` FK on
 `loan_accounts` — but that FK can be backfilled trivially when `entities` is
 introduced in V3:
-
 ```sql
 -- Future V3 migration
 ALTER TABLE loan_accounts ADD COLUMN entity_id uuid REFERENCES entities(id);
@@ -356,7 +377,6 @@ UPDATE loan_accounts
     LIMIT 1
   );
 ```
-
 Adding `entities` in V2 would have required: new table, new enum, new RLS
 policy, idempotent auto-creation in auth callback, updated seed script, and
 every future Claude Code session reasoning about a table with no UI or queries.
@@ -370,15 +390,12 @@ property + ownershipPct) and `loan_borrowers` (entity + loan + borrowerPct).
 **Idempotency note for when it is built:** `app/auth/callback/route.ts` can
 fire more than once due to network retries. Entity auto-creation must be a
 guarded insert, not a plain insert:
-
 ```typescript
-const existing = await db
-  .select()
-  .from(entities)
-  .where(and(eq(entities.userId, userId), eq(entities.type, "individual")))
-  .limit(1);
+const existing = await db.select().from(entities)
+  .where(and(eq(entities.userId, userId), eq(entities.type, 'individual')))
+  .limit(1)
 if (!existing.length) {
-  await db.insert(entities).values({ userId, name, type: "individual" });
+  await db.insert(entities).values({ userId, name, type: 'individual' })
 }
 ```
 
