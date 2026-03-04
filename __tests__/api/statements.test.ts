@@ -88,15 +88,17 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
+        leftJoin: vi.fn().mockReturnValue({           // propertyId drill-down branch
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockImplementation(() => mocks.mockPropertyEntries()),
+          }),
+        }),
         where: vi.fn().mockReturnValue({
           // POST path: .where().limit()
           limit: mocks.mockSelectLimit,
           // GET prior loan path: .where().orderBy().limit()
-          // GET propertyId path: .where().orderBy() thenable (no .limit())
           orderBy: vi.fn().mockReturnValue({
             limit: mocks.mockPriorLoanLimit,
-            then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
-              mocks.mockPropertyEntries().then(resolve, reject),
           }),
           // GET entries path: await .where() directly (thenable)
           then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
@@ -305,6 +307,33 @@ describe('GET /api/statements - propertyId filter', () => {
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/propertyId/i)
+  })
+
+  it('includes lender and loanNickname for a loan_payment entry', async () => {
+    const loanEntry = {
+      ...entryRow,
+      id: 'e2222222-2222-4222-a222-222222222222',
+      category: 'loan_payment',
+      loanAccountId: 'c3d4e5f6-a7b8-4901-c234-333333333333',
+      lender: 'Westpac',
+      loanNickname: 'Investment',
+    }
+    mocks.mockPropertyEntries.mockResolvedValueOnce([loanEntry])
+    const res = await GET(makePropertyRequest(validPropertyId, '2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.entries[0].lender).toBe('Westpac')
+    expect(json.entries[0].loanNickname).toBe('Investment')
+  })
+
+  it('includes null lender and loanNickname for a non-loan entry', async () => {
+    const nonLoanEntry = { ...entryRow, lender: null, loanNickname: null }
+    mocks.mockPropertyEntries.mockResolvedValueOnce([nonLoanEntry])
+    const res = await GET(makePropertyRequest(validPropertyId, '2026-03'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.entries[0].lender).toBeNull()
+    expect(json.entries[0].loanNickname).toBeNull()
   })
 })
 

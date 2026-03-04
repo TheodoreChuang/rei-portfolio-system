@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, getTableColumns, gte, lt, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { db } from '@/lib/db'
@@ -23,9 +23,11 @@ function isValidUuid(val: string): boolean {
 //   Response: { amountCents: number | null }
 //
 // GET /api/statements?propertyId=UUID&month=2026-03
-//   Returns all ledger entries for a specific property in the given month,
-//   sorted by lineItemDate DESC. Used by the property detail page Transactions section.
-//   Response: { entries: PropertyLedgerEntry[] }
+//   Returns all ledger entries for a specific property in the given month, LEFT JOINed
+//   with loan_accounts so each entry includes lender and loanNickname (null for non-loan
+//   entries). Sorted by category (rent first, loan_payment last) then lineItemDate DESC.
+//   Used by the report drill-down / property detail page Transactions section.
+//   Response: { entries: Array<PropertyLedgerEntry & { lender: string|null, loanNickname: string|null }> }
 export async function GET(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -67,8 +69,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 })
     }
     const entries = await db
-      .select()
+      .select({
+        ...getTableColumns(propertyLedgerEntries),
+        lender: loanAccounts.lender,
+        loanNickname: loanAccounts.nickname,
+      })
       .from(propertyLedgerEntries)
+      .leftJoin(loanAccounts, eq(propertyLedgerEntries.loanAccountId, loanAccounts.id))
       .where(
         and(
           eq(propertyLedgerEntries.userId, user.id),
@@ -77,7 +84,14 @@ export async function GET(request: Request) {
           lte(propertyLedgerEntries.lineItemDate, endDate),
         )
       )
-      .orderBy(desc(propertyLedgerEntries.lineItemDate))
+      .orderBy(
+        sql`CASE ${propertyLedgerEntries.category}
+          WHEN 'rent' THEN 0
+          WHEN 'loan_payment' THEN 2
+          ELSE 1
+        END`,
+        desc(propertyLedgerEntries.lineItemDate),
+      )
     return NextResponse.json({ entries })
   }
 

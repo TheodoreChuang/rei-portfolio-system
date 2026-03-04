@@ -1,6 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+
+type DrillDownEntry = {
+  id: string
+  category: string
+  lineItemDate: string
+  amountCents: number
+  description: string | null
+  sourceDocumentId: string | null
+  lender: string | null
+  loanNickname: string | null
+}
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppNav } from '@/components/app-nav'
@@ -26,6 +37,12 @@ type Report = {
 
 type DocEntry = { id: string; fileName: string; propertyId: string }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  rent: 'Rent', insurance: 'Insurance', rates: 'Rates', repairs: 'Repairs',
+  property_management: 'Mgmt fee', utilities: 'Utilities',
+  strata_fees: 'Strata', other_expense: 'Other', loan_payment: 'Mortgage',
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center px-5 py-3 border-b border-border">
@@ -38,11 +55,31 @@ function PropertyCard({
   p,
   docEntries,
   onDelete,
+  month,
 }: {
   p: PropertyTotals
   docEntries: DocEntry[]
   onDelete: (id: string) => void
+  month: string
 }) {
+  const [expanded, setExpanded] = useState(false)
+  const [drillEntries, setDrillEntries] = useState<DrillDownEntry[]>([])
+  const [drillLoading, setDrillLoading] = useState(false)
+  const [hasFetched, setHasFetched] = useState(false)
+
+  function handleExpand() {
+    setExpanded(true)
+    if (!hasFetched) {
+      setDrillLoading(true)
+      setHasFetched(true)
+      fetch(`/api/statements?propertyId=${p.propertyId}&month=${month}`)
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => setDrillEntries(data.entries ?? []))
+        .catch(() => {})
+        .finally(() => setDrillLoading(false))
+    }
+  }
+
   const netSign = p.netCents >= 0 ? '+' : '−'
   const netAbs = formatCents(Math.abs(p.netCents))
   const isComplete = p.hasStatement && p.hasMortgage
@@ -105,6 +142,45 @@ function PropertyCard({
         ))}
       </div>
       {isPartial && <p className="mt-2 text-[11px] text-warn font-mono">* Net excludes mortgage (not provided)</p>}
+
+      {/* Toggle */}
+      <button
+        onClick={() => expanded ? setExpanded(false) : handleExpand()}
+        className="mt-2 text-[11px] text-muted hover:text-ink font-mono"
+      >
+        {expanded ? '▲ Hide transactions' : '▼ Show transactions'}
+      </button>
+
+      {/* Drill-down */}
+      {expanded && (
+        <div className="mt-3 border-t border-ruled pt-3">
+          {drillLoading && <p className="text-xs text-muted">Loading…</p>}
+          {!drillLoading && drillEntries.length === 0 && (
+            <p className="text-xs text-muted">No entries for this month.</p>
+          )}
+          {!drillLoading && drillEntries.length > 0 && (
+            <div className="space-y-1.5">
+              {drillEntries.map(e => (
+                <div key={e.id} className="flex items-center gap-2 py-0.5 text-xs">
+                  <span className="text-muted font-mono w-20 flex-shrink-0">{e.lineItemDate}</span>
+                  <Badge variant={e.category === 'rent' ? 'green' : 'grey'} className="flex-shrink-0 text-[10px]">
+                    {CATEGORY_LABELS[e.category] ?? e.category}
+                  </Badge>
+                  <span className="flex-1 truncate text-muted min-w-0">
+                    {e.category === 'loan_payment' && e.lender
+                      ? `${e.lender}${e.loanNickname ? ` — ${e.loanNickname}` : ''}`
+                      : (e.description ?? '—')}
+                  </span>
+                  <span className="font-mono font-semibold flex-shrink-0">{formatCents(e.amountCents)}</span>
+                  {!e.sourceDocumentId && (
+                    <span className="text-[10px] text-muted font-mono flex-shrink-0">Manual</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -294,6 +370,7 @@ export default function ReportPage() {
                 p={p}
                 docEntries={docsByProperty.get(p.propertyId) ?? []}
                 onDelete={handleDelete}
+                month={month}
               />
             ))}
           </div>
