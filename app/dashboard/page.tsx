@@ -4,12 +4,19 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+} from 'recharts'
 import { AppNav } from '@/components/app-nav'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
+import { ChartTooltip } from '@/components/ui/chart'
+import type { ChartConfig } from '@/components/ui/chart'
 import { formatCents, formatMonth } from '@/lib/format'
 import type { ReportTotals } from '@/lib/reports/compute'
+import type { TrendPoint } from '@/app/api/reports/trends/route'
 import { cn } from '@/lib/utils'
 
 type ReportListItem = { month: string; createdAt: string }
@@ -23,6 +30,149 @@ type Report = {
   updatedAt: string | null
 }
 
+const chartConfig = {
+  rent:   { label: 'Rent',     color: '#2d5a3d' },   // --color-accent
+  costs:  { label: 'Costs',    color: '#c4622d' },   // --color-warn
+  net:    { label: 'Net',      color: '#1a1a1a' },   // --color-ink
+} satisfies ChartConfig
+
+type ChartPoint = {
+  label: string
+  month: string
+  rent: number | null
+  costs: number | null   // negated: -(expenses + mortgage)
+  net: number | null
+  hasReport: boolean
+}
+
+function TrendsSection({ trends, month, onBarClick }: {
+  trends: TrendPoint[]
+  month: string
+  onBarClick: (m: string) => void
+}) {
+  const data: ChartPoint[] = trends.map(t => ({
+    label: t.month.slice(5), // 'MM' abbreviation
+    month: t.month,
+    rent: t.rentCents !== null ? t.rentCents / 100 : null,
+    costs: t.expensesCents !== null && t.mortgageCents !== null
+      ? -((t.expensesCents + t.mortgageCents) / 100)
+      : null,
+    net: t.netCents !== null ? t.netCents / 100 : null,
+    hasReport: t.rentCents !== null,
+  }))
+
+  // Expense ratio stat
+  const currentIdx = trends.findIndex(t => t.month === month)
+  const current = currentIdx >= 0 ? trends[currentIdx] : null
+  const prior = currentIdx > 0 ? trends[currentIdx - 1] : null
+
+  const currentRatio = current?.rentCents && current.expensesCents !== null
+    ? (current.expensesCents / current.rentCents) * 100
+    : null
+  const priorRatio = prior?.rentCents && prior.expensesCents !== null
+    ? (prior.expensesCents / prior.rentCents) * 100
+    : null
+
+  const showRatio = currentRatio !== null && priorRatio !== null
+  const ratioDiff = showRatio ? currentRatio - priorRatio! : null
+  const ratioUp = ratioDiff !== null && ratioDiff > 0
+
+  const dollarFormatter = (v: number) =>
+    v === 0 ? '$0' : `${v < 0 ? '-' : ''}$${Math.abs(v / 1).toLocaleString('en-AU', { maximumFractionDigits: 0 })}`
+
+  return (
+    <div className="px-5 pb-5">
+      <div className="border border-border rounded-lg bg-white">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <p className="text-[10px] font-mono uppercase tracking-wider text-muted">12-month trend</p>
+          {showRatio && (
+            <div className="flex items-center gap-1.5 text-[11px] font-mono">
+              <span className="text-muted">Expense ratio</span>
+              <span className={cn('font-semibold', ratioUp ? 'text-warn' : 'text-accent')}>
+                {currentRatio!.toFixed(1)}%
+              </span>
+              <span className={cn('text-[10px]', ratioUp ? 'text-warn' : 'text-accent')}>
+                {ratioUp ? '↑' : '↓'}{Math.abs(ratioDiff!).toFixed(1)}pp
+              </span>
+            </div>
+          )}
+        </div>
+
+        <ChartContainer config={chartConfig} className="min-h-[220px] w-full px-2 pt-3 pb-1">
+          <ComposedChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+            onClick={(e) => {
+              const p = e?.activePayload?.[0]?.payload as ChartPoint | undefined
+              if (p?.hasReport) onBarClick(p.month)
+            }}
+          >
+            <CartesianGrid vertical={false} stroke="#ddd9cf" strokeDasharray="3 3" />
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 10, fontFamily: 'var(--font-mono)', fill: '#7a7670' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tickFormatter={dollarFormatter}
+              tick={{ fontSize: 10, fontFamily: 'var(--font-mono)', fill: '#7a7670' }}
+              axisLine={false}
+              tickLine={false}
+              width={56}
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name) => [
+                    `$${Math.abs(Number(value)).toLocaleString('en-AU', { maximumFractionDigits: 0 })}`,
+                    name === 'costs' ? 'Costs' : name === 'rent' ? 'Rent' : 'Net',
+                  ]}
+                />
+              }
+            />
+
+            {/* Rent bars — positive */}
+            <Bar dataKey="rent" stackId="a" fill={chartConfig.rent.color} radius={[2, 2, 0, 0]} maxBarSize={32}>
+              {data.map((entry) => (
+                <Cell
+                  key={entry.month}
+                  fill={entry.month === month ? '#2d5a3d' : '#8fba9e'}
+                  cursor={entry.hasReport ? 'pointer' : 'default'}
+                />
+              ))}
+            </Bar>
+
+            {/* Costs bars — negative (stacked below zero) */}
+            <Bar dataKey="costs" stackId="b" fill={chartConfig.costs.color} radius={[0, 0, 2, 2]} maxBarSize={32}>
+              {data.map((entry) => (
+                <Cell
+                  key={entry.month}
+                  fill={entry.month === month ? '#c4622d' : '#e0a080'}
+                  cursor={entry.hasReport ? 'pointer' : 'default'}
+                />
+              ))}
+            </Bar>
+
+            {/* Net cash flow line */}
+            <Line
+              dataKey="net"
+              stroke={chartConfig.net.color}
+              strokeWidth={1.5}
+              dot={{ r: 2, fill: '#1a1a1a' }}
+              connectNulls={false}
+            />
+          </ComposedChart>
+        </ChartContainer>
+
+        <div className="px-4 py-2 border-t border-ruled flex items-center gap-4 text-[10px] font-mono text-muted">
+          <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-accent opacity-60" />Rent</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-warn opacity-60" />Costs</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-6 h-px bg-ink" />Net</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function DashboardContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -30,6 +180,7 @@ function DashboardContent() {
   const [report, setReport] = useState<Report | null>(null)
   const [loadingList, setLoadingList] = useState(true)
   const [loadingReport, setLoadingReport] = useState(false)
+  const [trends, setTrends] = useState<TrendPoint[]>([])
 
   const month = searchParams.get('month') || reportList[0]?.month || ''
 
@@ -40,6 +191,14 @@ function DashboardContent() {
       .then(data => setReportList(data.reports ?? []))
       .catch(() => {})
       .finally(() => setLoadingList(false))
+  }, [])
+
+  // Fetch trends once on mount (independent of month selection)
+  useEffect(() => {
+    fetch('/api/reports/trends?months=12')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setTrends(data.trends ?? []) })
+      .catch(() => {})
   }, [])
 
   // Fetch selected report when month changes
@@ -127,7 +286,7 @@ function DashboardContent() {
 
             {/* AI Commentary */}
             {report.aiCommentary && (
-              <Card className="mx-5 mt-4 mb-5">
+              <Card className="mx-5 mt-4">
                 <div className="bg-screen-bg border-b border-border px-4 py-2 flex items-center gap-2 rounded-t-lg">
                   <div className="w-1.5 h-1.5 rounded-full bg-accent" />
                   <span className="text-[11px] font-mono uppercase tracking-wider text-muted">AI Commentary — {formatMonth(month)}</span>
@@ -138,11 +297,20 @@ function DashboardContent() {
               </Card>
             )}
 
-            <div className="px-5 pb-5">
+            <div className="px-5 py-4">
               <Link href={`/reports/${month}`}>
                 <Button variant="outline" size="sm" className="w-full">View full report →</Button>
               </Link>
             </div>
+
+            {/* Trends chart */}
+            {trends.length >= 1 && (
+              <TrendsSection
+                trends={trends}
+                month={month}
+                onBarClick={(m) => router.push('/reports/' + m)}
+              />
+            )}
           </div>
 
           {/* Sidebar */}
