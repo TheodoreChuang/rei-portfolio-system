@@ -1,6 +1,7 @@
 .DS_Store
 
 .claude
+.mcp.json
 .cursor
 .ralph
 .ralphrc
