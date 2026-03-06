@@ -40,6 +40,7 @@ __tests__/            — Vitest unit tests (*.test.ts)
 ## Testing Conventions
 - Unit tests mock at the boundary (Supabase, DB, AI); no real I/O
 - Integration tests use `pool: 'forks'` and run sequentially (DB safety)
+- **Always verify changes with tests before finishing**: `pnpm test` (unit), `pnpm test:integration` (integration), `pnpm test:e2e` (e2e) — run whichever suites are relevant to the change
 - Run `pnpm test` before every commit
 
 ## Key Patterns
