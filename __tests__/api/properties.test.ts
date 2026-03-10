@@ -35,6 +35,8 @@ const propRow = {
   userId: 'user-123',
   address: '42 Wallaby Way, Sydney NSW 2000',
   nickname: 'Beach House',
+  startDate: '2020-01-01',
+  endDate: null,
   createdAt: new Date(),
 }
 
@@ -103,7 +105,7 @@ describe('POST /api/properties', () => {
 
   it('returns 401 when not authenticated', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: null } })
-    const res = await POST(makePostRequest({ address: 'test' }))
+    const res = await POST(makePostRequest({ address: 'test', startDate: '2020-01-01' }))
     expect(res.status).toBe(401)
   })
 
@@ -120,73 +122,70 @@ describe('POST /api/properties', () => {
   })
 
   it('returns 400 when address is missing', async () => {
-    const res = await POST(makePostRequest({}))
+    const res = await POST(makePostRequest({ startDate: '2020-01-01' }))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('Missing or empty address')
   })
 
   it('returns 400 when address is empty string', async () => {
-    const res = await POST(makePostRequest({ address: '   ' }))
+    const res = await POST(makePostRequest({ address: '   ', startDate: '2020-01-01' }))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('Missing or empty address')
   })
 
   it('returns 400 when address exceeds 500 characters', async () => {
-    const res = await POST(makePostRequest({ address: 'A'.repeat(501) }))
+    const res = await POST(makePostRequest({ address: 'A'.repeat(501), startDate: '2020-01-01' }))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('Address too long (max 500 characters)')
   })
 
-  it('creates property with address only (nickname null)', async () => {
-    const res = await POST(makePostRequest({ address: '42 Wallaby Way, Sydney NSW 2000' }))
+  it('returns 400 when startDate is missing', async () => {
+    const res = await POST(makePostRequest({ address: '42 Wallaby Way' }))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/startDate/i)
+  })
+
+  it('returns 400 when endDate is before startDate', async () => {
+    const res = await POST(makePostRequest({ address: '42 Wallaby Way', startDate: '2025-01-01', endDate: '2020-01-01' }))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/endDate/i)
+  })
+
+  it('creates property with address and startDate only', async () => {
+    const res = await POST(makePostRequest({ address: '42 Wallaby Way, Sydney NSW 2000', startDate: '2020-01-01' }))
     expect(res.status).toBe(201)
     const json = await res.json()
     expect(json.property).toBeDefined()
     expect(json.property.address).toBe('42 Wallaby Way, Sydney NSW 2000')
   })
 
-  it('creates property with address and nickname', async () => {
+  it('creates property with address, startDate, and nickname', async () => {
     const res = await POST(
-      makePostRequest({ address: '42 Wallaby Way, Sydney NSW 2000', nickname: 'Beach House' })
+      makePostRequest({ address: '42 Wallaby Way, Sydney NSW 2000', nickname: 'Beach House', startDate: '2020-01-01' })
     )
     expect(res.status).toBe(201)
     const json = await res.json()
     expect(json.property).toBeDefined()
   })
 
-  it('trims whitespace from address and nickname', async () => {
-    const insertMock = vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{
-          ...propRow,
-          address: '42 Wallaby Way',
-          nickname: 'Beach',
-        }]),
-      }),
-    })
-    const { db } = await import('@/lib/db')
-    ;(db.insert as ReturnType<typeof vi.fn>).mockReturnValue({
-      values: insertMock.mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{
-          ...propRow,
-          address: '42 Wallaby Way',
-          nickname: 'Beach',
-        }]),
-      }),
-    })
-
+  it('creates property with endDate set', async () => {
+    mocks.mockInsertReturning.mockResolvedValueOnce([{ ...propRow, endDate: '2030-01-01' }])
     const res = await POST(
-      makePostRequest({ address: '  42 Wallaby Way  ', nickname: '  Beach  ' })
+      makePostRequest({ address: '42 Wallaby Way', startDate: '2020-01-01', endDate: '2030-01-01' })
     )
     expect(res.status).toBe(201)
+    const json = await res.json()
+    expect(json.property.endDate).toBe('2030-01-01')
   })
 
   it('sets nickname to null when empty string provided', async () => {
     const res = await POST(
-      makePostRequest({ address: '42 Wallaby Way', nickname: '' })
+      makePostRequest({ address: '42 Wallaby Way', nickname: '', startDate: '2020-01-01' })
     )
     expect(res.status).toBe(201)
   })

@@ -8,7 +8,7 @@ import { logger } from '@/lib/logger'
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // DELETE /api/documents/[id]
-// Deletes a source document, its associated ledger entries, and the storage file.
+// Soft-deletes a source document and its associated ledger entries, then removes the storage file.
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -35,14 +35,16 @@ export async function DELETE(
   let entriesDeleted = 0
   try {
     await db.transaction(async (tx) => {
-      const deletedEntries = await tx
-        .delete(propertyLedgerEntries)
+      const softDeletedEntries = await tx
+        .update(propertyLedgerEntries)
+        .set({ deletedAt: new Date() })
         .where(eq(propertyLedgerEntries.sourceDocumentId, id))
         .returning()
-      entriesDeleted = deletedEntries.length
+      entriesDeleted = softDeletedEntries.length
 
       await tx
-        .delete(sourceDocuments)
+        .update(sourceDocuments)
+        .set({ deletedAt: new Date() })
         .where(and(eq(sourceDocuments.id, id), eq(sourceDocuments.userId, user.id)))
     })
   } catch (err) {

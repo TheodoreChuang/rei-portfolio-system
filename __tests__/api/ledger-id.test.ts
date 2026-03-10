@@ -13,6 +13,8 @@ const manualEntry = {
   description: 'Building insurance',
   userNotes: null,
   createdAt: new Date(),
+  updatedAt: new Date(),
+  deletedAt: null,
 }
 
 const extractedEntry = {
@@ -30,7 +32,7 @@ function makeDeleteRequest(entryId: string) {
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockSelectLimit: vi.fn(),    // entry lookup
-  mockDeleteReturning: vi.fn(),
+  mockUpdateReturning: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -50,9 +52,11 @@ vi.mock('@/lib/db', () => ({
         }),
       }),
     }),
-    delete: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        returning: mocks.mockDeleteReturning,
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: mocks.mockUpdateReturning,
+        }),
       }),
     }),
   },
@@ -63,36 +67,37 @@ describe('DELETE /api/ledger/[id]', () => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockSelectLimit.mockResolvedValue([manualEntry])
-    mocks.mockDeleteReturning.mockResolvedValue([manualEntry])
+    mocks.mockUpdateReturning.mockResolvedValue([{ ...manualEntry, deletedAt: new Date() }])
   })
 
-  it('returns 200 with deleted entry on success', async () => {
+  it('returns 200 with soft-deleted entry on success', async () => {
     const res = await DELETE(makeDeleteRequest(VALID_ENTRY_ID), { params: Promise.resolve({ id: VALID_ENTRY_ID }) })
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.entry.id).toBe(VALID_ENTRY_ID)
     expect(json.entry.category).toBe('insurance')
+    expect(json.entry.deletedAt).not.toBeNull()
   })
 
   it('returns 401 when unauthenticated', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: null } })
     const res = await DELETE(makeDeleteRequest(VALID_ENTRY_ID), { params: Promise.resolve({ id: VALID_ENTRY_ID }) })
     expect(res.status).toBe(401)
-    expect(mocks.mockDeleteReturning).not.toHaveBeenCalled()
+    expect(mocks.mockUpdateReturning).not.toHaveBeenCalled()
   })
 
   it('returns 404 for invalid UUID (does not leak existence)', async () => {
     const res = await DELETE(makeDeleteRequest('not-a-uuid'), { params: Promise.resolve({ id: 'not-a-uuid' }) })
     expect(res.status).toBe(404)
     expect(mocks.mockSelectLimit).not.toHaveBeenCalled()
-    expect(mocks.mockDeleteReturning).not.toHaveBeenCalled()
+    expect(mocks.mockUpdateReturning).not.toHaveBeenCalled()
   })
 
   it('returns 404 when entry does not exist', async () => {
     mocks.mockSelectLimit.mockResolvedValueOnce([])
     const res = await DELETE(makeDeleteRequest(VALID_ENTRY_ID), { params: Promise.resolve({ id: VALID_ENTRY_ID }) })
     expect(res.status).toBe(404)
-    expect(mocks.mockDeleteReturning).not.toHaveBeenCalled()
+    expect(mocks.mockUpdateReturning).not.toHaveBeenCalled()
   })
 
   it('returns 404 when entry belongs to another user', async () => {
@@ -100,7 +105,7 @@ describe('DELETE /api/ledger/[id]', () => {
     mocks.mockSelectLimit.mockResolvedValueOnce([]) // WHERE userId = user-B → no match
     const res = await DELETE(makeDeleteRequest(VALID_ENTRY_ID), { params: Promise.resolve({ id: VALID_ENTRY_ID }) })
     expect(res.status).toBe(404)
-    expect(mocks.mockDeleteReturning).not.toHaveBeenCalled()
+    expect(mocks.mockUpdateReturning).not.toHaveBeenCalled()
   })
 
   it('returns 403 when entry was extracted from a PDF (sourceDocumentId not null)', async () => {
@@ -109,6 +114,6 @@ describe('DELETE /api/ledger/[id]', () => {
     expect(res.status).toBe(403)
     const json = await res.json()
     expect(json.error).toMatch(/extracted/i)
-    expect(mocks.mockDeleteReturning).not.toHaveBeenCalled()
+    expect(mocks.mockUpdateReturning).not.toHaveBeenCalled()
   })
 })

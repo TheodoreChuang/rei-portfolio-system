@@ -1,4 +1,4 @@
-// DELETE /api/ledger/[id] — delete a manual ledger entry.
+// DELETE /api/ledger/[id] — soft-delete a manual ledger entry.
 // Guard: entries linked to a source document (PDF-extracted) cannot be deleted here.
 // Those are removed at the statement level via DELETE /api/documents/[id].
 import { and, eq } from 'drizzle-orm'
@@ -40,10 +40,11 @@ export async function DELETE(
     )
   }
 
-  const [deleted] = await db
-    .delete(propertyLedgerEntries)
+  const [updated] = await db
+    .update(propertyLedgerEntries)
+    .set({ deletedAt: new Date() })
     .where(eq(propertyLedgerEntries.id, id))
     .returning()
 
-  return NextResponse.json({ entry: deleted })
+  return NextResponse.json({ entry: updated })
 }

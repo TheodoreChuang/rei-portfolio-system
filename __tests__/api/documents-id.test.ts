@@ -16,8 +16,8 @@ const docRow = {
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockSelectLimit: vi.fn(),
-  mockDeleteEntries: vi.fn(),
-  mockDeleteDoc: vi.fn(),
+  mockUpdateEntries: vi.fn(),
+  mockUpdateDoc: vi.fn(),
   mockStorageRemove: vi.fn(),
   mockTransaction: vi.fn(),
 }))
@@ -60,29 +60,33 @@ describe('DELETE /api/documents/[id]', () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockSelectLimit.mockResolvedValue([docRow])
     mocks.mockStorageRemove.mockResolvedValue({ error: null })
-    mocks.mockDeleteEntries.mockResolvedValue([{ id: 'entry-1' }, { id: 'entry-2' }])
-    mocks.mockDeleteDoc.mockResolvedValue([])
+    mocks.mockUpdateEntries.mockResolvedValue([{ id: 'entry-1' }, { id: 'entry-2' }])
+    mocks.mockUpdateDoc.mockResolvedValue([])
 
-    // Default transaction: executes callback with a mock tx
+    // Default transaction: soft-deletes entries then doc
     mocks.mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-      let deleteCallCount = 0
+      let updateCallCount = 0
       const tx = {
-        delete: vi.fn().mockImplementation(() => {
-          deleteCallCount++
-          if (deleteCallCount === 1) {
-            // First delete: propertyLedgerEntries — has .returning()
+        update: vi.fn().mockImplementation(() => {
+          updateCallCount++
+          if (updateCallCount === 1) {
+            // First update: propertyLedgerEntries — has .returning()
             return {
-              where: vi.fn().mockReturnValue({
-                returning: mocks.mockDeleteEntries,
+              set: vi.fn().mockReturnValue({
+                where: vi.fn().mockReturnValue({
+                  returning: mocks.mockUpdateEntries,
+                }),
               }),
             }
           }
-          // Second delete: sourceDocuments — awaited directly (no returning)
+          // Second update: sourceDocuments — awaited directly (no returning)
           return {
-            where: vi.fn().mockImplementation(() => ({
-              then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
-                mocks.mockDeleteDoc().then(resolve, reject),
-            })),
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockImplementation(() => ({
+                then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+                  mocks.mockUpdateDoc().then(resolve, reject),
+              })),
+            }),
           }
         }),
       }
@@ -124,13 +128,13 @@ describe('DELETE /api/documents/[id]', () => {
     expect(typeof json.entriesDeleted).toBe('number')
   })
 
-  it('calls DELETE on property_ledger_entries (first) before source_documents (second)', async () => {
+  it('soft-deletes property_ledger_entries (first) before source_documents (second)', async () => {
     const callOrder: string[] = []
-    mocks.mockDeleteEntries.mockImplementation(() => {
+    mocks.mockUpdateEntries.mockImplementation(() => {
       callOrder.push('entries')
       return Promise.resolve([{ id: 'e1' }])
     })
-    mocks.mockDeleteDoc.mockImplementation(() => {
+    mocks.mockUpdateDoc.mockImplementation(() => {
       callOrder.push('doc')
       return Promise.resolve([])
     })
@@ -162,8 +166,8 @@ describe('DELETE /api/documents/[id]', () => {
     expect(json.error).toBe('Delete failed')
   })
 
-  it('entriesDeleted count matches the number of rows deleted', async () => {
-    mocks.mockDeleteEntries.mockResolvedValue([
+  it('entriesDeleted count matches the number of rows soft-deleted', async () => {
+    mocks.mockUpdateEntries.mockResolvedValue([
       { id: 'e1' }, { id: 'e2' }, { id: 'e3' },
     ])
     const res = await DELETE(makeDeleteRequest(), makeParams(VALID_UUID))

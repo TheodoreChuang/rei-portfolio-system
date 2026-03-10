@@ -71,6 +71,20 @@ export async function POST(
 
   const nickname = typeof raw.nickname === 'string' ? raw.nickname.trim() || null : null
 
+  const startDate = typeof raw.startDate === 'string' ? raw.startDate.trim() : ''
+  if (!startDate) {
+    return NextResponse.json({ error: 'startDate is required' }, { status: 400 })
+  }
+
+  const endDate = typeof raw.endDate === 'string' ? raw.endDate.trim() : ''
+  if (!endDate) {
+    return NextResponse.json({ error: 'endDate is required' }, { status: 400 })
+  }
+
+  if (endDate < startDate) {
+    return NextResponse.json({ error: 'endDate cannot be before startDate' }, { status: 400 })
+  }
+
   const [property] = await db
     .select()
     .from(properties)
@@ -83,7 +97,7 @@ export async function POST(
 
   const [loan] = await db
     .insert(loanAccounts)
-    .values({ userId: user.id, propertyId: id, lender, nickname })
+    .values({ userId: user.id, propertyId: id, lender, nickname, startDate, endDate })
     .returning()
 
   return NextResponse.json({ loan }, { status: 201 })

@@ -6,6 +6,8 @@ const propRow = {
   userId: 'user-123',
   address: '123 Smith St, Sydney NSW 2000',
   nickname: 'Smith St',
+  startDate: '2020-01-01',
+  endDate: null,
   createdAt: new Date(),
 }
 
@@ -15,7 +17,8 @@ const loanRow = {
   propertyId: propRow.id,
   lender: 'Westpac',
   nickname: 'Investment loan',
-  isActive: true,
+  startDate: '2020-01-01',
+  endDate: '2050-01-01',
   createdAt: new Date(),
 }
 
@@ -120,9 +123,9 @@ describe('GET /api/properties/[id]/loans', () => {
     expect(json.loans[0].lender).toBe('Westpac')
   })
 
-  it('returns both active and inactive loans', async () => {
-    const inactiveLoan = { ...loanRow, id: 'c3d4e5f6-a7b8-4901-c234-333333333333', isActive: false }
-    mocks.mockSelectLoans.mockResolvedValueOnce([loanRow, inactiveLoan])
+  it('returns all loans regardless of endDate', async () => {
+    const endedLoan = { ...loanRow, id: 'c3d4e5f6-a7b8-4901-c234-333333333333', endDate: '2023-06-30' }
+    mocks.mockSelectLoans.mockResolvedValueOnce([loanRow, endedLoan])
     const res = await GET(makeGetRequest(VALID_PROP_ID), { params: Promise.resolve({ id: VALID_PROP_ID }) })
     expect(res.status).toBe(200)
     const json = await res.json()
@@ -142,37 +145,58 @@ describe('POST /api/properties/[id]/loans', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: null } })
-    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac', startDate: '2020-01-01', endDate: '2050-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 400 for invalid property ID', async () => {
-    const res = await POST(makePostRequest('bad-id', { lender: 'Westpac' }), { params: Promise.resolve({ id: 'bad-id' }) })
+    const res = await POST(makePostRequest('bad-id', { lender: 'Westpac', startDate: '2020-01-01', endDate: '2050-01-01' }), { params: Promise.resolve({ id: 'bad-id' }) })
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when lender is missing', async () => {
-    const res = await POST(makePostRequest(VALID_PROP_ID, { nickname: 'Top-up' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    const res = await POST(makePostRequest(VALID_PROP_ID, { nickname: 'Top-up', startDate: '2020-01-01', endDate: '2050-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/lender/i)
   })
 
   it('returns 400 when lender is empty string', async () => {
-    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: '   ' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: '   ', startDate: '2020-01-01', endDate: '2050-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/lender/i)
   })
 
   it('returns 400 when lender exceeds 200 characters', async () => {
-    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'A'.repeat(201) }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'A'.repeat(201), startDate: '2020-01-01', endDate: '2050-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
     expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when startDate is missing', async () => {
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac', endDate: '2050-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/startDate/i)
+  })
+
+  it('returns 400 when endDate is missing', async () => {
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac', startDate: '2020-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/endDate/i)
+  })
+
+  it('returns 400 when endDate is before startDate', async () => {
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac', startDate: '2025-01-01', endDate: '2020-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/endDate/i)
   })
 
   it('returns 404 when property not found', async () => {
     mocks.mockSelectLimit.mockResolvedValueOnce([])
-    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac', startDate: '2020-01-01', endDate: '2050-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
     expect(res.status).toBe(404)
     expect(mocks.mockInsertReturning).not.toHaveBeenCalled()
   })
@@ -180,12 +204,12 @@ describe('POST /api/properties/[id]/loans', () => {
   it('returns 404 when property belongs to another user', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
     mocks.mockSelectLimit.mockResolvedValueOnce([])
-    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac', startDate: '2020-01-01', endDate: '2050-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
     expect(res.status).toBe(404)
   })
 
   it('returns 201 and created loan on success', async () => {
-    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac', nickname: 'Investment loan' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'Westpac', nickname: 'Investment loan', startDate: '2020-01-01', endDate: '2050-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
     expect(res.status).toBe(201)
     const json = await res.json()
     expect(json.loan.lender).toBe('Westpac')
@@ -194,7 +218,7 @@ describe('POST /api/properties/[id]/loans', () => {
 
   it('accepts nickname as null (omitted from body)', async () => {
     mocks.mockInsertReturning.mockResolvedValueOnce([{ ...loanRow, nickname: null }])
-    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'ANZ' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    const res = await POST(makePostRequest(VALID_PROP_ID, { lender: 'ANZ', startDate: '2020-01-01', endDate: '2050-01-01' }), { params: Promise.resolve({ id: VALID_PROP_ID }) })
     expect(res.status).toBe(201)
     const json = await res.json()
     expect(json.loan.nickname).toBeNull()

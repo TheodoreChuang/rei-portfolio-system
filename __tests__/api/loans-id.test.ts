@@ -10,7 +10,8 @@ const loanRow = {
   propertyId: VALID_PROP_ID,
   lender: 'Westpac',
   nickname: 'Investment loan',
-  isActive: true,
+  startDate: '2020-01-01',
+  endDate: '2050-01-01',
   createdAt: new Date(),
 }
 
@@ -107,16 +108,6 @@ describe('PATCH /api/properties/[id]/loans/[loanId]', () => {
     expect(json.error).toMatch(/lender/i)
   })
 
-  it('returns 400 when isActive is not a boolean', async () => {
-    const res = await PATCH(
-      makePatchRequest(VALID_PROP_ID, VALID_LOAN_ID, { isActive: 'yes' }),
-      { params: Promise.resolve({ id: VALID_PROP_ID, loanId: VALID_LOAN_ID }) }
-    )
-    expect(res.status).toBe(400)
-    const json = await res.json()
-    expect(json.error).toMatch(/isActive/i)
-  })
-
   it('returns 404 when loan not found (wrong user or property)', async () => {
     mocks.mockUpdateReturning.mockResolvedValueOnce([])
     const res = await PATCH(
@@ -137,15 +128,25 @@ describe('PATCH /api/properties/[id]/loans/[loanId]', () => {
     expect(json.loan.lender).toBe('ANZ')
   })
 
-  it('returns 200 when isActive is set to false', async () => {
-    mocks.mockUpdateReturning.mockResolvedValueOnce([{ ...loanRow, isActive: false }])
+  it('returns 200 when endDate is updated', async () => {
+    mocks.mockUpdateReturning.mockResolvedValueOnce([{ ...loanRow, endDate: '2026-03-06' }])
     const res = await PATCH(
-      makePatchRequest(VALID_PROP_ID, VALID_LOAN_ID, { isActive: false }),
+      makePatchRequest(VALID_PROP_ID, VALID_LOAN_ID, { endDate: '2026-03-06' }),
       { params: Promise.resolve({ id: VALID_PROP_ID, loanId: VALID_LOAN_ID }) }
     )
     expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.loan.isActive).toBe(false)
+    expect(json.loan.endDate).toBe('2026-03-06')
+  })
+
+  it('returns 400 when endDate is empty string', async () => {
+    const res = await PATCH(
+      makePatchRequest(VALID_PROP_ID, VALID_LOAN_ID, { endDate: '' }),
+      { params: Promise.resolve({ id: VALID_PROP_ID, loanId: VALID_LOAN_ID }) }
+    )
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/endDate/i)
   })
 
   it('clears nickname when set to null', async () => {
@@ -166,7 +167,7 @@ describe('DELETE /api/properties/[id]/loans/[loanId]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
-    mocks.mockUpdateReturning.mockResolvedValue([{ ...loanRow, isActive: false }])
+    mocks.mockUpdateReturning.mockResolvedValue([{ ...loanRow, endDate: '2026-03-06' }])
   })
 
   it('returns 401 when unauthenticated', async () => {
@@ -195,14 +196,15 @@ describe('DELETE /api/properties/[id]/loans/[loanId]', () => {
     expect(res.status).toBe(404)
   })
 
-  it('returns 200 and sets isActive to false (soft delete)', async () => {
+  it('returns 200 and sets endDate to today (ends the loan)', async () => {
     const res = await DELETE(
       makeDeleteRequest(VALID_PROP_ID, VALID_LOAN_ID),
       { params: Promise.resolve({ id: VALID_PROP_ID, loanId: VALID_LOAN_ID }) }
     )
     expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.loan.isActive).toBe(false)
+    expect(json.loan.endDate).toBeDefined()
+    expect(typeof json.loan.endDate).toBe('string')
   })
 
   it('returns the updated loan in the response', async () => {

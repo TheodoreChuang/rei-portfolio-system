@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns, gte, lt, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, getTableColumns, gte, isNull, lt, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { db } from '@/lib/db'
@@ -56,6 +56,7 @@ export async function GET(request: Request) {
           eq(propertyLedgerEntries.loanAccountId, loanAccountId),
           eq(propertyLedgerEntries.category, 'loan_payment'),
           lt(propertyLedgerEntries.lineItemDate, `${month}-01`),
+          isNull(propertyLedgerEntries.deletedAt),
         )
       )
       .orderBy(desc(propertyLedgerEntries.lineItemDate))
@@ -82,6 +83,7 @@ export async function GET(request: Request) {
           eq(propertyLedgerEntries.propertyId, propertyId),
           gte(propertyLedgerEntries.lineItemDate, startDate),
           lte(propertyLedgerEntries.lineItemDate, endDate),
+          isNull(propertyLedgerEntries.deletedAt),
         )
       )
       .orderBy(
@@ -103,6 +105,7 @@ export async function GET(request: Request) {
         eq(propertyLedgerEntries.userId, user.id),
         gte(propertyLedgerEntries.lineItemDate, startDate),
         lte(propertyLedgerEntries.lineItemDate, endDate),
+        isNull(propertyLedgerEntries.deletedAt),
       )
     )
   return NextResponse.json({ entries })
@@ -188,7 +191,8 @@ export async function POST(request: Request) {
       .where(
         and(
           eq(sourceDocuments.id, sourceDocumentIdRaw!),
-          eq(sourceDocuments.userId, user.id)
+          eq(sourceDocuments.userId, user.id),
+          isNull(sourceDocuments.deletedAt),
         )
       )
       .limit(1)
@@ -274,20 +278,21 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Transaction: delete existing + insert new ────────────────────────────
+  // ── Transaction: soft-delete existing + insert new ───────────────────────
   let deleted: PropertyLedgerEntry[] = []
   let inserted: PropertyLedgerEntry[] = []
 
   try {
     await db.transaction(async (tx) => {
       if (isManualEntry) {
-        // Delete existing loan_payment entries for this user+property+loanAccount+month
+        // Soft-delete existing loan_payment entries for this user+property+loanAccount+month
         // before reinserting — makes mortgage saves idempotent on re-generation.
         const startDate = `${assignedMonth}-01`
         const endDate = lastDayOfMonth(assignedMonth)
         const manualLoanAccountId = result.lineItems.find(i => i.category === 'loan_payment')?.loanAccountId ?? null
         deleted = await tx
-          .delete(propertyLedgerEntries)
+          .update(propertyLedgerEntries)
+          .set({ deletedAt: new Date() })
           .where(
             and(
               eq(propertyLedgerEntries.userId, user.id),
@@ -300,9 +305,10 @@ export async function POST(request: Request) {
           )
           .returning()
       } else {
-        // PDF-backed entries: delete by sourceDocumentId (idempotent re-save)
+        // PDF-backed entries: soft-delete by sourceDocumentId (idempotent re-save)
         deleted = await tx
-          .delete(propertyLedgerEntries)
+          .update(propertyLedgerEntries)
+          .set({ deletedAt: new Date() })
           .where(
             and(
               eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentIdRaw!),
@@ -331,6 +337,18 @@ export async function POST(request: Request) {
       { error: 'Transaction failed', detail: message },
       { status: 500 }
     )
+  }
+
+  // Update source document with resolved property + statement period
+  if (!isManualEntry) {
+    await db
+      .update(sourceDocuments)
+      .set({
+        propertyId: property.id,
+        periodStart: result.statementPeriodStart,
+        periodEnd: result.statementPeriodEnd,
+      })
+      .where(eq(sourceDocuments.id, sourceDocumentIdRaw!))
   }
 
   return NextResponse.json({

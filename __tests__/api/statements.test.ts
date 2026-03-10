@@ -72,8 +72,9 @@ const mocks = vi.hoisted(() => ({
   mockPriorLoanLimit: vi.fn(),   // GET prior loan path: .where().orderBy().limit()
   mockPropertyEntries: vi.fn(),  // GET propertyId path: .where().orderBy() thenable
   mockTransaction: vi.fn(),
-  mockTxDeleteReturning: vi.fn(),
+  mockTxUpdateReturning: vi.fn(), // soft-delete returning in tx
   mockTxInsertReturning: vi.fn(),
+  mockUpdateSourceDoc: vi.fn(),   // db.update(sourceDocuments) after tx
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -107,6 +108,12 @@ vi.mock('@/lib/db', () => ({
       }),
     }),
     transaction: mocks.mockTransaction,
+    // top-level update for source doc after transaction
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockImplementation(() => mocks.mockUpdateSourceDoc()),
+      }),
+    }),
   },
 }))
 
@@ -351,16 +358,19 @@ describe('POST /api/statements', () => {
       .mockResolvedValueOnce([docRow])
       .mockResolvedValueOnce([propRow])
 
-    mocks.mockTxDeleteReturning.mockResolvedValue([])
+    mocks.mockTxUpdateReturning.mockResolvedValue([])
     mocks.mockTxInsertReturning.mockResolvedValue([
       { id: 'entry-1' },
       { id: 'entry-2' },
     ])
+    mocks.mockUpdateSourceDoc.mockResolvedValue([])
 
     mocks.mockTransaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) => {
       const tx = {
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({ returning: mocks.mockTxDeleteReturning }),
+        update: vi.fn().mockReturnValue({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({ returning: mocks.mockTxUpdateReturning }),
+          }),
         }),
         insert: vi.fn().mockReturnValue({
           values: vi.fn().mockReturnValue({ returning: mocks.mockTxInsertReturning }),
@@ -457,7 +467,7 @@ describe('POST /api/statements', () => {
 
   it('deletes existing entries before inserting (idempotent)', async () => {
     const existingEntry = { id: 'old-entry-1' }
-    mocks.mockTxDeleteReturning.mockResolvedValue([existingEntry])
+    mocks.mockTxUpdateReturning.mockResolvedValue([existingEntry])
     mocks.mockTxInsertReturning.mockResolvedValue([{ id: 'new-entry-1' }, { id: 'new-entry-2' }])
 
     const res = await POST(makeRequest(makeBody()))
@@ -479,7 +489,7 @@ describe('POST /api/statements', () => {
   })
 
   it('returns correct insertedCount and replacedCount', async () => {
-    mocks.mockTxDeleteReturning.mockResolvedValue([{ id: 'old-1' }, { id: 'old-2' }])
+    mocks.mockTxUpdateReturning.mockResolvedValue([{ id: 'old-1' }, { id: 'old-2' }])
     mocks.mockTxInsertReturning.mockResolvedValue([{ id: 'new-1' }])
 
     const res = await POST(makeRequest(makeBody()))
@@ -592,12 +602,14 @@ describe('POST /api/statements', () => {
       mocks.mockSelectLimit
         .mockResolvedValueOnce([propRow])
         .mockResolvedValueOnce([{ id: manualLoanId }])
-      mocks.mockTxDeleteReturning.mockResolvedValue([])
+      mocks.mockTxUpdateReturning.mockResolvedValue([])
       mocks.mockTxInsertReturning.mockResolvedValue([{ id: 'entry-1' }])
       mocks.mockTransaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) => {
         const tx = {
-          delete: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({ returning: mocks.mockTxDeleteReturning }),
+          update: vi.fn().mockReturnValue({
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({ returning: mocks.mockTxUpdateReturning }),
+            }),
           }),
           insert: vi.fn().mockReturnValue({
             values: vi.fn().mockReturnValue({ returning: mocks.mockTxInsertReturning }),
@@ -676,7 +688,7 @@ describe('POST /api/statements', () => {
     })
 
     it('deletes prior loan_payment entries in transaction (idempotent)', async () => {
-      mocks.mockTxDeleteReturning.mockResolvedValue([{ id: 'old-loan-1' }])
+      mocks.mockTxUpdateReturning.mockResolvedValue([{ id: 'old-loan-1' }])
       const res = await POST(makeRequest(makeManualBody()))
       expect(res.status).toBe(200)
       const json = await res.json()
@@ -685,7 +697,7 @@ describe('POST /api/statements', () => {
     })
 
     it('returns replacedCount = 0 on first save (no prior entries)', async () => {
-      // beforeEach has mockTxDeleteReturning returning []
+      // beforeEach has mockTxUpdateReturning returning []
       const res = await POST(makeRequest(makeManualBody()))
       expect(res.status).toBe(200)
       const json = await res.json()

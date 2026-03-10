@@ -58,7 +58,7 @@ export async function PUT(
   const raw = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
 
   // Build update set — only include fields that were explicitly provided
-  const updates: { address?: string; nickname?: string | null } = {}
+  const updates: { address?: string; nickname?: string | null; startDate?: string; endDate?: string | null } = {}
 
   if ('address' in raw) {
     const address = typeof raw.address === 'string' ? raw.address.trim() : ''
@@ -75,8 +75,25 @@ export async function PUT(
     updates.nickname = typeof raw.nickname === 'string' ? raw.nickname.trim() || null : null
   }
 
+  if ('startDate' in raw) {
+    const startDate = typeof raw.startDate === 'string' ? raw.startDate.trim() : ''
+    if (!startDate) {
+      return NextResponse.json({ error: 'startDate cannot be empty' }, { status: 400 })
+    }
+    updates.startDate = startDate
+  }
+
+  if ('endDate' in raw) {
+    updates.endDate = typeof raw.endDate === 'string' ? raw.endDate.trim() || null : null
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+  }
+
+  // Validate date range if both are present (either newly set or already in updates)
+  if (updates.startDate && updates.endDate && updates.endDate < updates.startDate) {
+    return NextResponse.json({ error: 'endDate cannot be before startDate' }, { status: 400 })
   }
 
   const [updated] = await db

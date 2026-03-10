@@ -8,6 +8,8 @@ function makeProperty(overrides: Partial<Property> = {}): Property {
     userId: 'user-1',
     address: '123 Smith St, Sydney NSW 2000',
     nickname: null,
+    startDate: '2020-01-01',
+    endDate: null,
     createdAt: new Date(),
     ...overrides,
   }
@@ -26,6 +28,8 @@ function makeEntry(overrides: Partial<PropertyLedgerEntry> = {}): PropertyLedger
     description: null,
     userNotes: null,
     createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
     ...overrides,
   }
 }
@@ -37,7 +41,8 @@ function makeLoanAccount(overrides: Partial<LoanAccount> = {}): LoanAccount {
     propertyId: 'prop-1',
     lender: 'Westpac',
     nickname: null,
-    isActive: true,
+    startDate: '2020-01-01',
+    endDate: '2050-01-01',
     createdAt: new Date(),
     ...overrides,
   }
@@ -222,13 +227,13 @@ describe('computeReport', () => {
     expect(flags.missingMortgages[0].nickname).toBe('Top-up')
   })
 
-  it('does not flag inactive loan accounts', () => {
-    const activeLoan = makeLoanAccount({ id: 'loan-1', propertyId: 'prop-1', isActive: true })
-    const inactiveLoan = makeLoanAccount({ id: 'loan-2', propertyId: 'prop-1', lender: 'ANZ', isActive: false })
+  it('does not flag ended loan accounts (caller filters active loans)', () => {
+    const activeLoan = makeLoanAccount({ id: 'loan-1', propertyId: 'prop-1' })
+    // Ended loan not passed to computeReport — caller is responsible for filtering
     const entries = [
       makeEntry({ id: 'm', category: 'loan_payment', loanAccountId: 'loan-1' }),
     ]
-    const { flags } = computeReport(entries, [prop1], [activeLoan, inactiveLoan])
+    const { flags } = computeReport(entries, [prop1], [activeLoan])
     expect(flags.missingMortgages).toHaveLength(0)
   })
 })

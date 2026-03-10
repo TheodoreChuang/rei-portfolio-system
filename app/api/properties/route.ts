@@ -40,9 +40,19 @@ export async function POST(request: Request) {
 
   const nickname = typeof raw.nickname === 'string' ? raw.nickname.trim() || null : null
 
+  const startDate = typeof raw.startDate === 'string' ? raw.startDate.trim() : ''
+  if (!startDate) {
+    return NextResponse.json({ error: 'startDate is required' }, { status: 400 })
+  }
+
+  const endDate = typeof raw.endDate === 'string' ? raw.endDate.trim() || null : null
+  if (endDate && endDate < startDate) {
+    return NextResponse.json({ error: 'endDate cannot be before startDate' }, { status: 400 })
+  }
+
   const [inserted] = await db
     .insert(properties)
-    .values({ userId: user.id, address, nickname })
+    .values({ userId: user.id, address, nickname, startDate, endDate })
     .returning()
 
   return NextResponse.json({ property: inserted }, { status: 201 })

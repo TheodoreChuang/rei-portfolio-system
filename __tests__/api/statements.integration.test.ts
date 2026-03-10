@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { properties, sourceDocuments, propertyLedgerEntries } from '@/db/schema'
 
@@ -111,7 +111,7 @@ describe('POST /api/statements (integration)', () => {
     // Insert test property for user A
     const [prop] = await db
       .insert(properties)
-      .values({ userId, address: TEST_ADDRESS })
+      .values({ userId, address: TEST_ADDRESS, startDate: '2020-01-01' })
       .returning()
     propertyId = prop.id
 
@@ -142,7 +142,7 @@ describe('POST /api/statements (integration)', () => {
 
         const [propB] = await db
           .insert(properties)
-          .values({ userId: userBId, address: `${TEST_ADDRESS} (User B)` })
+          .values({ userId: userBId, address: `${TEST_ADDRESS} (User B)`, startDate: '2020-01-01' })
           .returning()
         propertyBId = propB.id
 
@@ -240,11 +240,14 @@ describe('POST /api/statements (integration)', () => {
     expect(json.replacedCount).toBe(sampleResult.lineItems.length)
     expect(json.insertedCount).toBe(sampleResult.lineItems.length)
 
-    // Confirm no duplicates
+    // Confirm no duplicates (exclude soft-deleted rows)
     const rows = await db
       .select()
       .from(propertyLedgerEntries)
-      .where(eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentId))
+      .where(and(
+        eq(propertyLedgerEntries.sourceDocumentId, sourceDocumentId),
+        isNull(propertyLedgerEntries.deletedAt),
+      ))
     expect(rows).toHaveLength(sampleResult.lineItems.length)
   })
 

@@ -1,5 +1,5 @@
-// PATCH /api/properties/[id]/loans/[loanId] — update lender, nickname, or isActive
-// DELETE /api/properties/[id]/loans/[loanId] — soft-delete (sets isActive = false)
+// PATCH /api/properties/[id]/loans/[loanId] — update lender, nickname, startDate, or endDate
+// DELETE /api/properties/[id]/loans/[loanId] — end loan (sets endDate = today)
 import { and, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
@@ -30,7 +30,7 @@ export async function PATCH(
 
   const raw = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
 
-  const updates: { lender?: string; nickname?: string | null; isActive?: boolean } = {}
+  const updates: { lender?: string; nickname?: string | null; startDate?: string; endDate?: string } = {}
 
   if ('lender' in raw) {
     const lender = typeof raw.lender === 'string' ? raw.lender.trim() : ''
@@ -47,15 +47,28 @@ export async function PATCH(
     updates.nickname = typeof raw.nickname === 'string' ? raw.nickname.trim() || null : null
   }
 
-  if ('isActive' in raw) {
-    if (typeof raw.isActive !== 'boolean') {
-      return NextResponse.json({ error: 'isActive must be a boolean' }, { status: 400 })
+  if ('startDate' in raw) {
+    const startDate = typeof raw.startDate === 'string' ? raw.startDate.trim() : ''
+    if (!startDate) {
+      return NextResponse.json({ error: 'startDate cannot be empty' }, { status: 400 })
     }
-    updates.isActive = raw.isActive
+    updates.startDate = startDate
+  }
+
+  if ('endDate' in raw) {
+    const endDate = typeof raw.endDate === 'string' ? raw.endDate.trim() : ''
+    if (!endDate) {
+      return NextResponse.json({ error: 'endDate cannot be empty' }, { status: 400 })
+    }
+    updates.endDate = endDate
   }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+  }
+
+  if (updates.startDate && updates.endDate && updates.endDate < updates.startDate) {
+    return NextResponse.json({ error: 'endDate cannot be before startDate' }, { status: 400 })
   }
 
   const [updated] = await db
@@ -90,9 +103,11 @@ export async function DELETE(
     return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
   }
 
+  const today = new Date().toISOString().slice(0, 10)
+
   const [updated] = await db
     .update(loanAccounts)
-    .set({ isActive: false })
+    .set({ endDate: today })
     .where(
       and(
         eq(loanAccounts.id, loanId),

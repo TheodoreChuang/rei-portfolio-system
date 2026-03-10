@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { propertyLedgerEntries, portfolioReports, properties, loanAccounts } from '@/db/schema'
@@ -72,6 +72,7 @@ export async function POST(request: Request) {
           eq(propertyLedgerEntries.userId, user.id),
           gte(propertyLedgerEntries.lineItemDate, startDate),
           lte(propertyLedgerEntries.lineItemDate, endDate),
+          isNull(propertyLedgerEntries.deletedAt),
         )
       ),
     db.select()
