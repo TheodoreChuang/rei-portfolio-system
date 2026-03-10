@@ -5,64 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1771730415648,
-      "tag": "0000_equal_black_widow",
+      "when": 1772801377815,
+      "tag": "0000_ancient_screwball",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1771730415649,
+      "when": 1772801377816,
       "tag": "0001_rls",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1771730415650,
-      "tag": "0002_auto_rls_trigger",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1772157559134,
-      "tag": "0003_perpetual_terrax",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1772157559135,
-      "tag": "0004_rename_ledger_to_property_ledger",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1772500000000,
-      "tag": "0005_fix_rls_trigger",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1772500000001,
-      "tag": "0006_loan_accounts",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1772500000002,
-      "tag": "0007_ledger_loan_account_id",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1772500000003,
-      "tag": "0008_loan_accounts_rls",
       "breakpoints": true
     }
   ]

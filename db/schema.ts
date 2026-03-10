@@ -1,5 +1,5 @@
 import {
-  pgTable, text, integer, timestamp, boolean,
+  pgTable, text, integer, timestamp,
   date, pgEnum, varchar, uuid, unique, index, jsonb,
 } from 'drizzle-orm/pg-core'
 
@@ -20,6 +20,8 @@ export const properties = pgTable('properties', {
   userId:    uuid('user_id').notNull(),
   address:   text('address').notNull(),
   nickname:  text('nickname'),
+  startDate: date('start_date').notNull(),
+  endDate:   date('end_date'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('properties_user_id_idx').on(t.userId),
@@ -28,11 +30,19 @@ export const properties = pgTable('properties', {
 export const sourceDocuments = pgTable('source_documents', {
   id:           uuid('id').primaryKey().defaultRandom(),
   userId:       uuid('user_id').notNull(),
+  propertyId:   uuid('property_id')
+                  .references(() => properties.id, { onDelete: 'set null' }),
   fileName:     text('file_name').notNull(),
   fileHash:     text('file_hash').notNull(), // SHA-256 for dedup
   documentType: varchar('document_type', { length: 50 }).notNull(), // 'pm_statement'
   filePath:     text('file_path').notNull(), // Supabase Storage path
+  periodStart:  date('period_start'),
+  periodEnd:    date('period_end'),
   uploadedAt:   timestamp('uploaded_at').defaultNow().notNull(),
+  updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+                  .$onUpdate(() => new Date()),
+  deletedAt:    timestamp('deleted_at', { withTimezone: true }),
+                // always filter deleted_at IS NULL except staleness MAX query
 }, (t) => [
   unique().on(t.userId, t.fileHash),
 ])
@@ -44,7 +54,8 @@ export const loanAccounts = pgTable('loan_accounts', {
                 .references(() => properties.id, { onDelete: 'cascade' }),
   lender:     text('lender').notNull(),
   nickname:   text('nickname'),
-  isActive:   boolean('is_active').notNull().default(true),
+  startDate:  date('start_date').notNull(),
+  endDate:    date('end_date').notNull(),
   createdAt:  timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('idx_loan_accounts_user').on(t.userId),
@@ -69,6 +80,10 @@ export const propertyLedgerEntries = pgTable('property_ledger_entries', {
   description:      text('description'),      // extracted from PDF by LLM
   userNotes:        text('user_notes'),        // optional manual annotation
   createdAt:        timestamp('created_at').defaultNow().notNull(),
+  updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+                      .$onUpdate(() => new Date()),
+  deletedAt:        timestamp('deleted_at', { withTimezone: true }),
+                    // always filter deleted_at IS NULL except staleness MAX query
 }, (t) => [
   index('idx_ledger_user_month').on(t.userId, t.lineItemDate),
   index('idx_ledger_property').on(t.propertyId, t.lineItemDate),

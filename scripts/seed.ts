@@ -56,9 +56,9 @@ async function seedOwner(userId: string) {
   const [smithSt, georgeAve, riverside] = await db
     .insert(properties)
     .values([
-      { userId, address: '123 Smith St, Sydney NSW 2000', nickname: 'Smith St'   },
-      { userId, address: '8 George Ave, Brisbane QLD 4000', nickname: 'George Ave' },
-      { userId, address: '7 River Rd, Melbourne VIC 3000', nickname: 'Riverside'  },
+      { userId, address: '123 Smith St, Sydney NSW 2000', nickname: 'Smith St',   startDate: '2020-01-01' },
+      { userId, address: '8 George Ave, Brisbane QLD 4000', nickname: 'George Ave', startDate: '2020-01-01' },
+      { userId, address: '7 River Rd, Melbourne VIC 3000', nickname: 'Riverside',  startDate: '2020-01-01' },
     ])
     .returning()
 
@@ -91,9 +91,9 @@ async function seedOwner(userId: string) {
   const [smithLoan, georgeLoan, riversideLoan] = await db
     .insert(loanAccounts)
     .values([
-      { userId, propertyId: smithSt.id,   lender: 'Westpac', nickname: 'Investment loan', isActive: true },
-      { userId, propertyId: georgeAve.id, lender: 'ANZ',     nickname: 'Main loan',       isActive: true },
-      { userId, propertyId: riverside.id, lender: 'CBA',     nickname: 'Mortgage',         isActive: true },
+      { userId, propertyId: smithSt.id,   lender: 'Westpac', nickname: 'Investment loan', startDate: '2020-01-01', endDate: '2050-01-01' },
+      { userId, propertyId: georgeAve.id, lender: 'ANZ',     nickname: 'Main loan',       startDate: '2020-01-01', endDate: '2050-01-01' },
+      { userId, propertyId: riverside.id, lender: 'CBA',     nickname: 'Mortgage',        startDate: '2020-01-01', endDate: '2050-01-01' },
     ])
     .returning()
 
