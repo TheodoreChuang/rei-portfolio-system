@@ -13,30 +13,43 @@ test.describe('Loan accounts on property edit page', () => {
     await expect(page.getByText('Loan accounts')).toBeVisible({ timeout: 10000 })
     await expect(page.getByText('Westpac')).toBeVisible()
     await expect(page.getByText('Investment loan')).toBeVisible()
-    await expect(page.getByText('Active').first()).toBeVisible()
+    // Slice 5: shows date range instead of Active/Inactive badge
+    await expect(page.getByText(/2020-01-01/)).toBeVisible()
   })
 
   test('adds a new loan account', async ({ page }) => {
     await goToSmithStEdit(page)
     await expect(page.getByText('Loan accounts')).toBeVisible({ timeout: 10000 })
 
-    await page.getByLabel('Lender').fill('ANZ')
-    await page.getByLabel('Nickname').fill('Variable rate')
+    await page.locator('#new-lender').fill('ANZ')
+    await page.locator('#new-nickname').fill('Variable rate')
+    // Chrome date inputs require native value setter to trigger React onChange
+    await page.locator('#new-loan-start').evaluate((el: HTMLInputElement) => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set?.call(el, '2020-01-01')
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await page.locator('#new-loan-end').evaluate((el: HTMLInputElement) => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set?.call(el, '2050-01-01')
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    })
     await page.getByRole('button', { name: 'Add loan account' }).click()
 
     await expect(page.getByText('ANZ')).toBeVisible({ timeout: 5000 })
     await expect(page.getByText('Variable rate')).toBeVisible()
   })
 
-  test('deactivates a loan account', async ({ page }) => {
+  test('ends a loan account', async ({ page }) => {
     await goToSmithStEdit(page)
     await expect(page.getByText('Westpac')).toBeVisible({ timeout: 10000 })
 
-    // Click Deactivate next to Westpac
-    const westpacCard = page.locator('div').filter({ hasText: /^Westpac/ }).first()
-    await westpacCard.getByRole('button', { name: 'Deactivate' }).click()
+    const endLoanButtons = page.getByRole('button', { name: 'End loan' })
+    const initialCount = await endLoanButtons.count()
 
-    await expect(westpacCard.getByText('Inactive')).toBeVisible({ timeout: 5000 })
-    await expect(westpacCard.getByRole('button', { name: 'Reactivate' })).toBeVisible()
+    // End the first loan (Westpac) — button disappears for ended loans
+    await endLoanButtons.first().click()
+
+    await expect(endLoanButtons).toHaveCount(initialCount - 1, { timeout: 5000 })
   })
 })

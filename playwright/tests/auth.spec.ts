@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { createTestUser, deleteTestUser, getTestSession } from '../fixtures'
 
 test.describe('Authentication flows', () => {
   test('authenticated user visiting /dashboard sees the dashboard', async ({ page }) => {
@@ -19,15 +20,36 @@ test.describe('Authentication flows', () => {
     await context.close()
   })
 
-  test('sign out returns user to /login', async ({ page }) => {
-    await page.goto('/dashboard')
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 })
+  test('sign out returns user to /login', async ({ browser }) => {
+    // Use a dedicated throwaway user so signing out doesn't invalidate the
+    // shared storageState session used by other tests (loans, rls, etc.)
+    const { email, password, user } = await createTestUser()
+    try {
+      const session = await getTestSession(email, password)
+      const cookieValue = 'base64-' + Buffer.from(JSON.stringify(session)).toString('base64url')
+      const context = await browser.newContext()
+      const page = await context.newPage()
+      await context.addCookies([{
+        name: 'sb-127-auth-token',
+        value: cookieValue,
+        domain: 'localhost',
+        path: '/',
+        httpOnly: false,
+        secure: false,
+        sameSite: 'Lax',
+      }])
 
-    // Open user dropdown and click sign out
-    await page.getByTestId('user-avatar').click()
-    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible({ timeout: 5000 })
-    await page.getByRole('button', { name: /sign out/i }).click()
+      await page.goto('/dashboard')
+      await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 })
 
-    await expect(page).toHaveURL(/\/login/, { timeout: 15000 })
+      await page.getByTestId('user-avatar').click()
+      await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible({ timeout: 5000 })
+      await page.getByRole('button', { name: /sign out/i }).click()
+
+      await expect(page).toHaveURL(/\/login/, { timeout: 15000 })
+      await context.close()
+    } finally {
+      await deleteTestUser(user.id)
+    }
   })
 })
