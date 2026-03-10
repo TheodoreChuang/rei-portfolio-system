@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { formatMonth, lastDayOfMonth, recentMonths } from '@/lib/format'
+import { isActiveInMonth, firstDayOfMonth } from '@/lib/date-ranges'
 import { MAX_UPLOAD_BYTES } from '@/lib/constants'
 import type { Property } from '@/db/schema'
 import type { ExtractionResult } from '@/lib/extraction/schema'
@@ -39,7 +40,7 @@ type FileProcessingStatus = {
   error:              ProcessingError | null
 }
 
-type LoanRow = { id: string; lender: string; nickname: string | null; isActive: boolean }
+type LoanRow = { id: string; lender: string; nickname: string | null; startDate: string; endDate: string }
 
 type LoanEntry = {
   loanAccountId:   string
@@ -94,7 +95,9 @@ async function buildLoanEntries(
     const loansRes = await fetch(`/api/properties/${p.id}/loans`)
     if (!loansRes.ok) return
     const { loans }: { loans: LoanRow[] } = await loansRes.json()
-    const activeLoans = loans.filter(l => l.isActive)
+    const firstDay = firstDayOfMonth(month)
+    const lastDay = lastDayOfMonth(month)
+    const activeLoans = loans.filter(l => isActiveInMonth(l.startDate, l.endDate, firstDay, lastDay))
     const hasStatement = matchedAddresses.includes(p.address.toLowerCase())
     await Promise.all(activeLoans.map(async (loan) => {
       let amountValue = ''
