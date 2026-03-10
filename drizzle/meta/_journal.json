@@ -15,6 +15,13 @@
       "when": 1772801377816,
       "tag": "0001_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772801377817,
+      "tag": "0002_indexes",
+      "breakpoints": true
     }
   ]
 }
