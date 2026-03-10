@@ -17,6 +17,7 @@ import type { ChartConfig } from '@/components/ui/chart'
 import { formatCents, formatMonth } from '@/lib/format'
 import type { ReportTotals } from '@/lib/reports/compute'
 import type { TrendPoint } from '@/app/api/reports/trends/route'
+import type { MonthHealth } from '@/app/api/reports/health/route'
 import { cn } from '@/lib/utils'
 
 type ReportListItem = { month: string; createdAt: string }
@@ -181,6 +182,7 @@ function DashboardContent() {
   const [loadingList, setLoadingList] = useState(true)
   const [loadingReport, setLoadingReport] = useState(false)
   const [trends, setTrends] = useState<TrendPoint[]>([])
+  const [health, setHealth] = useState<MonthHealth[]>([])
 
   const month = searchParams.get('month') || reportList[0]?.month || ''
 
@@ -193,11 +195,15 @@ function DashboardContent() {
       .finally(() => setLoadingList(false))
   }, [])
 
-  // Fetch trends once on mount (independent of month selection)
+  // Fetch trends + health once on mount (independent of month selection)
   useEffect(() => {
     fetch('/api/reports/trends?months=12')
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setTrends(data.trends ?? []) })
+      .catch(() => {})
+    fetch('/api/reports/health?months=12')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setHealth(data.health ?? []) })
       .catch(() => {})
   }, [])
 
@@ -215,6 +221,7 @@ function DashboardContent() {
 
   const hasReport = !!report
   const totals = report?.totals
+  const healthMap = new Map(health.map(h => [h.month, h]))
 
   return (
     <div className="min-h-screen bg-screen-bg">
@@ -227,16 +234,26 @@ function DashboardContent() {
         ) : reportList.length === 0 ? (
           <span className="text-xs text-muted">No reports yet.</span>
         ) : (
-          reportList.map(r => (
-            <button key={r.month} onClick={() => router.push('/dashboard?month=' + r.month)}
-              className={cn('flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-mono border transition-colors',
-                r.month === month
-                  ? 'bg-ink text-white border-ink'
-                  : 'border-accent text-accent bg-white hover:bg-accent-light'
-              )}>
-              {formatMonth(r.month)}
-            </button>
-          ))
+          reportList.map(r => {
+            const h = healthMap.get(r.month)
+            const indicator = h?.status === 'healthy'
+              ? <span className="ml-1 text-accent">✓</span>
+              : h?.status === 'stale'
+              ? <span className="ml-1 text-warn">⚠</span>
+              : h?.status === 'incomplete'
+              ? <span className="ml-1 text-muted">○</span>
+              : null
+            return (
+              <button key={r.month} onClick={() => router.push('/dashboard?month=' + r.month)}
+                className={cn('flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-mono border transition-colors',
+                  r.month === month
+                    ? 'bg-ink text-white border-ink'
+                    : 'border-accent text-accent bg-white hover:bg-accent-light'
+                )}>
+                {formatMonth(r.month)}{indicator}
+              </button>
+            )
+          })
         )}
         <Button size="sm" className="ml-auto flex-shrink-0" onClick={() => router.push('/upload')}>
           Generate report

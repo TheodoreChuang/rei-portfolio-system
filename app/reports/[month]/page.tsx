@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import type { MonthHealth } from '@/app/api/reports/health/route'
 
 type DrillDownEntry = {
   id: string
@@ -193,7 +194,19 @@ export default function ReportPage() {
   const [notFound, setNotFound] = useState(false)
   const [docs, setDocs] = useState<DocEntry[]>([])
   const [reportList, setReportList] = useState<{ month: string }[]>([])
-  const [stale, setStale] = useState(false)
+  const [monthHealth, setMonthHealth] = useState<MonthHealth | null>(null)
+
+  const fetchHealth = useCallback(() => {
+    fetch('/api/reports/health?months=12')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          const entry = (data.health as MonthHealth[]).find(h => h.month === month)
+          setMonthHealth(entry ?? null)
+        }
+      })
+      .catch(() => {})
+  }, [month])
 
   useEffect(() => {
     Promise.all([
@@ -215,14 +228,15 @@ export default function ReportPage() {
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
-  }, [month])
+    fetchHealth()
+  }, [month, fetchHealth])
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this statement? This will remove all extracted line items.')) return
     const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' })
     if (res.ok) {
       setDocs(prev => prev.filter(d => d.id !== id))
-      setStale(true)
+      fetchHealth()
     }
   }
 
@@ -266,13 +280,28 @@ export default function ReportPage() {
     <div className="min-h-screen bg-screen-bg">
       <AppNav />
 
-      {stale && (
+      {monthHealth?.status === 'stale' && (
         <div className="bg-warn-light border-b border-warn px-6 py-3 flex items-center justify-between">
-          <span className="text-sm text-warn font-medium">Statement deleted — regenerate to update totals</span>
-          <div className="flex items-center gap-2">
-            <Link href="/upload"><Button variant="outline" size="sm">Regenerate report</Button></Link>
-            <button onClick={() => setStale(false)} className="text-warn hover:text-warn text-sm px-1">✕</button>
-          </div>
+          <span className="text-sm text-warn font-medium">
+            ⚠ Entries have been added or changed since this report was generated.
+          </span>
+          <Link href="/upload"><Button variant="outline" size="sm">Regenerate →</Button></Link>
+        </div>
+      )}
+      {monthHealth?.status === 'incomplete' && monthHealth.missing.length > 0 && (
+        <div className="bg-screen-bg border-b border-border px-6 py-3 flex items-center justify-between">
+          <span className="text-sm text-muted">
+            ○ Missing data:{' '}
+            {monthHealth.missing.map((m, i) => (
+              <span key={i}>
+                {i > 0 && ' · '}
+                {m.type === 'missing_statement'
+                  ? `No statement for ${m.address}`
+                  : `No loan payment for ${m.lender}${m.nickname ? ` — ${m.nickname}` : ''}`}
+              </span>
+            ))}
+          </span>
+          <Link href="/upload"><Button variant="outline" size="sm">Upload →</Button></Link>
         </div>
       )}
 
