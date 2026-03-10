@@ -7,7 +7,6 @@ import { AppNav } from '@/components/app-nav'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -18,7 +17,7 @@ import { cn } from '@/lib/utils'
 import { formatMonth, formatCents, recentMonths } from '@/lib/format'
 import type { Property, PropertyLedgerEntry } from '@/db/schema'
 
-type LoanRow = { id: string; lender: string; nickname: string | null; isActive: boolean }
+type LoanRow = { id: string; lender: string; nickname: string | null; startDate: string; endDate: string }
 
 const MANUAL_CATEGORIES = [
   'rent', 'insurance', 'rates', 'repairs',
@@ -38,6 +37,12 @@ function parseCents(input: string): number {
   return Math.round(dollars * 100)
 }
 
+function addYears(dateStr: string, years: number): string {
+  const d = new Date(dateStr)
+  d.setFullYear(d.getFullYear() + years)
+  return d.toISOString().slice(0, 10)
+}
+
 export default function EditPropertyPage() {
   const router = useRouter()
   const { id } = useParams<{ id: string }>()
@@ -46,10 +51,14 @@ export default function EditPropertyPage() {
   const [originalAddress, setOriginalAddress] = useState('')
   const [address, setAddress] = useState('')
   const [nickname, setNickname] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [loans, setLoans] = useState<LoanRow[]>([])
   const [newLender, setNewLender] = useState('')
   const [newNickname, setNewNickname] = useState('')
+  const [newLoanStartDate, setNewLoanStartDate] = useState('')
+  const [newLoanEndDate, setNewLoanEndDate] = useState('')
   const [addingLoan, setAddingLoan] = useState(false)
   const [txMonth, setTxMonth] = useState(() => recentMonths(1)[0])
   const [entries, setEntries] = useState<PropertyLedgerEntry[]>([])
@@ -74,6 +83,8 @@ export default function EditPropertyPage() {
         const p: Property = propData.property
         setAddress(p.address)
         setNickname(p.nickname ?? '')
+        setStartDate(p.startDate ?? '')
+        setEndDate(p.endDate ?? '')
         setOriginalAddress(p.address)
         setLoans(loansData.loans ?? [])
       })
@@ -126,7 +137,12 @@ export default function EditPropertyPage() {
     const res = await fetch(`/api/properties/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address, nickname: nickname.trim() || null }),
+      body: JSON.stringify({
+        address,
+        nickname: nickname.trim() || null,
+        startDate: startDate || undefined,
+        endDate: endDate || null,
+      }),
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
@@ -149,12 +165,17 @@ export default function EditPropertyPage() {
   }
 
   async function handleAddLoan() {
-    if (!newLender.trim()) return
+    if (!newLender.trim() || !newLoanStartDate || !newLoanEndDate) return
     setAddingLoan(true)
     const res = await fetch(`/api/properties/${id}/loans`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lender: newLender.trim(), nickname: newNickname.trim() || null }),
+      body: JSON.stringify({
+        lender: newLender.trim(),
+        nickname: newNickname.trim() || null,
+        startDate: newLoanStartDate,
+        endDate: newLoanEndDate,
+      }),
     })
     setAddingLoan(false)
     if (!res.ok) { toast.error((await res.json().catch(() => ({}))).error ?? 'Failed to add loan'); return }
@@ -162,15 +183,13 @@ export default function EditPropertyPage() {
     setLoans(prev => [...prev, loan])
     setNewLender('')
     setNewNickname('')
+    setNewLoanStartDate('')
+    setNewLoanEndDate('')
   }
 
-  async function handleToggleLoan(loanId: string, isCurrentlyActive: boolean) {
-    const res = await fetch(`/api/properties/${id}/loans/${loanId}`,
-      isCurrentlyActive
-        ? { method: 'DELETE' }
-        : { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: true }) }
-    )
-    if (!res.ok) { toast.error('Failed to update loan'); return }
+  async function handleEndLoan(loanId: string) {
+    const res = await fetch(`/api/properties/${id}/loans/${loanId}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to end loan'); return }
     const { loan } = await res.json()
     setLoans(prev => prev.map(l => l.id === loanId ? loan : l))
   }
@@ -191,6 +210,8 @@ export default function EditPropertyPage() {
       </div>
     </div>
   )
+
+  const today = new Date().toISOString().slice(0, 10)
 
   return (
     <div className="min-h-screen bg-screen-bg">
@@ -213,6 +234,16 @@ export default function EditPropertyPage() {
               <Label htmlFor="nickname">Nickname <span className="font-normal text-muted">(optional)</span></Label>
               <Input id="nickname" value={nickname} onChange={e => setNickname(e.target.value)} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="start-date">Acquisition date</Label>
+                <Input id="start-date" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="end-date">Sold date <span className="font-normal text-muted">(optional)</span></Label>
+                <Input id="end-date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+              </div>
+            </div>
             <Separator />
             <div className="flex items-center gap-2 pt-1">
               <Button className="flex-1" onClick={handleSave}>Save changes</Button>
@@ -227,24 +258,27 @@ export default function EditPropertyPage() {
         <div className="mt-8">
           <h2 className="font-semibold text-sm mb-3">Loan accounts</h2>
           <div className="space-y-2 mb-4">
-            {[...loans.filter(l => l.isActive), ...loans.filter(l => !l.isActive)].map(loan => (
-              <Card key={loan.id} className={cn(!loan.isActive && 'opacity-60')}>
-                <CardContent className="py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{loan.lender}</p>
-                    {loan.nickname && <p className="text-[11px] text-muted">{loan.nickname}</p>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={loan.isActive ? 'green' : 'grey'}>
-                      {loan.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                    <Button variant="outline" size="sm" onClick={() => handleToggleLoan(loan.id, loan.isActive)}>
-                      {loan.isActive ? 'Deactivate' : 'Reactivate'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {loans.map(loan => {
+              const isEnded = loan.endDate <= today
+              return (
+                <Card key={loan.id} className={cn(isEnded && 'opacity-60')}>
+                  <CardContent className="py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{loan.lender}</p>
+                      {loan.nickname && <p className="text-[11px] text-muted">{loan.nickname}</p>}
+                      <p className="text-[11px] text-muted font-mono mt-0.5">
+                        {loan.startDate} – {loan.endDate}
+                      </p>
+                    </div>
+                    {!isEnded && (
+                      <Button variant="outline" size="sm" onClick={() => handleEndLoan(loan.id)}>
+                        End loan
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
             {loans.length === 0 && <p className="text-sm text-muted">No loan accounts yet.</p>}
           </div>
 
@@ -259,7 +293,28 @@ export default function EditPropertyPage() {
                 <Label htmlFor="new-nickname">Nickname <span className="font-normal text-muted">(optional)</span></Label>
                 <Input id="new-nickname" placeholder="e.g. Investment loan" value={newNickname} onChange={e => setNewNickname(e.target.value)} />
               </div>
-              <Button onClick={handleAddLoan} disabled={!newLender.trim() || addingLoan}>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-loan-start">Loan start</Label>
+                  <Input
+                    id="new-loan-start"
+                    type="date"
+                    value={newLoanStartDate}
+                    onChange={e => {
+                      setNewLoanStartDate(e.target.value)
+                      if (e.target.value) setNewLoanEndDate(addYears(e.target.value, 30))
+                    }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-loan-end">Loan end</Label>
+                  <Input id="new-loan-end" type="date" value={newLoanEndDate} onChange={e => setNewLoanEndDate(e.target.value)} />
+                </div>
+              </div>
+              <Button
+                onClick={handleAddLoan}
+                disabled={!newLender.trim() || !newLoanStartDate || !newLoanEndDate || addingLoan}
+              >
                 {addingLoan ? 'Adding…' : 'Add loan account'}
               </Button>
             </CardContent>
@@ -292,9 +347,12 @@ export default function EditPropertyPage() {
                 <CardContent className="py-2.5 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <Badge variant={e.category === 'rent' ? 'green' : 'grey'}>
+                      <span className={cn(
+                        'text-[10px] font-mono px-1.5 py-0.5 rounded',
+                        e.category === 'rent' ? 'bg-accent-light text-accent' : 'bg-screen-bg text-muted'
+                      )}>
                         {CATEGORY_LABELS[e.category] ?? e.category}
-                      </Badge>
+                      </span>
                       {!e.sourceDocumentId && (
                         <span className="text-[10px] text-muted font-mono">Manual</span>
                       )}

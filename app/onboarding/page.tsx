@@ -16,6 +16,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true)
   const [address, setAddress] = useState('')
   const [nickname, setNickname] = useState('')
+  const [startDate, setStartDate] = useState('')
   const [showForm, setShowForm] = useState(true)
 
   useEffect(() => {
@@ -31,11 +32,11 @@ export default function OnboardingPage() {
   }, [])
 
   async function addProperty() {
-    if (!address.trim()) return
+    if (!address.trim() || !startDate) return
     const res = await fetch('/api/properties', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: address.trim(), nickname: nickname.trim() || null }),
+      body: JSON.stringify({ address: address.trim(), nickname: nickname.trim() || null, startDate }),
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
@@ -46,6 +47,7 @@ export default function OnboardingPage() {
     setProperties(prev => [...prev, property])
     setAddress('')
     setNickname('')
+    setStartDate('')
     setShowForm(false)
     toast.success('Property added')
   }
@@ -144,10 +146,19 @@ export default function OnboardingPage() {
                     placeholder="e.g. Smith St"
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="start-date">Acquisition date</Label>
+                  <Input
+                    id="start-date"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && addProperty()}
                   />
                 </div>
-                <Button className="w-full" onClick={addProperty} disabled={!address.trim()}>
+                <Button className="w-full" onClick={addProperty} disabled={!address.trim() || !startDate}>
                   Add property
                 </Button>
               </div>

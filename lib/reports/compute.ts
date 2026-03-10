@@ -108,7 +108,7 @@ export function computeReport(
   const missingMortgages: MissingMortgage[] = []
   for (const p of properties) {
     const propEntries = entries.filter((e) => e.propertyId === p.id)
-    const activeLoans = loanAccounts.filter((l) => l.propertyId === p.id && l.isActive)
+    const activeLoans = loanAccounts.filter((l) => l.propertyId === p.id)
     for (const loan of activeLoans) {
       const hasPaid = propEntries.some(
         (e) => e.category === 'loan_payment' && e.loanAccountId === loan.id,
