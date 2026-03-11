@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { computeReport } from '@/lib/reports/compute'
 import { generateCommentary } from '@/lib/reports/commentary'
 import { lastDayOfMonth } from '@/lib/format'
+import { flags } from '@/lib/flags'
 
 const MONTH_REGEX = /^\d{4}-\d{2}$/
 
@@ -87,8 +88,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No properties found — add a property before generating a report' }, { status: 422 })
   }
 
-  const { totals, flags } = computeReport(entries, props, loans)
-  const aiCommentary = await generateCommentary(totals, month)
+  const { totals, flags: reportFlags } = computeReport(entries, props, loans)
+  const aiCommentary = flags.aiCommentary ? await generateCommentary(totals, month) : null
 
   const [report] = await db
     .insert(portfolioReports)
@@ -96,14 +97,14 @@ export async function POST(request: Request) {
       userId: user.id,
       month,
       totals: totals as unknown as Record<string, unknown>,
-      flags: flags as unknown as Record<string, unknown>,
+      flags: reportFlags as unknown as Record<string, unknown>,
       aiCommentary,
     })
     .onConflictDoUpdate({
       target: [portfolioReports.userId, portfolioReports.month],
       set: {
         totals: totals as unknown as Record<string, unknown>,
-        flags: flags as unknown as Record<string, unknown>,
+        flags: reportFlags as unknown as Record<string, unknown>,
         aiCommentary,
         version: sql`${portfolioReports.version} + 1`,
         updatedAt: new Date(),

@@ -232,15 +232,12 @@ describe('POST /api/reports', () => {
     expect(json.report.month).toBe('2026-03')
   })
 
-  it('calls generateCommentary with totals and month', async () => {
+  it('skips generateCommentary when aiCommentary flag is off (default)', async () => {
     await POST(makePostRequest({ month: '2026-03' }))
-    expect(mocks.mockGenerateCommentary).toHaveBeenCalledOnce()
-    const [, calledMonth] = mocks.mockGenerateCommentary.mock.calls[0]
-    expect(calledMonth).toBe('2026-03')
+    expect(mocks.mockGenerateCommentary).not.toHaveBeenCalled()
   })
 
-  it('proceeds with empty commentary if generateCommentary returns empty string', async () => {
-    mocks.mockGenerateCommentary.mockResolvedValue('')
+  it('stores null aiCommentary when flag is off', async () => {
     const res = await POST(makePostRequest({ month: '2026-03' }))
     expect(res.status).toBe(200)
   })
