@@ -20,8 +20,11 @@ loan", "Top-up facility").
 **FR-1.2** Loan accounts are managed on the property detail page under a
 dedicated "Loans" section.
 
-**FR-1.3** A user can mark a loan account as inactive. Inactive loans do not
-appear in the upload mortgage step but their payment history is retained.
+**FR-1.3** A loan account has a `startDate` and `endDate` representing its
+active period. Loans whose `endDate` is before the selected month do not appear
+in the upload mortgage step, but their payment history is retained. (The
+original `isActive` boolean was removed in Slice 5 — active status is now
+derived from date ranges.)
 
 **FR-1.4** In the upload mortgage step, one input row is shown per active loan
 account per property. If a property has no active loan accounts, the user is
@@ -109,7 +112,8 @@ retroactive recalculations.
 
 ```
 loan_accounts     id, userId, propertyId (FK → properties),
-                  lender, nickname, isActive, createdAt
+                  lender, nickname, startDate, endDate, createdAt
+                  (isActive removed in Slice 5 — replaced by date ranges)
 ```
 
 ### Modified tables
