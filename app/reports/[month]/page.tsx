@@ -22,14 +22,12 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { formatCents, formatMonth } from '@/lib/format'
-import type { ReportTotals, PropertyTotals, MissingMortgage } from '@/lib/reports/compute'
+import type { ReportTotals, ReportFlags, PropertyTotals, MissingMortgage } from '@/lib/reports/compute'
 import { cn } from '@/lib/utils'
 
 type Report = {
   id: string
   month: string
-  totals: ReportTotals
-  flags: { missingStatements: string[]; missingMortgages: MissingMortgage[] }
   aiCommentary: string | null
   version: number
   createdAt: string
@@ -190,6 +188,8 @@ export default function ReportPage() {
   const { month } = useParams<{ month: string }>()
   const router = useRouter()
   const [report, setReport] = useState<Report | null>(null)
+  const [totals, setTotals] = useState<ReportTotals | null>(null)
+  const [flags, setFlags] = useState<ReportFlags | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [docs, setDocs] = useState<DocEntry[]>([])
@@ -209,22 +209,31 @@ export default function ReportPage() {
   }, [month])
 
   useEffect(() => {
+    const [year, mon] = month.split('-')
+    const lastDay = new Date(Number(year), Number(mon), 0).toISOString().slice(0, 10)
+
     Promise.all([
       fetch(`/api/reports?month=${month}`),
       fetch(`/api/documents?month=${month}`),
       fetch('/api/reports'),
+      fetch(`/api/ledger/summary?from=${month}-01&to=${lastDay}`),
     ])
-      .then(async ([reportRes, docsRes, listRes]) => {
+      .then(async ([reportRes, docsRes, listRes, summaryRes]) => {
         if (reportRes.status === 404) { setNotFound(true); return }
         if (!reportRes.ok) throw new Error()
-        const [reportData, docsData, listData] = await Promise.all([
+        const [reportData, docsData, listData, summaryData] = await Promise.all([
           reportRes.json(),
           docsRes.ok ? docsRes.json() : { documents: [] },
           listRes.ok ? listRes.json() : { reports: [] },
+          summaryRes.ok ? summaryRes.json() : null,
         ])
         setReport(reportData.report)
         setDocs(docsData.documents ?? [])
         setReportList(listData.reports ?? [])
+        if (summaryData) {
+          setTotals(summaryData.totals)
+          setFlags(summaryData.flags)
+        }
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
@@ -253,7 +262,7 @@ export default function ReportPage() {
     </div>
   )
 
-  if (notFound || !report) return (
+  if (notFound || !report || !totals) return (
     <div className="min-h-screen bg-screen-bg">
       <AppNav />
       <div className="max-w-xl mx-auto px-4 py-16 text-center">
@@ -263,7 +272,6 @@ export default function ReportPage() {
     </div>
   )
 
-  const totals = report.totals
   const generatedDate = new Date(report.createdAt).toLocaleDateString('en-AU', {
     day: 'numeric', month: 'short', year: 'numeric',
   })
@@ -373,7 +381,7 @@ export default function ReportPage() {
                 </div>
               )
             })}
-            {report.flags.missingMortgages.map(m => (
+            {flags?.missingMortgages.map(m => (
               <div key={m.loanAccountId} className="flex items-start gap-3 px-5 py-3 border-b border-ruled last:border-b-0 text-xs leading-relaxed">
                 <span className="text-sm flex-shrink-0 mt-0.5">⚠️</span>
                 <div className="text-muted">
@@ -382,7 +390,7 @@ export default function ReportPage() {
                 </div>
               </div>
             ))}
-            {totals.properties.every(p => p.hasStatement) && report.flags.missingMortgages.length === 0 && (
+            {totals.properties.every(p => p.hasStatement) && (flags?.missingMortgages.length ?? 0) === 0 && (
               <div className="flex items-start gap-3 px-5 py-3 text-xs leading-relaxed">
                 <span className="text-sm flex-shrink-0 mt-0.5">✓</span>
                 <div className="text-muted"><span className="text-accent">All statements and loan payments received. Complete data.</span></div>
