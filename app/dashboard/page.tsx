@@ -15,7 +15,7 @@ import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
 import { ChartTooltip } from '@/components/ui/chart'
 import type { ChartConfig } from '@/components/ui/chart'
 import { formatCents, formatMonth } from '@/lib/format'
-import type { ReportTotals } from '@/lib/reports/compute'
+import type { ReportTotals, ReportFlags } from '@/lib/reports/compute'
 import type { TrendPoint } from '@/app/api/reports/trends/route'
 import type { MonthHealth } from '@/app/api/reports/health/route'
 import { cn } from '@/lib/utils'
@@ -24,7 +24,6 @@ type ReportListItem = { month: string; createdAt: string }
 
 type Report = {
   month: string
-  totals: ReportTotals
   aiCommentary: string | null
   version: number
   createdAt: string
@@ -40,10 +39,10 @@ const chartConfig = {
 type ChartPoint = {
   label: string
   month: string
-  rent: number | null
-  costs: number | null   // negated: -(expenses + mortgage)
-  net: number | null
-  hasReport: boolean
+  rent: number
+  costs: number   // negated: -(expenses + mortgage)
+  net: number
+  hasData: boolean
 }
 
 function TrendsSection({ trends, month, onBarClick }: {
@@ -54,12 +53,10 @@ function TrendsSection({ trends, month, onBarClick }: {
   const data: ChartPoint[] = trends.map(t => ({
     label: t.month.slice(5), // 'MM' abbreviation
     month: t.month,
-    rent: t.rentCents !== null ? t.rentCents / 100 : null,
-    costs: t.expensesCents !== null && t.mortgageCents !== null
-      ? -((t.expensesCents + t.mortgageCents) / 100)
-      : null,
-    net: t.netCents !== null ? t.netCents / 100 : null,
-    hasReport: t.rentCents !== null,
+    rent: t.rentCents / 100,
+    costs: -((t.expensesCents + t.mortgageCents) / 100),
+    net: t.netCents / 100,
+    hasData: t.hasData,
   }))
 
   // Expense ratio stat
@@ -67,10 +64,10 @@ function TrendsSection({ trends, month, onBarClick }: {
   const current = currentIdx >= 0 ? trends[currentIdx] : null
   const prior = currentIdx > 0 ? trends[currentIdx - 1] : null
 
-  const currentRatio = current?.rentCents && current.expensesCents !== null
+  const currentRatio = current?.rentCents && current.expensesCents
     ? (current.expensesCents / current.rentCents) * 100
     : null
-  const priorRatio = prior?.rentCents && prior.expensesCents !== null
+  const priorRatio = prior?.rentCents && prior.expensesCents
     ? (prior.expensesCents / prior.rentCents) * 100
     : null
 
@@ -103,7 +100,7 @@ function TrendsSection({ trends, month, onBarClick }: {
           <ComposedChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
             onClick={(e) => {
               const p = e?.activePayload?.[0]?.payload as ChartPoint | undefined
-              if (p?.hasReport) onBarClick(p.month)
+              if (p?.hasData) onBarClick(p.month)
             }}
           >
             <CartesianGrid vertical={false} stroke="#ddd9cf" strokeDasharray="3 3" />
@@ -137,7 +134,7 @@ function TrendsSection({ trends, month, onBarClick }: {
                 <Cell
                   key={entry.month}
                   fill={entry.month === month ? '#2d5a3d' : '#8fba9e'}
-                  cursor={entry.hasReport ? 'pointer' : 'default'}
+                  cursor={entry.hasData ? 'pointer' : 'default'}
                 />
               ))}
             </Bar>
@@ -148,7 +145,7 @@ function TrendsSection({ trends, month, onBarClick }: {
                 <Cell
                   key={entry.month}
                   fill={entry.month === month ? '#c4622d' : '#e0a080'}
-                  cursor={entry.hasReport ? 'pointer' : 'default'}
+                  cursor={entry.hasData ? 'pointer' : 'default'}
                 />
               ))}
             </Bar>
@@ -179,6 +176,7 @@ function DashboardContent() {
   const router = useRouter()
   const [reportList, setReportList] = useState<ReportListItem[]>([])
   const [report, setReport] = useState<Report | null>(null)
+  const [totals, setTotals] = useState<ReportTotals | null>(null)
   const [loadingList, setLoadingList] = useState(true)
   const [loadingReport, setLoadingReport] = useState(false)
   const [trends, setTrends] = useState<TrendPoint[]>([])
@@ -207,21 +205,40 @@ function DashboardContent() {
       .catch(() => {})
   }, [])
 
-  // Fetch selected report when month changes
+  // Fetch selected report (commentary) + live totals when month changes
   useEffect(() => {
     if (!month) return
     setLoadingReport(true)
     setReport(null)
-    fetch(`/api/reports?month=${month}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setReport(data.report) })
+    setTotals(null)
+
+    const [year, mon] = month.split('-')
+    const lastDay = new Date(Number(year), Number(mon), 0).toISOString().slice(0, 10)
+
+    Promise.all([
+      fetch(`/api/reports?month=${month}`).then(r => r.ok ? r.json() : null),
+      fetch(`/api/ledger/summary?from=${month}-01&to=${lastDay}`).then(r => r.ok ? r.json() : null),
+    ])
+      .then(([reportData, summaryData]) => {
+        if (reportData) setReport(reportData.report)
+        if (summaryData) setTotals(summaryData.totals)
+      })
       .catch(() => {})
       .finally(() => setLoadingReport(false))
   }, [month])
 
-  const hasReport = !!report
-  const totals = report?.totals
   const healthMap = new Map(health.map(h => [h.month, h]))
+
+  const healthIndicator = (status: MonthHealth['status'] | undefined) => {
+    if (status === 'healthy')       return <span className="ml-1 text-accent">✓</span>
+    if (status === 'stale')         return <span className="ml-1 text-warn">⚠</span>
+    if (status === 'incomplete')    return <span className="ml-1 text-muted">○</span>
+    if (status === 'no_commentary') return <span className="ml-1 text-muted">✏</span>
+    if (status === 'no_data')       return <span className="ml-1 text-muted">—</span>
+    return null
+  }
+
+  const hasTotals = totals !== null && totals.propertyCount > 0
 
   return (
     <div className="min-h-screen bg-screen-bg">
@@ -236,13 +253,6 @@ function DashboardContent() {
         ) : (
           reportList.map(r => {
             const h = healthMap.get(r.month)
-            const indicator = h?.status === 'healthy'
-              ? <span className="ml-1 text-accent">✓</span>
-              : h?.status === 'stale'
-              ? <span className="ml-1 text-warn">⚠</span>
-              : h?.status === 'incomplete'
-              ? <span className="ml-1 text-muted">○</span>
-              : null
             return (
               <button key={r.month} onClick={() => router.push('/dashboard?month=' + r.month)}
                 className={cn('flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-mono border transition-colors',
@@ -250,7 +260,7 @@ function DashboardContent() {
                     ? 'bg-ink text-white border-ink'
                     : 'border-accent text-accent bg-white hover:bg-accent-light'
                 )}>
-                {formatMonth(r.month)}{indicator}
+                {formatMonth(r.month)}{healthIndicator(h?.status)}
               </button>
             )
           })
@@ -262,11 +272,11 @@ function DashboardContent() {
 
       {loadingReport ? (
         <div className="flex items-center justify-center py-24 text-sm text-muted">Loading…</div>
-      ) : !hasReport || !totals ? (
+      ) : !hasTotals ? (
         <div className="flex flex-col items-center justify-center py-24 text-center px-4">
           <div className="text-4xl mb-4">📊</div>
           <h2 className="text-lg font-semibold mb-2">
-            {month ? `No report for ${formatMonth(month)}` : 'No reports yet'}
+            {month ? `No data for ${formatMonth(month)}` : 'No reports yet'}
           </h2>
           <p className="text-sm text-muted mb-6 max-w-xs">Upload your PM statements and generate a report for this month.</p>
           <Button onClick={() => router.push('/upload')}>Upload statements →</Button>
@@ -302,7 +312,7 @@ function DashboardContent() {
             )}
 
             {/* AI Commentary */}
-            {report.aiCommentary && (
+            {report?.aiCommentary && (
               <Card className="mx-5 mt-4">
                 <div className="bg-screen-bg border-b border-border px-4 py-2 flex items-center gap-2 rounded-t-lg">
                   <div className="w-1.5 h-1.5 rounded-full bg-accent" />
@@ -347,11 +357,11 @@ function DashboardContent() {
                 { label: 'Entered this month', value: `${totals.mortgagesProvided} of ${totals.propertyCount}` },
                 { label: 'Not entered', value: String(totals.propertyCount - totals.mortgagesProvided), warn: totals.mortgagesProvided < totals.propertyCount },
               ]},
-              { title: 'Generated', rows: [
+              ...(report ? [{ title: 'Generated', rows: [
                 { label: 'Date',  value: new Date(report.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) },
                 { label: 'Month', value: formatMonth(month) },
                 ...(report.version > 1 && report.updatedAt ? [{ label: 'Last updated', value: new Date(report.updatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) }] : []),
-              ]},
+              ]}] : []),
             ].map(block => (
               <div key={block.title} className="px-4 py-4 border-b border-border">
                 <p className="text-[10px] font-mono uppercase tracking-widest text-muted mb-2">{block.title}</p>
