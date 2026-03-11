@@ -46,8 +46,6 @@ const reportRow = {
   id: 'report-uuid-1',
   userId: 'user-123',
   month: '2026-03',
-  totals: { totalRent: 400000, totalExpenses: 90000, totalMortgage: 210000, netAfterMortgage: 100000, properties: [] },
-  flags: { missingStatements: [], missingMortgages: [] },
   aiCommentary: 'Commentary text.',
   version: 1,
   createdAt: new Date(),

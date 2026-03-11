@@ -192,26 +192,12 @@ async function seedOwner(userId: string) {
   // Keep a reference to georgeLoan for the flags
   void georgeLoan
 
-  // Portfolio report — totals are a snapshot computed from the ledger above
-  // Income:   Smith St $4,000 + George Ave $8,400             = $12,400
-  // Expenses: Smith St $900 + George Ave $2,350                =  $3,250
-  // Loans:    Smith St $2,100 + Riverside $2,400 (George = $0) =  $4,500
-  // Net:      $12,400 - $3,250 - $4,500                        =  $4,650
+  // Portfolio report — commentary only (totals computed live from ledger)
   console.log('  → portfolio report')
   await db.insert(portfolioReports).values([
     {
       userId,
       month:   '2026-03',
-      totals:  JSON.stringify({
-        totalRentCents:          1_240_000,
-        totalExpensesCents:        325_000,
-        totalLoanPaymentCents:     450_000,
-        netCents:                  465_000,
-      }),
-      flags: JSON.stringify([
-        { type: 'missing_statement', propertyId: riverside.id,  message: 'No statement for Riverside — rent assumed $0' },
-        { type: 'missing_loan',      propertyId: georgeAve.id,  message: 'No loan payment entered for George Ave'        },
-      ]),
       aiCommentary:
         'Expenses at George Ave were notably higher this month due to an emergency plumbing repair ($1,426). ' +
         'Excluding this one-off, operating expenses across the portfolio were in line with prior periods. ' +

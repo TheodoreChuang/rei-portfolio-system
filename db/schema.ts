@@ -1,6 +1,6 @@
 import {
   pgTable, text, integer, timestamp,
-  date, pgEnum, varchar, uuid, unique, index, jsonb,
+  date, pgEnum, varchar, uuid, unique, index,
 } from 'drizzle-orm/pg-core'
 
 export const ledgerCategoryEnum = pgEnum('ledger_category', [
@@ -94,8 +94,6 @@ export const portfolioReports = pgTable('portfolio_reports', {
   id:           uuid('id').primaryKey().defaultRandom(),
   userId:       uuid('user_id').notNull(),
   month:        varchar('month', { length: 7 }).notNull(), // 'YYYY-MM'
-  totals:       jsonb('totals').notNull(),    // computed snapshot at generation time
-  flags:        jsonb('flags').notNull(),     // missing data warnings etc
   aiCommentary: text('ai_commentary'),
   version:      integer('version').notNull().default(1),
   createdAt:    timestamp('created_at').defaultNow().notNull(),

@@ -42,7 +42,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ reports: rows })
 }
 
-// POST /api/reports — generate or regenerate a report for a month
+// POST /api/reports — generate or regenerate commentary for a month
 export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing or invalid month (must be YYYY-MM)' }, { status: 400 })
   }
 
-  // Fetch ledger entries for user+month
+  // Fetch ledger entries for user+month (needed for commentary when flag is on)
   const startDate = `${month}-01`
   const endDate = lastDayOfMonth(month)
 
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No properties found — add a property before generating a report' }, { status: 422 })
   }
 
-  const { totals, flags: reportFlags } = computeReport(entries, props, loans)
+  const { totals } = computeReport(entries, props, loans)
   const aiCommentary = flags.aiCommentary ? await generateCommentary(totals, month) : null
 
   const [report] = await db
@@ -96,15 +96,11 @@ export async function POST(request: Request) {
     .values({
       userId: user.id,
       month,
-      totals: totals as unknown as Record<string, unknown>,
-      flags: reportFlags as unknown as Record<string, unknown>,
       aiCommentary,
     })
     .onConflictDoUpdate({
       target: [portfolioReports.userId, portfolioReports.month],
       set: {
-        totals: totals as unknown as Record<string, unknown>,
-        flags: reportFlags as unknown as Record<string, unknown>,
         aiCommentary,
         version: sql`${portfolioReports.version} + 1`,
         updatedAt: new Date(),

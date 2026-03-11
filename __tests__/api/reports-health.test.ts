@@ -58,8 +58,8 @@ function makeReport(month: string, updatedAt = REPORT_UPDATED_AT) {
     id: 'rep-' + month,
     userId: 'user-123',
     month,
-    totals: {},
-    flags: {},
+    aiCommentary: null,
+    version: 1,
     createdAt: new Date('2026-03-01'),
     updatedAt,
   }
