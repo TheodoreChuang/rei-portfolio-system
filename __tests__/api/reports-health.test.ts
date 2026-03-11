@@ -157,12 +157,24 @@ describe('GET /api/reports/health', () => {
     expect(json.health).toHaveLength(12)
   })
 
-  it('returns missing_report for months with no report', async () => {
+  it('returns no_data for months with no report and no entries', async () => {
     mocks.mockReports.mockResolvedValue([])
+    mocks.mockEntries.mockResolvedValue([])
     const res = await GET(makeRequest({ months: '1' }))
     const json = await res.json()
-    expect(json.health[0].status).toBe('missing_report')
+    expect(json.health[0].status).toBe('no_data')
     expect(json.health[0].month).toBe('2026-03')
+    expect(json.health[0].missing).toEqual([])
+  })
+
+  it('returns no_commentary for months with entries but no report', async () => {
+    mocks.mockReports.mockResolvedValue([])
+    mocks.mockEntries.mockResolvedValue([
+      makeLoanPaymentEntry(), // active entry in the month
+    ])
+    const res = await GET(makeRequest({ months: '1' }))
+    const json = await res.json()
+    expect(json.health[0].status).toBe('no_commentary')
     expect(json.health[0].missing).toEqual([])
   })
 

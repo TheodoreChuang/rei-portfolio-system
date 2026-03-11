@@ -15,7 +15,7 @@ type MissingItem =
 
 export type MonthHealth = {
   month: string
-  status: 'healthy' | 'stale' | 'incomplete' | 'missing_report'
+  status: 'healthy' | 'stale' | 'incomplete' | 'no_commentary' | 'no_data'
   missing: MissingItem[]
 }
 
@@ -92,16 +92,24 @@ export async function GET(request: Request) {
     const lastDay = lastDayOfMonth(month)
     const report = reportMap.get(month)
 
+    // Filter entries for this month
+    const monthEntries = entries.filter(e =>
+      e.lineItemDate >= firstDay && e.lineItemDate <= lastDay
+    )
+    const hasEntries = monthEntries.some(e => e.deletedAt === null)
+
     if (!report) {
-      return { month, status: 'missing_report' as const, missing: [] }
+      // Distinguish: no data at all vs entries exist but no commentary
+      return {
+        month,
+        status: hasEntries ? 'no_commentary' as const : 'no_data' as const,
+        missing: [],
+      }
     }
 
     const reportUpdatedAt = report.updatedAt
 
     // Staleness: any entry (including deleted) updated after report.updatedAt
-    const monthEntries = entries.filter(e =>
-      e.lineItemDate >= firstDay && e.lineItemDate <= lastDay
-    )
     const isStaleFromEntries = monthEntries.some(e =>
       e.updatedAt && reportUpdatedAt && e.updatedAt > reportUpdatedAt
     )
