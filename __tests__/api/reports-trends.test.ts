@@ -6,7 +6,7 @@ vi.setSystemTime(new Date('2026-03-15'))
 
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
-  mockSelectOrderBy: vi.fn(),
+  mockGroupBy: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -20,7 +20,7 @@ vi.mock('@/lib/db', () => ({
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockImplementation(() => mocks.mockSelectOrderBy()),
+          groupBy: vi.fn().mockImplementation(() => mocks.mockGroupBy()),
         }),
       }),
     }),
@@ -33,28 +33,16 @@ function makeRequest(params: Record<string, string> = {}) {
   return new Request(url.toString(), { method: 'GET' })
 }
 
-// A report row as returned from DB (totals is the JSONB blob)
-function makeReport(month: string, rent: number, expenses: number, mortgage: number) {
-  return {
-    month,
-    totals: {
-      totalRent: rent,
-      totalExpenses: expenses,
-      totalMortgage: mortgage,
-      netAfterMortgage: rent - expenses - mortgage,
-      statementsReceived: 1,
-      mortgagesProvided: 1,
-      propertyCount: 1,
-      properties: [],
-    },
-  }
+// A DB row as returned from the grouped query
+function makeRow(month: string, category: string, totalCents: number) {
+  return { month, category, totalCents }
 }
 
 describe('GET /api/reports/trends', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
-    mocks.mockSelectOrderBy.mockResolvedValue([])
+    mocks.mockGroupBy.mockResolvedValue([])
   })
 
   it('returns 401 when unauthenticated', async () => {
@@ -106,23 +94,42 @@ describe('GET /api/reports/trends', () => {
     expect(months[0]).toBe('2025-04')
   })
 
-  it('null fields for months with no report (not 0)', async () => {
-    mocks.mockSelectOrderBy.mockResolvedValueOnce([
-      makeReport('2026-03', 400000, 90000, 210000),
+  it('zero fields for months with no entries (not null)', async () => {
+    mocks.mockGroupBy.mockResolvedValueOnce([
+      makeRow('2026-03', 'rent', 400000),
     ])
     const res = await GET(makeRequest({ months: '3' }))
     const json = await res.json()
-    // 2026-01 and 2026-02 have no report
+    // 2026-01 and 2026-02 have no entries — should be 0, not null
     const jan = json.trends.find((t: { month: string }) => t.month === '2026-01')
     const feb = json.trends.find((t: { month: string }) => t.month === '2026-02')
-    expect(jan.rentCents).toBeNull()
-    expect(jan.netCents).toBeNull()
-    expect(feb.rentCents).toBeNull()
+    expect(jan.rentCents).toBe(0)
+    expect(jan.netCents).toBe(0)
+    expect(feb.rentCents).toBe(0)
   })
 
-  it('derives netCents from totalRent - totalExpenses - totalMortgage', async () => {
-    mocks.mockSelectOrderBy.mockResolvedValueOnce([
-      makeReport('2026-03', 400000, 90000, 210000),
+  it('hasData is false for months with no entries', async () => {
+    const res = await GET(makeRequest({ months: '3' }))
+    const json = await res.json()
+    json.trends.forEach((t: { hasData: boolean }) => {
+      expect(t.hasData).toBe(false)
+    })
+  })
+
+  it('hasData is true for months with any entries', async () => {
+    mocks.mockGroupBy.mockResolvedValueOnce([
+      makeRow('2026-03', 'rent', 400000),
+    ])
+    const res = await GET(makeRequest({ months: '1' }))
+    const json = await res.json()
+    expect(json.trends[0].hasData).toBe(true)
+  })
+
+  it('derives netCents from rent - expenses - mortgage', async () => {
+    mocks.mockGroupBy.mockResolvedValueOnce([
+      makeRow('2026-03', 'rent', 400000),
+      makeRow('2026-03', 'repairs', 90000),
+      makeRow('2026-03', 'loan_payment', 210000),
     ])
     const res = await GET(makeRequest({ months: '1' }))
     const json = await res.json()
@@ -133,35 +140,22 @@ describe('GET /api/reports/trends', () => {
     expect(point.netCents).toBe(400000 - 90000 - 210000) // 100000
   })
 
-  it('does not include months outside the requested range', async () => {
-    // DB returns a report outside range — should not appear (WHERE clause handles this,
-    // but even if returned, it wouldn't map to any slot in our range array)
-    mocks.mockSelectOrderBy.mockResolvedValueOnce([
-      makeReport('2024-01', 100000, 50000, 40000), // far outside 1-month range
-      makeReport('2026-03', 400000, 90000, 210000),
+  it('aggregates multiple expense categories into expensesCents', async () => {
+    mocks.mockGroupBy.mockResolvedValueOnce([
+      makeRow('2026-03', 'rent', 400000),
+      makeRow('2026-03', 'insurance', 10000),
+      makeRow('2026-03', 'rates', 5000),
+      makeRow('2026-03', 'repairs', 20000),
     ])
     const res = await GET(makeRequest({ months: '1' }))
     const json = await res.json()
-    expect(json.trends).toHaveLength(1)
-    expect(json.trends[0].month).toBe('2026-03')
-    expect(json.trends[0].rentCents).toBe(400000)
+    expect(json.trends[0].expensesCents).toBe(35000)
   })
 
-  it('returns all-null for every month when portfolio has no reports', async () => {
-    mocks.mockSelectOrderBy.mockResolvedValueOnce([])
-    const res = await GET(makeRequest({ months: '3' }))
-    const json = await res.json()
-    expect(json.trends).toHaveLength(3)
-    json.trends.forEach((t: { rentCents: unknown; netCents: unknown }) => {
-      expect(t.rentCents).toBeNull()
-      expect(t.netCents).toBeNull()
-    })
-  })
-
-  it('multiple reports populate their respective months correctly', async () => {
-    mocks.mockSelectOrderBy.mockResolvedValueOnce([
-      makeReport('2026-01', 300000, 60000, 200000),
-      makeReport('2026-03', 400000, 90000, 210000),
+  it('multiple months populate their respective months correctly', async () => {
+    mocks.mockGroupBy.mockResolvedValueOnce([
+      makeRow('2026-01', 'rent', 300000),
+      makeRow('2026-03', 'rent', 400000),
     ])
     const res = await GET(makeRequest({ months: '3' }))
     const json = await res.json()
@@ -169,7 +163,17 @@ describe('GET /api/reports/trends', () => {
     const feb = json.trends.find((t: { month: string }) => t.month === '2026-02')
     const mar = json.trends.find((t: { month: string }) => t.month === '2026-03')
     expect(jan.rentCents).toBe(300000)
-    expect(feb.rentCents).toBeNull()  // gap
+    expect(feb.rentCents).toBe(0)  // zero, not null
     expect(mar.rentCents).toBe(400000)
+  })
+
+  it('returns all-zero for every month when no entries', async () => {
+    const res = await GET(makeRequest({ months: '3' }))
+    const json = await res.json()
+    expect(json.trends).toHaveLength(3)
+    json.trends.forEach((t: { rentCents: unknown; netCents: unknown }) => {
+      expect(t.rentCents).toBe(0)
+      expect(t.netCents).toBe(0)
+    })
   })
 })

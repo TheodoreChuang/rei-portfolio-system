@@ -1,17 +1,23 @@
-import { and, asc, eq, gte, lte } from 'drizzle-orm'
+import { and, eq, gte, isNull, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { portfolioReports } from '@/db/schema'
+import { propertyLedgerEntries } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { ReportTotals } from '@/lib/reports/compute'
+import { lastDayOfMonth } from '@/lib/format'
 
 export type TrendPoint = {
   month: string
-  rentCents: number | null
-  expensesCents: number | null
-  mortgageCents: number | null
-  netCents: number | null
+  rentCents: number
+  expensesCents: number
+  mortgageCents: number
+  netCents: number
+  hasData: boolean
 }
+
+const EXPENSE_CATEGORIES = new Set([
+  'insurance', 'rates', 'repairs', 'property_management',
+  'utilities', 'strata_fees', 'other_expense',
+])
 
 function currentMonth(): string {
   const now = new Date()
@@ -30,7 +36,7 @@ function generateMonthRange(endMonth: string, count: number): string[] {
 
 // GET /api/reports/trends?months=12
 //   Returns an ascending array of monthly trend data points for the last N months,
-//   ending at the current month. Missing months have null values (not 0).
+//   ending at the current month. Months with no entries show 0 (not null).
 //   Response: { trends: TrendPoint[] }
 export async function GET(request: Request) {
   const supabase = await createServerSupabaseClient()
@@ -49,31 +55,55 @@ export async function GET(request: Request) {
 
   const end = currentMonth()
   const months = generateMonthRange(end, monthsNum)
-  const start = months[0]
+  const from = `${months[0]}-01`
+  const to = lastDayOfMonth(months[months.length - 1])
 
-  const reports = await db
-    .select({ month: portfolioReports.month, totals: portfolioReports.totals })
-    .from(portfolioReports)
+  // Grouped ledger query: one row per (month, category)
+  const rows = await db
+    .select({
+      month: sql<string>`to_char(date_trunc('month', ${propertyLedgerEntries.lineItemDate}), 'YYYY-MM')`,
+      category: propertyLedgerEntries.category,
+      totalCents: sql<number>`SUM(${propertyLedgerEntries.amountCents})::int`,
+    })
+    .from(propertyLedgerEntries)
     .where(
       and(
-        eq(portfolioReports.userId, user.id),
-        gte(portfolioReports.month, start),
-        lte(portfolioReports.month, end),
+        eq(propertyLedgerEntries.userId, user.id),
+        gte(propertyLedgerEntries.lineItemDate, from),
+        lte(propertyLedgerEntries.lineItemDate, to),
+        isNull(propertyLedgerEntries.deletedAt),
       )
     )
-    .orderBy(asc(portfolioReports.month))
+    .groupBy(
+      sql`date_trunc('month', ${propertyLedgerEntries.lineItemDate})`,
+      propertyLedgerEntries.category,
+    )
 
-  const reportMap = new Map(reports.map(r => [r.month, r.totals as ReportTotals]))
+  // Build lookup: month → { rent, expenses, mortgage }
+  type MonthBucket = { rent: number; expenses: number; mortgage: number }
+  const buckets = new Map<string, MonthBucket>()
+  for (const row of rows) {
+    const b = buckets.get(row.month) ?? { rent: 0, expenses: 0, mortgage: 0 }
+    if (row.category === 'rent') {
+      b.rent += Number(row.totalCents)
+    } else if (EXPENSE_CATEGORIES.has(row.category)) {
+      b.expenses += Number(row.totalCents)
+    } else if (row.category === 'loan_payment') {
+      b.mortgage += Number(row.totalCents)
+    }
+    buckets.set(row.month, b)
+  }
 
   const trends: TrendPoint[] = months.map(month => {
-    const totals = reportMap.get(month)
-    if (!totals) return { month, rentCents: null, expensesCents: null, mortgageCents: null, netCents: null }
+    const b = buckets.get(month) ?? { rent: 0, expenses: 0, mortgage: 0 }
+    const hasData = b.rent > 0 || b.expenses > 0 || b.mortgage > 0
     return {
       month,
-      rentCents: totals.totalRent,
-      expensesCents: totals.totalExpenses,
-      mortgageCents: totals.totalMortgage,
-      netCents: totals.totalRent - totals.totalExpenses - totals.totalMortgage,
+      rentCents:     b.rent,
+      expensesCents: b.expenses,
+      mortgageCents: b.mortgage,
+      netCents:      b.rent - b.expenses - b.mortgage,
+      hasData,
     }
   })
 
