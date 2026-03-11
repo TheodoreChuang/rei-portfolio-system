@@ -92,7 +92,7 @@ export default function PropertiesPage() {
                 <p className="text-sm font-semibold truncate">{p.address}</p>
                 {p.nickname && <p className="text-[11px] text-muted font-mono mt-0.5">"{p.nickname}"</p>}
               </div>
-              <Link href={`/properties/${p.id}/edit`}>
+              <Link href={`/properties/${p.id}`}>
                 <Button variant="outline" size="sm">Edit</Button>
               </Link>
             </div>

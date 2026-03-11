@@ -4,7 +4,7 @@ async function goToSmithStEdit(page: Page) {
   await page.goto('/properties')
   await page.locator('div').filter({ hasText: '123 Smith St' })
     .getByRole('button', { name: 'Edit' }).click()
-  await expect(page).toHaveURL(/\/properties\/.+\/edit/, { timeout: 10000 })
+  await expect(page).toHaveURL(/\/properties\/.+(?<!\/edit)$/, { timeout: 10000 })
 }
 
 test.describe('Loan accounts on property edit page', () => {
