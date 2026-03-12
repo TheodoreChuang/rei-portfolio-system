@@ -19,6 +19,7 @@ import { currentFY, prevFY } from '@/lib/date-ranges'
 import type { ReportTotals, ReportFlags } from '@/lib/reports/compute'
 import type { TrendPoint } from '@/app/api/reports/trends/route'
 import type { MonthHealth } from '@/app/api/reports/health/route'
+import type { PortfolioLVR } from '@/app/api/portfolio/summary/route'
 import { cn } from '@/lib/utils'
 
 type DateRangeOption = 'last12' | 'current_fy' | 'prev_fy' | 'custom'
@@ -261,6 +262,7 @@ function DashboardContent() {
   const [loadingTotals, setLoadingTotals] = useState(true)
   const [trends, setTrends] = useState<TrendPoint[]>([])
   const [health, setHealth] = useState<MonthHealth[]>([])
+  const [portfolio, setPortfolio] = useState<PortfolioLVR | null>(null)
   const [rangeOption, setRangeOption] = useState<DateRangeOption>('last12')
   const [customFrom, setCustomFrom] = useState(currentMonthStr)
   const [customTo, setCustomTo] = useState(currentMonthStr)
@@ -279,7 +281,7 @@ function DashboardContent() {
       .finally(() => setLoadingList(false))
   }, [])
 
-  // Fetch trends + health once on mount (independent of month/range selection)
+  // Fetch trends + health + portfolio once on mount
   useEffect(() => {
     fetch('/api/reports/trends?months=12')
       .then(r => r.ok ? r.json() : null)
@@ -288,6 +290,10 @@ function DashboardContent() {
     fetch('/api/reports/health?months=12')
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setHealth(data.health ?? []) })
+      .catch(() => {})
+    fetch('/api/portfolio/summary')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setPortfolio(data.portfolio ?? null) })
       .catch(() => {})
   }, [])
 
@@ -394,6 +400,32 @@ function DashboardContent() {
                 </div>
               ))}
             </div>
+
+            {/* Portfolio LVR — only when at least one valuation AND one balance exist */}
+            {portfolio && portfolio.propertiesValued > 0 && portfolio.loansWithBalance > 0 && (
+              <div className="mx-5 mt-4">
+                <Card>
+                  <CardContent className="py-3 px-5 flex items-center gap-6 flex-wrap">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted">Portfolio</p>
+                    <div>
+                      <span className="text-sm font-serif">{formatCents(portfolio.totalValueCents)}</span>
+                      <span className="text-[11px] text-muted ml-1">({portfolio.propertiesValued} of {portfolio.propertiesTotal} valued)</span>
+                    </div>
+                    <div>
+                      <span className="text-sm font-serif">{formatCents(portfolio.totalDebtCents)}</span>
+                      <span className="text-[11px] text-muted ml-1">({portfolio.loansWithBalance} of {portfolio.activeLoansTotal} loans)</span>
+                    </div>
+                    {portfolio.lvr !== null && (
+                      <div>
+                        <span className={cn('text-sm font-semibold', portfolio.lvr >= 80 ? 'text-warn' : 'text-accent')}>
+                          LVR: {portfolio.lvr.toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             {/* Incomplete warning — only for single-month views */}
             {singleMonth && totals.statementsReceived < totals.propertyCount && (
