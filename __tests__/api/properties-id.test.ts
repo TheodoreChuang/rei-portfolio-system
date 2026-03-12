@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { GET, PUT, DELETE } from '@/app/api/properties/[id]/route'
 
+let selectCallCount = 0
+
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
-  mockSelectLimit: vi.fn(),
+  mockSelectLimit: vi.fn(),       // call 1: property lookup
+  mockValuationLimit: vi.fn(),    // call 2: latest valuation
+  mockLedgerWhere: vi.fn(),       // call 3: ledger entries (no limit/orderBy)
   mockUpdateReturning: vi.fn(),
   mockDeleteReturning: vi.fn(),
 }))
@@ -18,12 +22,22 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: mocks.mockSelectLimit,
+    select: vi.fn(() => {
+      selectCallCount++
+      const call = selectCallCount
+      return {
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: call === 1 ? mocks.mockSelectLimit : mocks.mockValuationLimit,
+            orderBy: vi.fn().mockReturnValue({
+              limit: mocks.mockValuationLimit,
+            }),
+            then: call === 3
+              ? (resolve: (v: unknown[]) => void) => Promise.resolve(mocks.mockLedgerWhere()).then(resolve)
+              : undefined,
+          }),
         }),
-      }),
+      }
     }),
     update: vi.fn().mockReturnValue({
       set: vi.fn().mockReturnValue({
@@ -72,7 +86,11 @@ function makeDeleteRequest() {
 describe('GET /api/properties/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    selectCallCount = 0
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
+    mocks.mockSelectLimit.mockResolvedValue([propRow])
+    mocks.mockValuationLimit.mockResolvedValue([]) // no valuations by default
+    mocks.mockLedgerWhere.mockResolvedValue([])    // no ledger entries by default
   })
 
   it('returns 401 when not authenticated', async () => {
@@ -95,7 +113,6 @@ describe('GET /api/properties/[id]', () => {
   })
 
   it('returns the property when found', async () => {
-    mocks.mockSelectLimit.mockResolvedValue([propRow])
     const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
     expect(res.status).toBe(200)
     const json = await res.json()
@@ -108,6 +125,60 @@ describe('GET /api/properties/[id]', () => {
     mocks.mockSelectLimit.mockResolvedValue([])
     const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
     expect(res.status).toBe(404)
+  })
+
+  it('returns latestValuation null and yield null when no valuations', async () => {
+    const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.latestValuation).toBeNull()
+    expect(json.yield).toBeNull()
+  })
+
+  it('returns latestValuation when valuations exist', async () => {
+    mocks.mockValuationLimit.mockResolvedValue([{
+      id: 'v1', userId: 'user-123', propertyId: VALID_UUID,
+      valuedAt: '2026-03-01', valueCents: 65000000, source: 'bank', notes: null, createdAt: new Date(),
+    }])
+    const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.latestValuation.valueCents).toBe(65000000)
+    expect(json.latestValuation.valuedAt).toBe('2026-03-01')
+    expect(json.latestValuation.source).toBe('bank')
+  })
+
+  it('computes gross yield correctly: (trailing12mRent / valueCents) * 100', async () => {
+    mocks.mockValuationLimit.mockResolvedValue([{
+      id: 'v1', userId: 'user-123', propertyId: VALID_UUID,
+      valuedAt: '2026-03-01', valueCents: 100000000, source: null, notes: null, createdAt: new Date(),
+    }])
+    mocks.mockLedgerWhere.mockResolvedValue([
+      { category: 'rent', amountCents: 5000000 },   // $50,000 rent
+      { category: 'insurance', amountCents: 200000 }, // $2,000 expense
+      { category: 'loan_payment', amountCents: 1000000 }, // excluded from both
+    ])
+    const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
+    const json = await res.json()
+    // gross = 5000000 / 100000000 * 100 = 5.00
+    expect(json.yield.grossPercent).toBe(5)
+  })
+
+  it('computes net yield excluding loan_payment: ((rent - expenses) / valueCents) * 100', async () => {
+    mocks.mockValuationLimit.mockResolvedValue([{
+      id: 'v1', userId: 'user-123', propertyId: VALID_UUID,
+      valuedAt: '2026-03-01', valueCents: 100000000, source: null, notes: null, createdAt: new Date(),
+    }])
+    mocks.mockLedgerWhere.mockResolvedValue([
+      { category: 'rent', amountCents: 5000000 },    // $50,000 rent
+      { category: 'insurance', amountCents: 200000 },  // $2,000 expense
+      { category: 'loan_payment', amountCents: 1000000 }, // $10,000 — excluded
+    ])
+    const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
+    const json = await res.json()
+    // net = (5000000 - 200000) / 100000000 * 100 = 4.80
+    expect(json.yield.netPercent).toBe(4.8)
+    expect(json.yield.periodLabel).toBe('trailing 12m')
   })
 })
 

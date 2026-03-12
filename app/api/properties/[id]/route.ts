@@ -1,13 +1,13 @@
 // /api/properties/[id] — GET, PUT, DELETE for a single property
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq, gte, isNull } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { properties } from '@/db/schema'
+import { properties, propertyLedgerEntries, propertyValuations } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// GET /api/properties/[id] — get a single property
+// GET /api/properties/[id] — get a single property with latest valuation + yield
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -31,7 +31,56 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  return NextResponse.json({ property })
+  // Latest valuation
+  const [latestValuationRow] = await db
+    .select()
+    .from(propertyValuations)
+    .where(and(eq(propertyValuations.propertyId, id), eq(propertyValuations.userId, user.id)))
+    .orderBy(desc(propertyValuations.valuedAt))
+    .limit(1)
+
+  const latestValuation = latestValuationRow
+    ? { valueCents: latestValuationRow.valueCents, valuedAt: latestValuationRow.valuedAt, source: latestValuationRow.source }
+    : null
+
+  // Trailing 12m ledger entries for yield calc
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
+  const cutoff = twelveMonthsAgo.toISOString().slice(0, 10)
+
+  const ledgerEntries = await db
+    .select()
+    .from(propertyLedgerEntries)
+    .where(
+      and(
+        eq(propertyLedgerEntries.userId, user.id),
+        eq(propertyLedgerEntries.propertyId, id),
+        gte(propertyLedgerEntries.lineItemDate, cutoff),
+        isNull(propertyLedgerEntries.deletedAt)
+      )
+    )
+
+  // Compute yield only when a valuation exists
+  let yieldStats: { grossPercent: number; netPercent: number; periodLabel: string } | null = null
+  if (latestValuation) {
+    let trailing12mRent = 0
+    let trailing12mExpenses = 0
+    for (const e of ledgerEntries) {
+      if (e.category === 'rent') {
+        trailing12mRent += e.amountCents
+      } else if (e.category !== 'loan_payment') {
+        trailing12mExpenses += e.amountCents
+      }
+    }
+    const val = latestValuation.valueCents
+    yieldStats = {
+      grossPercent: Math.round((trailing12mRent / val) * 10000) / 100,
+      netPercent: Math.round(((trailing12mRent - trailing12mExpenses) / val) * 10000) / 100,
+      periodLabel: 'trailing 12m',
+    }
+  }
+
+  return NextResponse.json({ property, latestValuation, yield: yieldStats })
 }
 
 // PUT /api/properties/[id] — update a property
