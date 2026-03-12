@@ -1,9 +1,9 @@
 // GET /api/properties/[id]/loans  — list all loan accounts for a property
 // POST /api/properties/[id]/loans — create a loan account
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { properties, loanAccounts } from '@/db/schema'
+import { properties, loanAccounts, loanBalances } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -36,7 +36,26 @@ export async function GET(
     .from(loanAccounts)
     .where(and(eq(loanAccounts.propertyId, id), eq(loanAccounts.userId, user.id)))
 
-  return NextResponse.json({ loans })
+  // Enrich each loan with its latest balance
+  const balanceRows = await db
+    .select()
+    .from(loanBalances)
+    .where(eq(loanBalances.userId, user.id))
+    .orderBy(loanBalances.loanAccountId, desc(loanBalances.recordedAt))
+
+  const latestBalanceMap = new Map<string, { balanceCents: number; recordedAt: string }>()
+  for (const row of balanceRows) {
+    if (!latestBalanceMap.has(row.loanAccountId)) {
+      latestBalanceMap.set(row.loanAccountId, { balanceCents: row.balanceCents, recordedAt: row.recordedAt })
+    }
+  }
+
+  const loansWithBalance = loans.map(loan => ({
+    ...loan,
+    latestBalance: latestBalanceMap.get(loan.id) ?? null,
+  }))
+
+  return NextResponse.json({ loans: loansWithBalance })
 }
 
 export async function POST(

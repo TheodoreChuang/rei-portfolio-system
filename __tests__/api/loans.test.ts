@@ -36,10 +36,13 @@ function makePostRequest(propertyId: string, body: unknown) {
   })
 }
 
+let selectCallCount = 0
+
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
-  mockSelectLimit: vi.fn(),  // property ownership check (.where().limit())
-  mockSelectLoans: vi.fn(),  // loan listing (.where() thenable, no limit)
+  mockSelectLimit: vi.fn(),    // property ownership check (.where().limit())
+  mockSelectLoans: vi.fn(),    // loan listing (call 2, thenable, no limit)
+  mockSelectBalances: vi.fn(), // balance enrichment (call 3, orderBy)
   mockInsertReturning: vi.fn(),
 }))
 
@@ -53,15 +56,42 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: mocks.mockSelectLimit,
-          // thenable — for the loans list (no .limit())
-          then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
-            mocks.mockSelectLoans().then(resolve, reject),
+    select: vi.fn(() => {
+      selectCallCount++
+      const call = selectCallCount
+      if (call === 1) {
+        // property ownership check
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: mocks.mockSelectLimit,
+              then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+                mocks.mockSelectLoans().then(resolve, reject),
+            }),
+          }),
+        }
+      }
+      if (call === 2) {
+        // loans list
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: mocks.mockSelectLimit,
+              then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+                mocks.mockSelectLoans().then(resolve, reject),
+            }),
+          }),
+        }
+      }
+      // call 3 — balance enrichment (orderBy)
+      return {
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+            orderBy: vi.fn().mockImplementation(() => mocks.mockSelectBalances()),
+          }),
         }),
-      }),
+      }
     }),
     insert: vi.fn().mockReturnValue({
       values: vi.fn().mockReturnValue({
@@ -76,9 +106,11 @@ vi.mock('@/lib/db', () => ({
 describe('GET /api/properties/[id]/loans', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    selectCallCount = 0
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockSelectLimit.mockResolvedValue([propRow])
     mocks.mockSelectLoans.mockResolvedValue([loanRow])
+    mocks.mockSelectBalances.mockResolvedValue([])
   })
 
   it('returns 401 when unauthenticated', async () => {
@@ -131,6 +163,22 @@ describe('GET /api/properties/[id]/loans', () => {
     const json = await res.json()
     expect(json.loans).toHaveLength(2)
   })
+
+  it('enriches loans with latestBalance when balance exists', async () => {
+    const balanceRow = { id: 'd4e5f6a7-b8c9-4012-d345-444444444444', userId: 'user-123', loanAccountId: loanRow.id, balanceCents: 45000000, recordedAt: '2026-03-01', notes: null, createdAt: new Date() }
+    mocks.mockSelectBalances.mockResolvedValueOnce([balanceRow])
+    const res = await GET(makeGetRequest(VALID_PROP_ID), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.loans[0].latestBalance).toEqual({ balanceCents: 45000000, recordedAt: '2026-03-01' })
+  })
+
+  it('returns null latestBalance when no balance exists', async () => {
+    const res = await GET(makeGetRequest(VALID_PROP_ID), { params: Promise.resolve({ id: VALID_PROP_ID }) })
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.loans[0].latestBalance).toBeNull()
+  })
 })
 
 // ── POST ──────────────────────────────────────────────────────────────────────
@@ -138,6 +186,7 @@ describe('GET /api/properties/[id]/loans', () => {
 describe('POST /api/properties/[id]/loans', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    selectCallCount = 0
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockSelectLimit.mockResolvedValue([propRow])
     mocks.mockInsertReturning.mockResolvedValue([loanRow])

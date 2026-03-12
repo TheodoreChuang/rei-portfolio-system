@@ -15,9 +15,10 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { formatMonth, formatCents, recentMonths } from '@/lib/format'
-import type { Property, PropertyLedgerEntry, PropertyValuation } from '@/db/schema'
+import type { Property, PropertyLedgerEntry, PropertyValuation, LoanBalance } from '@/db/schema'
 
-type LoanRow = { id: string; lender: string; nickname: string | null; startDate: string; endDate: string }
+type LatestBalance = { balanceCents: number; recordedAt: string } | null
+type LoanRow = { id: string; lender: string; nickname: string | null; startDate: string; endDate: string; latestBalance: LatestBalance }
 type LatestValuation = { valueCents: number; valuedAt: string; source: string | null } | null
 type YieldStats = { grossPercent: number; netPercent: number; periodLabel: string } | null
 
@@ -81,6 +82,13 @@ export default function EditPropertyPage() {
   const [valSource, setValSource] = useState('')
   const [valNotes, setValNotes] = useState('')
   const [savingVal, setSavingVal] = useState(false)
+  const [loanBalancesMap, setLoanBalancesMap] = useState<Record<string, LoanBalance[]>>({})
+  const [expandedLoan, setExpandedLoan] = useState<string | null>(null)
+  const [showAddBalance, setShowAddBalance] = useState<string | null>(null)
+  const [balDate, setBalDate] = useState('')
+  const [balAmount, setBalAmount] = useState('')
+  const [balNotes, setBalNotes] = useState('')
+  const [savingBal, setSavingBal] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -245,6 +253,50 @@ export default function EditPropertyPage() {
     setValuations(prev => prev.filter(v => v.id !== valuationId))
   }
 
+  async function handleToggleLoanBalances(loanId: string) {
+    if (expandedLoan === loanId) {
+      setExpandedLoan(null)
+      return
+    }
+    setExpandedLoan(loanId)
+    if (loanBalancesMap[loanId]) return // already fetched
+    const res = await fetch(`/api/properties/${id}/loans/${loanId}/balances`)
+    if (!res.ok) { toast.error('Failed to load balances'); return }
+    const data = await res.json()
+    setLoanBalancesMap(prev => ({ ...prev, [loanId]: data.balances ?? [] }))
+  }
+
+  async function handleAddBalance(loanId: string) {
+    let balanceCents: number
+    try { balanceCents = parseCents(balAmount) }
+    catch {
+      // Allow $0
+      const clean = balAmount.replace(/[$,\s]/g, '')
+      if (clean === '0') { balanceCents = 0 }
+      else { toast.error('Invalid amount'); return }
+    }
+
+    setSavingBal(true)
+    const res = await fetch(`/api/properties/${id}/loans/${loanId}/balances`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recordedAt: balDate, balanceCents, notes: balNotes.trim() || null }),
+    })
+    setSavingBal(false)
+    if (!res.ok) { toast.error((await res.json().catch(() => ({}))).error ?? 'Failed to add balance'); return }
+    const { balance } = await res.json()
+    setLoanBalancesMap(prev => ({ ...prev, [loanId]: [balance, ...(prev[loanId] ?? [])] }))
+    setLoans(prev => prev.map(l => l.id === loanId ? { ...l, latestBalance: { balanceCents: balance.balanceCents, recordedAt: balance.recordedAt } } : l))
+    setBalDate(''); setBalAmount(''); setBalNotes('')
+    setShowAddBalance(null)
+  }
+
+  async function handleDeleteBalance(loanId: string, balanceId: string) {
+    const res = await fetch(`/api/properties/${id}/loans/${loanId}/balances/${balanceId}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete balance'); return }
+    setLoanBalancesMap(prev => ({ ...prev, [loanId]: (prev[loanId] ?? []).filter(b => b.id !== balanceId) }))
+  }
+
   if (loading) return (
     <div className="min-h-screen bg-screen-bg">
       <AppNav />
@@ -311,20 +363,86 @@ export default function EditPropertyPage() {
           <div className="space-y-2 mb-4">
             {loans.map(loan => {
               const isEnded = loan.endDate <= today
+              const isExpanded = expandedLoan === loan.id
+              const balances = loanBalancesMap[loan.id] ?? []
               return (
                 <Card key={loan.id} className={cn(isEnded && 'opacity-60')}>
-                  <CardContent className="py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">{loan.lender}</p>
-                      {loan.nickname && <p className="text-[11px] text-muted">{loan.nickname}</p>}
-                      <p className="text-[11px] text-muted font-mono mt-0.5">
-                        {loan.startDate} – {loan.endDate}
-                      </p>
+                  <CardContent className="py-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">{loan.lender}</p>
+                        {loan.nickname && <p className="text-[11px] text-muted">{loan.nickname}</p>}
+                        <p className="text-[11px] text-muted font-mono mt-0.5">
+                          {loan.startDate} – {loan.endDate}
+                        </p>
+                        {loan.latestBalance && (
+                          <p className="text-[11px] text-muted font-mono mt-0.5">
+                            Balance: <span className="text-ink font-semibold">{formatCents(loan.latestBalance.balanceCents)}</span>
+                            <span className="ml-1">as of {loan.latestBalance.recordedAt}</span>
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleLoanBalances(loan.id)}
+                          className="text-[11px] text-muted hover:text-ink font-mono border border-border rounded px-2 py-1"
+                        >
+                          {isExpanded ? 'Hide balances' : 'Balances'}
+                        </button>
+                        {!isEnded && (
+                          <Button variant="outline" size="sm" onClick={() => handleEndLoan(loan.id)}>
+                            End loan
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    {!isEnded && (
-                      <Button variant="outline" size="sm" onClick={() => handleEndLoan(loan.id)}>
-                        End loan
-                      </Button>
+
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t border-border space-y-2">
+                        {balances.length === 0 && <p className="text-xs text-muted">No balance records yet.</p>}
+                        {balances.map(b => (
+                          <div key={b.id} className="flex items-center justify-between text-xs">
+                            <div>
+                              <span className="font-mono font-semibold">{formatCents(b.balanceCents)}</span>
+                              <span className="text-muted ml-2 font-mono">{b.recordedAt}</span>
+                              {b.notes && <span className="text-muted ml-2">{b.notes}</span>}
+                            </div>
+                            <Button variant="outline" size="sm" className="text-warn border-warn/50 hover:bg-warn-light h-6 text-[10px] px-2"
+                              onClick={() => handleDeleteBalance(loan.id, b.id)}>
+                              Delete
+                            </Button>
+                          </div>
+                        ))}
+                        {showAddBalance === loan.id ? (
+                          <div className="space-y-2 pt-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Date</Label>
+                                <Input type="date" value={balDate} onChange={e => setBalDate(e.target.value)} className="h-8 text-xs" />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Balance</Label>
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted">$</span>
+                                  <Input className="pl-6 h-8 text-xs" placeholder="e.g. 450,000"
+                                    value={balAmount} onChange={e => setBalAmount(e.target.value)} />
+                                </div>
+                              </div>
+                            </div>
+                            <Input placeholder="Notes (optional)" value={balNotes} onChange={e => setBalNotes(e.target.value)} className="h-8 text-xs" />
+                            <div className="flex gap-2">
+                              <Button size="sm" className="h-7 text-xs" onClick={() => handleAddBalance(loan.id)} disabled={!balDate || !balAmount || savingBal}>
+                                {savingBal ? 'Saving…' : 'Save'}
+                              </Button>
+                              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowAddBalance(null)}>Cancel</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setShowAddBalance(loan.id); setBalDate(new Date().toISOString().slice(0, 10)) }}>
+                            + Add balance
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </CardContent>
                 </Card>
