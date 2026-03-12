@@ -15,10 +15,14 @@ import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
 import { ChartTooltip } from '@/components/ui/chart'
 import type { ChartConfig } from '@/components/ui/chart'
 import { formatCents, formatMonth } from '@/lib/format'
+import { currentFY, prevFY } from '@/lib/date-ranges'
 import type { ReportTotals, ReportFlags } from '@/lib/reports/compute'
 import type { TrendPoint } from '@/app/api/reports/trends/route'
 import type { MonthHealth } from '@/app/api/reports/health/route'
 import { cn } from '@/lib/utils'
+
+type DateRangeOption = 'last12' | 'current_fy' | 'prev_fy' | 'custom'
+type DateRange = { from: string; to: string; label: string }
 
 type ReportListItem = { month: string; createdAt: string }
 
@@ -31,18 +35,94 @@ type Report = {
 }
 
 const chartConfig = {
-  rent:   { label: 'Rent',     color: '#2d5a3d' },   // --color-accent
-  costs:  { label: 'Costs',    color: '#c4622d' },   // --color-warn
-  net:    { label: 'Net',      color: '#1a1a1a' },   // --color-ink
+  rent:   { label: 'Rent',     color: '#2d5a3d' },
+  costs:  { label: 'Costs',    color: '#c4622d' },
+  net:    { label: 'Net',      color: '#1a1a1a' },
 } satisfies ChartConfig
 
 type ChartPoint = {
   label: string
   month: string
   rent: number
-  costs: number   // negated: -(expenses + mortgage)
+  costs: number
   net: number
   hasData: boolean
+}
+
+function lastDayOfMonth(yyyyMM: string): string {
+  const [year, mon] = yyyyMM.split('-').map(Number)
+  return new Date(year, mon, 0).toISOString().slice(0, 10)
+}
+
+function getActiveRange(option: DateRangeOption, customFrom: string, customTo: string): DateRange {
+  if (option === 'current_fy') return currentFY()
+  if (option === 'prev_fy') return prevFY()
+  if (option === 'custom') {
+    const from = customFrom
+    const to = customFrom > customTo ? customFrom : customTo
+    return {
+      from: `${from}-01`,
+      to: lastDayOfMonth(to),
+      label: from === to ? formatMonth(from) : `${formatMonth(from)} – ${formatMonth(to)}`,
+    }
+  }
+  // last12
+  const now = new Date()
+  const toMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const fromDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+  const fromMonth = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}`
+  return {
+    from: `${fromMonth}-01`,
+    to: lastDayOfMonth(toMonth),
+    label: 'Last 12 months',
+  }
+}
+
+function isSingleMonth(from: string, to: string): boolean {
+  return from.slice(0, 7) === to.slice(0, 7)
+}
+
+function DateRangeSelector({ option, onOptionChange, customFrom, customTo, onCustomFromChange, onCustomToChange }: {
+  option: DateRangeOption
+  onOptionChange: (opt: DateRangeOption) => void
+  customFrom: string
+  customTo: string
+  onCustomFromChange: (v: string) => void
+  onCustomToChange: (v: string) => void
+}) {
+  const buttons: { key: DateRangeOption; label: string }[] = [
+    { key: 'last12', label: 'Last 12m' },
+    { key: 'current_fy', label: 'Current FY' },
+    { key: 'prev_fy', label: 'Previous FY' },
+    { key: 'custom', label: 'Custom ▾' },
+  ]
+
+  return (
+    <div className="bg-white border-b border-border px-6 py-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        {buttons.map(btn => (
+          <button key={btn.key} onClick={() => onOptionChange(btn.key)}
+            className={cn('px-3 py-1 text-xs font-mono rounded border transition-colors',
+              option === btn.key
+                ? 'bg-ink text-white border-ink'
+                : 'border-border text-muted bg-white hover:bg-screen-bg'
+            )}>
+            {btn.label}
+          </button>
+        ))}
+      </div>
+      {option === 'custom' && (
+        <div className="flex items-center gap-3 mt-2 text-xs font-mono text-muted">
+          <span>From</span>
+          <input type="month" value={customFrom} onChange={e => onCustomFromChange(e.target.value)}
+            className="border border-border rounded px-2 py-1 text-xs font-mono text-ink" />
+          <span>To</span>
+          <input type="month" value={customTo} min={customFrom} onChange={e => onCustomToChange(e.target.value)}
+            className="border border-border rounded px-2 py-1 text-xs font-mono text-ink" />
+        </div>
+      )}
+    </div>
+  )
 }
 
 function TrendsSection({ trends, month, onBarClick }: {
@@ -51,7 +131,7 @@ function TrendsSection({ trends, month, onBarClick }: {
   onBarClick: (m: string) => void
 }) {
   const data: ChartPoint[] = trends.map(t => ({
-    label: t.month.slice(5), // 'MM' abbreviation
+    label: t.month.slice(5),
     month: t.month,
     rent: t.rentCents / 100,
     costs: -((t.expensesCents + t.mortgageCents) / 100),
@@ -59,7 +139,6 @@ function TrendsSection({ trends, month, onBarClick }: {
     hasData: t.hasData,
   }))
 
-  // Expense ratio stat
   const currentIdx = trends.findIndex(t => t.month === month)
   const current = currentIdx >= 0 ? trends[currentIdx] : null
   const prior = currentIdx > 0 ? trends[currentIdx - 1] : null
@@ -128,7 +207,6 @@ function TrendsSection({ trends, month, onBarClick }: {
               }
             />
 
-            {/* Rent bars — positive */}
             <Bar dataKey="rent" stackId="a" fill={chartConfig.rent.color} radius={[2, 2, 0, 0]} maxBarSize={32}>
               {data.map((entry) => (
                 <Cell
@@ -139,7 +217,6 @@ function TrendsSection({ trends, month, onBarClick }: {
               ))}
             </Bar>
 
-            {/* Costs bars — negative (stacked below zero) */}
             <Bar dataKey="costs" stackId="b" fill={chartConfig.costs.color} radius={[0, 0, 2, 2]} maxBarSize={32}>
               {data.map((entry) => (
                 <Cell
@@ -150,7 +227,6 @@ function TrendsSection({ trends, month, onBarClick }: {
               ))}
             </Bar>
 
-            {/* Net cash flow line */}
             <Line
               dataKey="net"
               stroke={chartConfig.net.color}
@@ -174,15 +250,25 @@ function TrendsSection({ trends, month, onBarClick }: {
 function DashboardContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  const now = new Date()
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
   const [reportList, setReportList] = useState<ReportListItem[]>([])
   const [report, setReport] = useState<Report | null>(null)
   const [totals, setTotals] = useState<ReportTotals | null>(null)
   const [loadingList, setLoadingList] = useState(true)
-  const [loadingReport, setLoadingReport] = useState(false)
+  const [loadingTotals, setLoadingTotals] = useState(true)
   const [trends, setTrends] = useState<TrendPoint[]>([])
   const [health, setHealth] = useState<MonthHealth[]>([])
+  const [rangeOption, setRangeOption] = useState<DateRangeOption>('last12')
+  const [customFrom, setCustomFrom] = useState(currentMonthStr)
+  const [customTo, setCustomTo] = useState(currentMonthStr)
 
   const month = searchParams.get('month') || reportList[0]?.month || ''
+
+  const activeRange = getActiveRange(rangeOption, customFrom, customTo)
+  const singleMonth = isSingleMonth(activeRange.from, activeRange.to)
 
   // Fetch report list on mount
   useEffect(() => {
@@ -193,7 +279,7 @@ function DashboardContent() {
       .finally(() => setLoadingList(false))
   }, [])
 
-  // Fetch trends + health once on mount (independent of month selection)
+  // Fetch trends + health once on mount (independent of month/range selection)
   useEffect(() => {
     fetch('/api/reports/trends?months=12')
       .then(r => r.ok ? r.json() : null)
@@ -205,27 +291,26 @@ function DashboardContent() {
       .catch(() => {})
   }, [])
 
-  // Fetch selected report (commentary) + live totals when month changes
+  // Fetch commentary when month pill changes (independent of date range)
   useEffect(() => {
     if (!month) return
-    setLoadingReport(true)
     setReport(null)
-    setTotals(null)
-
-    const [year, mon] = month.split('-')
-    const lastDay = new Date(Number(year), Number(mon), 0).toISOString().slice(0, 10)
-
-    Promise.all([
-      fetch(`/api/reports?month=${month}`).then(r => r.ok ? r.json() : null),
-      fetch(`/api/ledger/summary?from=${month}-01&to=${lastDay}`).then(r => r.ok ? r.json() : null),
-    ])
-      .then(([reportData, summaryData]) => {
-        if (reportData) setReport(reportData.report)
-        if (summaryData) setTotals(summaryData.totals)
-      })
+    fetch(`/api/reports?month=${month}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setReport(data.report) })
       .catch(() => {})
-      .finally(() => setLoadingReport(false))
   }, [month])
+
+  // Fetch live totals when active range changes
+  useEffect(() => {
+    setTotals(null)
+    setLoadingTotals(true)
+    fetch(`/api/ledger/summary?from=${activeRange.from}&to=${activeRange.to}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setTotals(data.totals) })
+      .catch(() => {})
+      .finally(() => setLoadingTotals(false))
+  }, [activeRange.from, activeRange.to])
 
   const healthMap = new Map(health.map(h => [h.month, h]))
 
@@ -244,7 +329,7 @@ function DashboardContent() {
     <div className="min-h-screen bg-screen-bg">
       <AppNav />
 
-      {/* Month selector */}
+      {/* Month selector (pill nav) */}
       <div className="bg-white border-b border-border px-6 py-3 flex items-center gap-2 overflow-x-auto">
         {loadingList ? (
           <span className="text-xs text-muted">Loading…</span>
@@ -270,13 +355,23 @@ function DashboardContent() {
         </Button>
       </div>
 
-      {loadingReport ? (
+      {/* Date range selector */}
+      <DateRangeSelector
+        option={rangeOption}
+        onOptionChange={setRangeOption}
+        customFrom={customFrom}
+        customTo={customTo}
+        onCustomFromChange={setCustomFrom}
+        onCustomToChange={setCustomTo}
+      />
+
+      {loadingTotals ? (
         <div className="flex items-center justify-center py-24 text-sm text-muted">Loading…</div>
       ) : !hasTotals ? (
         <div className="flex flex-col items-center justify-center py-24 text-center px-4">
           <div className="text-4xl mb-4">📊</div>
           <h2 className="text-lg font-semibold mb-2">
-            {month ? `No data for ${formatMonth(month)}` : 'No reports yet'}
+            No data for {activeRange.label}
           </h2>
           <p className="text-sm text-muted mb-6 max-w-xs">Upload your PM statements and generate a report for this month.</p>
           <Button onClick={() => router.push('/upload')}>Upload statements →</Button>
@@ -287,10 +382,10 @@ function DashboardContent() {
             {/* KPI strip */}
             <div className="grid grid-cols-2 md:grid-cols-4 border-b border-border">
               {[
-                { label: 'Total rent',    value: formatCents(totals.totalRent),        sub: `${totals.statementsReceived} of ${totals.propertyCount} statements` },
-                { label: 'Expenses',      value: formatCents(totals.totalExpenses),     sub: `across ${totals.statementsReceived} properties` },
-                { label: 'Mortgage',      value: formatCents(totals.totalMortgage),     sub: `${totals.mortgagesProvided} of ${totals.propertyCount} provided` },
-                { label: 'Net cash flow', value: formatCents(totals.netAfterMortgage),  sub: 'after mortgage', positive: totals.netAfterMortgage >= 0 },
+                { label: 'Total rent',    value: formatCents(totals.totalRent),       sub: singleMonth ? `${totals.statementsReceived} of ${totals.propertyCount} statements` : activeRange.label },
+                { label: 'Expenses',      value: formatCents(totals.totalExpenses),    sub: singleMonth ? `across ${totals.statementsReceived} properties` : activeRange.label },
+                { label: 'Mortgage',      value: formatCents(totals.totalMortgage),    sub: singleMonth ? `${totals.mortgagesProvided} of ${totals.propertyCount} provided` : activeRange.label },
+                { label: 'Net cash flow', value: formatCents(totals.netAfterMortgage), sub: 'after mortgage', positive: totals.netAfterMortgage >= 0 },
               ].map((kpi, i) => (
                 <div key={i} className="bg-white p-5 border-r border-border last:border-r-0">
                   <p className="text-[10px] font-mono uppercase tracking-wider text-muted mb-1.5">{kpi.label}</p>
@@ -300,19 +395,19 @@ function DashboardContent() {
               ))}
             </div>
 
-            {/* Incomplete warning */}
-            {totals.statementsReceived < totals.propertyCount && (
+            {/* Incomplete warning — only for single-month views */}
+            {singleMonth && totals.statementsReceived < totals.propertyCount && (
               <div className="mx-5 mt-4 border border-warn/40 rounded-lg p-3 bg-warn-light flex gap-3 text-xs text-[#7a3a1a] leading-relaxed">
                 <span className="text-base flex-shrink-0">⚠️</span>
                 <div>
                   <strong>Incomplete data — {totals.propertyCount - totals.statementsReceived} statement{totals.propertyCount - totals.statementsReceived > 1 ? 's' : ''} missing.</strong>{' '}
-                  {totals.properties.filter(p => !p.hasStatement).map(p => p.address).join(', ')} has no statement for {formatMonth(month)}. Rent shown as $0.
+                  {totals.properties.filter(p => !p.hasStatement).map(p => p.address).join(', ')} has no statement for {month ? formatMonth(month) : activeRange.label}. Rent shown as $0.
                 </div>
               </div>
             )}
 
-            {/* AI Commentary */}
-            {report?.aiCommentary && (
+            {/* AI Commentary — only when a month pill is selected */}
+            {month && report?.aiCommentary && (
               <Card className="mx-5 mt-4">
                 <div className="bg-screen-bg border-b border-border px-4 py-2 flex items-center gap-2 rounded-t-lg">
                   <div className="w-1.5 h-1.5 rounded-full bg-accent" />
@@ -324,11 +419,14 @@ function DashboardContent() {
               </Card>
             )}
 
-            <div className="px-5 py-4">
-              <Link href={`/reports/${month}`}>
-                <Button variant="outline" size="sm" className="w-full">View full report →</Button>
-              </Link>
-            </div>
+            {/* View full report — only for single-month views when a pill is selected */}
+            {singleMonth && month && (
+              <div className="px-5 py-4">
+                <Link href={`/reports/${month}`}>
+                  <Button variant="outline" size="sm" className="w-full">View full report →</Button>
+                </Link>
+              </div>
+            )}
 
             {/* Trends chart */}
             {trends.length >= 1 && (
@@ -347,7 +445,7 @@ function DashboardContent() {
                 <Button variant="outline" className="w-full" size="sm">↻ Regenerate</Button>
               </Link>
             </div>
-            {[
+            {singleMonth && [
               { title: 'Statements', rows: [
                 { label: 'Expected', value: String(totals.propertyCount) },
                 { label: 'Received', value: String(totals.statementsReceived) },
