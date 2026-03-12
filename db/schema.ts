@@ -104,9 +104,25 @@ export const portfolioReports = pgTable('portfolio_reports', {
   index('idx_reports_user_month').on(t.userId, t.month),
 ])
 
+export const propertyValuations = pgTable('property_valuations', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  userId:     uuid('user_id').notNull(),
+  propertyId: uuid('property_id').notNull()
+                .references(() => properties.id, { onDelete: 'cascade' }),
+  valuedAt:   date('valued_at').notNull(),
+  valueCents: integer('value_cents').notNull(),
+  source:     text('source'),
+  notes:      text('notes'),
+  createdAt:  timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  unique().on(t.propertyId, t.valuedAt),
+  index('idx_valuations_property_date').on(t.propertyId, t.valuedAt),
+])
+
 export type Property            = typeof properties.$inferSelect
 export type SourceDocument      = typeof sourceDocuments.$inferSelect
 export type LoanAccount         = typeof loanAccounts.$inferSelect
 export type PropertyLedgerEntry = typeof propertyLedgerEntries.$inferSelect
 export type PortfolioReport     = typeof portfolioReports.$inferSelect
 export type LedgerCategory      = typeof ledgerCategoryEnum.enumValues[number]
+export type PropertyValuation   = typeof propertyValuations.$inferSelect
