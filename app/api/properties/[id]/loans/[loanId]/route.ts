@@ -30,7 +30,7 @@ export async function PATCH(
 
   const raw = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
 
-  const updates: { lender?: string; nickname?: string | null; startDate?: string; endDate?: string } = {}
+  const updates: { lender?: string; nickname?: string | null; startDate?: string; endDate?: string; entityId?: string | null } = {}
 
   if ('lender' in raw) {
     const lender = typeof raw.lender === 'string' ? raw.lender.trim() : ''
@@ -61,6 +61,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'endDate cannot be empty' }, { status: 400 })
     }
     updates.endDate = endDate
+  }
+
+  if ('entityId' in raw) {
+    updates.entityId = typeof raw.entityId === 'string' && raw.entityId ? raw.entityId : null
   }
 
   if (Object.keys(updates).length === 0) {

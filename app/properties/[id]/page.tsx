@@ -15,10 +15,10 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { formatMonth, formatCents, recentMonths } from '@/lib/format'
-import type { Property, PropertyLedgerEntry, PropertyValuation, LoanBalance } from '@/db/schema'
+import type { Property, PropertyLedgerEntry, PropertyValuation, LoanBalance, Entity } from '@/db/schema'
 
 type LatestBalance = { balanceCents: number; recordedAt: string } | null
-type LoanRow = { id: string; lender: string; nickname: string | null; startDate: string; endDate: string; latestBalance: LatestBalance }
+type LoanRow = { id: string; lender: string; nickname: string | null; startDate: string; endDate: string; entityId: string | null; latestBalance: LatestBalance }
 type LatestValuation = { valueCents: number; valuedAt: string; source: string | null } | null
 type YieldStats = { grossPercent: number; netPercent: number; periodLabel: string } | null
 
@@ -89,6 +89,16 @@ export default function EditPropertyPage() {
   const [balAmount, setBalAmount] = useState('')
   const [balNotes, setBalNotes] = useState('')
   const [savingBal, setSavingBal] = useState(false)
+  const [availableEntities, setAvailableEntities] = useState<Entity[]>([])
+  const [entityId, setEntityId] = useState<string | null>(null)
+  const [loanEntityIds, setLoanEntityIds] = useState<Record<string, string | null>>({})
+
+  useEffect(() => {
+    fetch('/api/entities')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setAvailableEntities(data.entities ?? []) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -105,10 +115,13 @@ export default function EditPropertyPage() {
         setNickname(p.nickname ?? '')
         setStartDate(p.startDate ?? '')
         setEndDate(p.endDate ?? '')
+        setEntityId(p.entityId ?? null)
         setOriginalAddress(p.address)
         setLatestValuation(propData.latestValuation ?? null)
         setYieldStats(propData.yield ?? null)
-        setLoans(loansData.loans ?? [])
+        const loadedLoans: LoanRow[] = loansData.loans ?? []
+        setLoans(loadedLoans)
+        setLoanEntityIds(Object.fromEntries(loadedLoans.map(l => [l.id, l.entityId])))
         setValuations(valsData.valuations ?? [])
       })
       .catch(() => toast.error('Failed to load property'))
@@ -165,6 +178,7 @@ export default function EditPropertyPage() {
         nickname: nickname.trim() || null,
         startDate: startDate || undefined,
         endDate: endDate || null,
+        entityId: entityId || null,
       }),
     })
     if (!res.ok) {
@@ -291,6 +305,15 @@ export default function EditPropertyPage() {
     setShowAddBalance(null)
   }
 
+  async function handleLoanEntityChange(loanId: string, newEntityId: string | null) {
+    setLoanEntityIds(prev => ({ ...prev, [loanId]: newEntityId }))
+    await fetch(`/api/properties/${id}/loans/${loanId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entityId: newEntityId }),
+    }).catch(() => toast.error('Failed to update loan entity'))
+  }
+
   async function handleDeleteBalance(loanId: string, balanceId: string) {
     const res = await fetch(`/api/properties/${id}/loans/${loanId}/balances/${balanceId}`, { method: 'DELETE' })
     if (!res.ok) { toast.error('Failed to delete balance'); return }
@@ -347,6 +370,16 @@ export default function EditPropertyPage() {
                 <Input id="end-date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
               </div>
             </div>
+            {availableEntities.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="prop-entity">Entity <span className="font-normal text-muted">(optional)</span></Label>
+                <select id="prop-entity" value={entityId ?? ''} onChange={e => setEntityId(e.target.value || null)}
+                  className="w-full border border-border rounded-md px-3 py-2 text-sm bg-white text-ink">
+                  <option value="">None</option>
+                  {availableEntities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+            )}
             <Separator />
             <div className="flex items-center gap-2 pt-1">
               <Button className="flex-1" onClick={handleSave}>Save changes</Button>
@@ -380,6 +413,16 @@ export default function EditPropertyPage() {
                             Balance: <span className="text-ink font-semibold">{formatCents(loan.latestBalance.balanceCents)}</span>
                             <span className="ml-1">as of {loan.latestBalance.recordedAt}</span>
                           </p>
+                        )}
+                        {availableEntities.length > 0 && (
+                          <select
+                            value={loanEntityIds[loan.id] ?? ''}
+                            onChange={e => handleLoanEntityChange(loan.id, e.target.value || null)}
+                            className="mt-1 border border-border rounded px-2 py-0.5 text-[11px] font-mono bg-white text-ink"
+                          >
+                            <option value="">No entity</option>
+                            {availableEntities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                          </select>
                         )}
                       </div>
                       <div className="flex items-center gap-2">

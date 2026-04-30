@@ -3,6 +3,20 @@ import {
   date, pgEnum, varchar, uuid, unique, index,
 } from 'drizzle-orm/pg-core'
 
+export const entityTypeEnum = pgEnum('entity_type', [
+  'individual', 'joint', 'trust', 'company', 'superannuation',
+])
+
+export const entities = pgTable('entities', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  userId:    uuid('user_id').notNull(),
+  name:      text('name').notNull(),
+  type:      entityTypeEnum('type').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('idx_entities_user').on(t.userId),
+])
+
 export const ledgerCategoryEnum = pgEnum('ledger_category', [
   'rent',
   'insurance',
@@ -22,9 +36,11 @@ export const properties = pgTable('properties', {
   nickname:  text('nickname'),
   startDate: date('start_date').notNull(),
   endDate:   date('end_date'),
+  entityId:  uuid('entity_id').references(() => entities.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('properties_user_id_idx').on(t.userId),
+  index('idx_properties_entity').on(t.entityId),
 ])
 
 export const sourceDocuments = pgTable('source_documents', {
@@ -56,6 +72,7 @@ export const loanAccounts = pgTable('loan_accounts', {
   nickname:   text('nickname'),
   startDate:  date('start_date').notNull(),
   endDate:    date('end_date').notNull(),
+  entityId:   uuid('entity_id').references(() => entities.id, { onDelete: 'set null' }),
   createdAt:  timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('idx_loan_accounts_user').on(t.userId),
@@ -141,3 +158,5 @@ export type PortfolioReport     = typeof portfolioReports.$inferSelect
 export type LedgerCategory      = typeof ledgerCategoryEnum.enumValues[number]
 export type PropertyValuation   = typeof propertyValuations.$inferSelect
 export type LoanBalance         = typeof loanBalances.$inferSelect
+export type Entity              = typeof entities.$inferSelect
+export type EntityType          = typeof entityTypeEnum.enumValues[number]

@@ -107,7 +107,7 @@ export async function PUT(
   const raw = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
 
   // Build update set — only include fields that were explicitly provided
-  const updates: { address?: string; nickname?: string | null; startDate?: string; endDate?: string | null } = {}
+  const updates: { address?: string; nickname?: string | null; startDate?: string; endDate?: string | null; entityId?: string | null } = {}
 
   if ('address' in raw) {
     const address = typeof raw.address === 'string' ? raw.address.trim() : ''
@@ -134,6 +134,10 @@ export async function PUT(
 
   if ('endDate' in raw) {
     updates.endDate = typeof raw.endDate === 'string' ? raw.endDate.trim() || null : null
+  }
+
+  if ('entityId' in raw) {
+    updates.entityId = typeof raw.entityId === 'string' && raw.entityId ? raw.entityId : null
   }
 
   if (Object.keys(updates).length === 0) {

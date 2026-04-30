@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lte } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, lte } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { propertyLedgerEntries, properties, loanAccounts } from '@/db/schema'
@@ -6,8 +6,6 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { computeReport } from '@/lib/reports/compute'
 
 // GET /api/ledger/summary?from=YYYY-MM-DD&to=YYYY-MM-DD[&propertyId=UUID][&entityId=UUID]
-// Returns live-computed totals and flags for the given date range.
-// entityId is accepted but not yet implemented (Slice 4).
 export async function GET(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -17,6 +15,7 @@ export async function GET(request: Request) {
   const from = searchParams.get('from')
   const to = searchParams.get('to')
   const propertyId = searchParams.get('propertyId')
+  const entityId = searchParams.get('entityId')
 
   if (!from || !to) {
     return NextResponse.json({ error: 'Missing required params: from and to (YYYY-MM-DD)' }, { status: 400 })
@@ -31,24 +30,35 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'from must be on or before to' }, { status: 400 })
   }
 
+  const propertiesWhere = [
+    eq(properties.userId, user.id),
+    ...(propertyId ? [eq(properties.id, propertyId)] : []),
+    ...(entityId ? [eq(properties.entityId, entityId)] : []),
+  ]
+
+  const loansWhere = [
+    eq(loanAccounts.userId, user.id),
+    ...(entityId ? [eq(loanAccounts.entityId, entityId)] : []),
+  ]
+
+  const [props, loans] = await Promise.all([
+    db.select().from(properties).where(and(...propertiesWhere)),
+    db.select().from(loanAccounts).where(and(...loansWhere)),
+  ])
+
+  const filteredPropertyIds = props.map(p => p.id)
+
   const entriesWhere = [
     eq(propertyLedgerEntries.userId, user.id),
     gte(propertyLedgerEntries.lineItemDate, from),
     lte(propertyLedgerEntries.lineItemDate, to),
     isNull(propertyLedgerEntries.deletedAt),
-    ...(propertyId ? [eq(propertyLedgerEntries.propertyId, propertyId)] : []),
+    ...(filteredPropertyIds.length > 0 ? [inArray(propertyLedgerEntries.propertyId, filteredPropertyIds)] : []),
   ]
 
-  const propertiesWhere = [
-    eq(properties.userId, user.id),
-    ...(propertyId ? [eq(properties.id, propertyId)] : []),
-  ]
-
-  const [entries, props, loans] = await Promise.all([
-    db.select().from(propertyLedgerEntries).where(and(...entriesWhere)),
-    db.select().from(properties).where(and(...propertiesWhere)),
-    db.select().from(loanAccounts).where(eq(loanAccounts.userId, user.id)),
-  ])
+  const entries = filteredPropertyIds.length === 0 && (propertyId || entityId)
+    ? []
+    : await db.select().from(propertyLedgerEntries).where(and(...entriesWhere))
 
   const { totals, flags } = computeReport(entries, props, loans)
 

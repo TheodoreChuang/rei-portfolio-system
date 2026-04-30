@@ -20,6 +20,7 @@ import type { ReportTotals, ReportFlags } from '@/lib/reports/compute'
 import type { TrendPoint } from '@/app/api/reports/trends/route'
 import type { MonthHealth } from '@/app/api/reports/health/route'
 import type { PortfolioLVR } from '@/app/api/portfolio/summary/route'
+import type { Entity } from '@/db/schema'
 import { cn } from '@/lib/utils'
 
 type DateRangeOption = 'last12' | 'current_fy' | 'prev_fy' | 'custom'
@@ -266,6 +267,8 @@ function DashboardContent() {
   const [rangeOption, setRangeOption] = useState<DateRangeOption>('last12')
   const [customFrom, setCustomFrom] = useState(currentMonthStr)
   const [customTo, setCustomTo] = useState(currentMonthStr)
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
 
   const month = searchParams.get('month') || reportList[0]?.month || ''
 
@@ -281,8 +284,12 @@ function DashboardContent() {
       .finally(() => setLoadingList(false))
   }, [])
 
-  // Fetch trends + health + portfolio once on mount
+  // Fetch entities + trends + health once on mount
   useEffect(() => {
+    fetch('/api/entities')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setEntities(data.entities ?? []) })
+      .catch(() => {})
     fetch('/api/reports/trends?months=12')
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setTrends(data.trends ?? []) })
@@ -291,11 +298,18 @@ function DashboardContent() {
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setHealth(data.health ?? []) })
       .catch(() => {})
-    fetch('/api/portfolio/summary')
+  }, [])
+
+  // Fetch portfolio summary when entity filter changes
+  useEffect(() => {
+    const url = selectedEntityId
+      ? `/api/portfolio/summary?entityId=${selectedEntityId}`
+      : '/api/portfolio/summary'
+    fetch(url)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setPortfolio(data.portfolio ?? null) })
       .catch(() => {})
-  }, [])
+  }, [selectedEntityId])
 
   // Fetch commentary when month pill changes (independent of date range)
   useEffect(() => {
@@ -307,16 +321,17 @@ function DashboardContent() {
       .catch(() => {})
   }, [month])
 
-  // Fetch live totals when active range changes
+  // Fetch live totals when active range or entity filter changes
   useEffect(() => {
     setTotals(null)
     setLoadingTotals(true)
-    fetch(`/api/ledger/summary?from=${activeRange.from}&to=${activeRange.to}`)
+    const entityParam = selectedEntityId ? `&entityId=${selectedEntityId}` : ''
+    fetch(`/api/ledger/summary?from=${activeRange.from}&to=${activeRange.to}${entityParam}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setTotals(data.totals) })
       .catch(() => {})
       .finally(() => setLoadingTotals(false))
-  }, [activeRange.from, activeRange.to])
+  }, [activeRange.from, activeRange.to, selectedEntityId])
 
   const healthMap = new Map(health.map(h => [h.month, h]))
 
@@ -370,6 +385,21 @@ function DashboardContent() {
         onCustomFromChange={setCustomFrom}
         onCustomToChange={setCustomTo}
       />
+
+      {/* Entity filter — only shown when user has multiple entities */}
+      {entities.length > 1 && (
+        <div className="bg-white border-b border-border px-6 py-2 flex items-center gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-muted">Entity</span>
+          <select
+            value={selectedEntityId ?? ''}
+            onChange={e => setSelectedEntityId(e.target.value || null)}
+            className="border border-border rounded px-2 py-1 text-xs font-mono text-ink bg-white"
+          >
+            <option value="">All entities</option>
+            {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+        </div>
+      )}
 
       {loadingTotals ? (
         <div className="flex items-center justify-center py-24 text-sm text-muted">Loading…</div>

@@ -79,7 +79,7 @@ describe('GET /api/portfolio/summary', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: null } })
-    const res = await GET()
+    const res = await GET(new Request('http://localhost/api/portfolio/summary'))
     expect(res.status).toBe(401)
   })
 
@@ -88,7 +88,7 @@ describe('GET /api/portfolio/summary', () => {
     mocks.mockSelect1.mockResolvedValue([])
     mocks.mockSelect2.mockResolvedValue([])
     mocks.mockSelect3.mockResolvedValue([])
-    const res = await GET()
+    const res = await GET(new Request('http://localhost/api/portfolio/summary'))
     expect(res.status).toBe(200)
     const { portfolio } = await res.json()
     expect(portfolio.totalValueCents).toBe(0)
@@ -102,7 +102,7 @@ describe('GET /api/portfolio/summary', () => {
 
   it('returns 200 with properties valued but no loan balances — totalDebtCents = 0, lvr = 0', async () => {
     mocks.mockSelect2.mockResolvedValue([])
-    const res = await GET()
+    const res = await GET(new Request('http://localhost/api/portfolio/summary'))
     expect(res.status).toBe(200)
     const { portfolio } = await res.json()
     expect(portfolio.totalValueCents).toBe(65000000)
@@ -114,7 +114,7 @@ describe('GET /api/portfolio/summary', () => {
 
   it('returns 200 with loan balances but no valuations — totalValueCents = 0, lvr = null', async () => {
     mocks.mockSelect1.mockResolvedValue([])
-    const res = await GET()
+    const res = await GET(new Request('http://localhost/api/portfolio/summary'))
     expect(res.status).toBe(200)
     const { portfolio } = await res.json()
     expect(portfolio.totalValueCents).toBe(0)
@@ -125,7 +125,7 @@ describe('GET /api/portfolio/summary', () => {
   })
 
   it('returns 200 with LVR computed correctly', async () => {
-    const res = await GET()
+    const res = await GET(new Request('http://localhost/api/portfolio/summary'))
     expect(res.status).toBe(200)
     const { portfolio } = await res.json()
     expect(portfolio.totalValueCents).toBe(65000000)
@@ -144,7 +144,7 @@ describe('GET /api/portfolio/summary', () => {
       balanceRow,
       { loanAccountId: LOAN_ID2, balanceCents: 20000000, recordedAt: '2019-01-01' },
     ])
-    const res = await GET()
+    const res = await GET(new Request('http://localhost/api/portfolio/summary'))
     expect(res.status).toBe(200)
     const { portfolio } = await res.json()
     // Only active loan's balance counts
@@ -156,7 +156,7 @@ describe('GET /api/portfolio/summary', () => {
   it('picks latest balance per loan (most recent recordedAt)', async () => {
     // balanceRow is more recent than balanceRow2 (already ordered desc by route)
     mocks.mockSelect2.mockResolvedValue([balanceRow, balanceRow2])
-    const res = await GET()
+    const res = await GET(new Request('http://localhost/api/portfolio/summary'))
     expect(res.status).toBe(200)
     const { portfolio } = await res.json()
     expect(portfolio.totalDebtCents).toBe(45000000) // balanceRow, not balanceRow2
@@ -164,7 +164,7 @@ describe('GET /api/portfolio/summary', () => {
 
   it('picks latest valuation per property (most recent valuedAt)', async () => {
     mocks.mockSelect1.mockResolvedValue([valuationRow, valuationRow2])
-    const res = await GET()
+    const res = await GET(new Request('http://localhost/api/portfolio/summary'))
     expect(res.status).toBe(200)
     const { portfolio } = await res.json()
     expect(portfolio.totalValueCents).toBe(65000000) // valuationRow, not valuationRow2
@@ -177,7 +177,7 @@ describe('GET /api/portfolio/summary', () => {
       valuationRow,
       { propertyId: PROP_ID2, valueCents: 80000000, valuedAt: '2026-02-01' },
     ])
-    const res = await GET()
+    const res = await GET(new Request('http://localhost/api/portfolio/summary'))
     expect(res.status).toBe(200)
     const { portfolio } = await res.json()
     expect(portfolio.totalValueCents).toBe(65000000 + 80000000)

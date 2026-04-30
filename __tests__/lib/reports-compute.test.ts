@@ -10,6 +10,7 @@ function makeProperty(overrides: Partial<Property> = {}): Property {
     nickname: null,
     startDate: '2020-01-01',
     endDate: null,
+    entityId: null,
     createdAt: new Date(),
     ...overrides,
   }
@@ -43,6 +44,7 @@ function makeLoanAccount(overrides: Partial<LoanAccount> = {}): LoanAccount {
     nickname: null,
     startDate: '2020-01-01',
     endDate: '2050-01-01',
+    entityId: null,
     createdAt: new Date(),
     ...overrides,
   }

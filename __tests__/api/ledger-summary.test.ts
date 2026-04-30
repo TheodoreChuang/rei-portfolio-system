@@ -25,9 +25,10 @@ vi.mock('@/lib/db', () => ({
         where: vi.fn().mockImplementation(() => {
           mocks.callCount.current++
           const n = mocks.callCount.current
-          if (n === 1) return mocks.mockSelectEntries()
-          if (n === 2) return mocks.mockSelectProperties()
-          return mocks.mockSelectLoans()
+          // New query order: (1) properties, (2) loans [parallel], (3) entries
+          if (n === 1) return mocks.mockSelectProperties()
+          if (n === 2) return mocks.mockSelectLoans()
+          return mocks.mockSelectEntries()
         }),
       }),
     }),

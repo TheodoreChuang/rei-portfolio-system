@@ -10,6 +10,7 @@ const links = [
   { href: '/dashboard',  label: 'Reports' },
   { href: '/upload',     label: 'Upload' },
   { href: '/properties', label: 'Properties' },
+  { href: '/entities',   label: 'Entities' },
 ]
 
 function getInitials(email: string): string {

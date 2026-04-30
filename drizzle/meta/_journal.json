@@ -43,6 +43,13 @@
       "when": 1773313243395,
       "tag": "0005_exotic_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777589677004,
+      "tag": "0006_thick_tempest",
+      "breakpoints": true
     }
   ]
 }

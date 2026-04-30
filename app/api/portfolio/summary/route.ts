@@ -1,5 +1,5 @@
-// GET /api/portfolio/summary
-import { desc, eq } from 'drizzle-orm'
+// GET /api/portfolio/summary[?entityId=UUID]
+import { and, desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { properties, propertyValuations, loanAccounts, loanBalances } from '@/db/schema'
@@ -15,15 +15,26 @@ export type PortfolioLVR = {
   activeLoansTotal: number
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { searchParams } = new URL(request.url)
+  const entityId = searchParams.get('entityId')
+
   const today = new Date().toISOString().slice(0, 10)
 
+  const propsWhere = entityId
+    ? and(eq(properties.userId, user.id), eq(properties.entityId, entityId))
+    : eq(properties.userId, user.id)
+
+  const loansWhere = entityId
+    ? and(eq(loanAccounts.userId, user.id), eq(loanAccounts.entityId, entityId))
+    : eq(loanAccounts.userId, user.id)
+
   const [allProperties, valuationRows, balanceRows, allLoans] = await Promise.all([
-    db.select().from(properties).where(eq(properties.userId, user.id)),
+    db.select().from(properties).where(propsWhere),
     db
       .select({ propertyId: propertyValuations.propertyId, valueCents: propertyValuations.valueCents, valuedAt: propertyValuations.valuedAt })
       .from(propertyValuations)
@@ -34,7 +45,7 @@ export async function GET() {
       .from(loanBalances)
       .where(eq(loanBalances.userId, user.id))
       .orderBy(loanBalances.loanAccountId, desc(loanBalances.recordedAt)),
-    db.select().from(loanAccounts).where(eq(loanAccounts.userId, user.id)),
+    db.select().from(loanAccounts).where(loansWhere),
   ])
 
   // Latest valuation per property (first entry per propertyId after ordering by desc date)

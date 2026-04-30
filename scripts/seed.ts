@@ -17,6 +17,7 @@ import {
   loanAccounts,
   propertyLedgerEntries,
   portfolioReports,
+  entities,
 } from '../db/schema'
 
 config({ path: '.env.local' })
@@ -51,14 +52,21 @@ const TEST_USERS = [
 
 async function seedOwner(userId: string) {
 
+  // Default entity
+  console.log('  → entities')
+  const [personalEntity] = await db
+    .insert(entities)
+    .values({ userId, name: 'Personal', type: 'individual' })
+    .returning()
+
   // Properties
   console.log('  → properties')
   const [smithSt, georgeAve, riverside] = await db
     .insert(properties)
     .values([
-      { userId, address: '123 Smith St, Sydney NSW 2000', nickname: 'Smith St',   startDate: '2020-01-01' },
-      { userId, address: '8 George Ave, Brisbane QLD 4000', nickname: 'George Ave', startDate: '2020-01-01' },
-      { userId, address: '7 River Rd, Melbourne VIC 3000', nickname: 'Riverside',  startDate: '2020-01-01' },
+      { userId, address: '123 Smith St, Sydney NSW 2000', nickname: 'Smith St',   startDate: '2020-01-01', entityId: personalEntity.id },
+      { userId, address: '8 George Ave, Brisbane QLD 4000', nickname: 'George Ave', startDate: '2020-01-01', entityId: personalEntity.id },
+      { userId, address: '7 River Rd, Melbourne VIC 3000', nickname: 'Riverside',  startDate: '2020-01-01', entityId: personalEntity.id },
     ])
     .returning()
 
