@@ -32,8 +32,8 @@ test.describe('RLS data isolation', () => {
       await page.goto('/dashboard')
       await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 })
 
-      // User B should see no reports (not user A's reports)
-      await expect(page.getByRole('heading', { name: 'No reports yet' })).toBeVisible({ timeout: 15000 })
+      // User B should see the empty state (not user A's reports)
+      await expect(page.getByRole('heading', { name: /No data for/i })).toBeVisible({ timeout: 15000 })
 
       await context.close()
     } finally {
