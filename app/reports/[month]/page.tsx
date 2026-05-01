@@ -19,7 +19,6 @@ import { AppNav } from '@/components/app-nav'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { formatCents, formatMonth } from '@/lib/format'
 import type { ReportTotals, ReportFlags, PropertyTotals, MissingMortgage } from '@/lib/reports/compute'
@@ -381,7 +380,7 @@ export default function ReportPage() {
                 </div>
               )
             })}
-            {flags?.missingMortgages.map(m => (
+            {flags?.missingMortgages.map((m: MissingMortgage) => (
               <div key={m.loanAccountId} className="flex items-start gap-3 px-5 py-3 border-b border-ruled last:border-b-0 text-xs leading-relaxed">
                 <span className="text-sm flex-shrink-0 mt-0.5">⚠️</span>
                 <div className="text-muted">

@@ -6,7 +6,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import {
   ComposedChart, Bar, Line, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  CartesianGrid, Cell,
 } from 'recharts'
 import { AppNav } from '@/components/app-nav'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ import { ChartTooltip } from '@/components/ui/chart'
 import type { ChartConfig } from '@/components/ui/chart'
 import { formatCents, formatMonth } from '@/lib/format'
 import { currentFY, prevFY } from '@/lib/date-ranges'
-import type { ReportTotals, ReportFlags } from '@/lib/reports/compute'
+import type { ReportTotals } from '@/lib/reports/compute'
 import type { TrendPoint } from '@/app/api/reports/trends/route'
 import type { MonthHealth } from '@/app/api/reports/health/route'
 import type { PortfolioLVR } from '@/app/api/portfolio/summary/route'
@@ -153,8 +153,10 @@ function TrendsSection({ trends, month, onBarClick }: {
     : null
 
   const showRatio = currentRatio !== null && priorRatio !== null
-  const ratioDiff = showRatio ? currentRatio - priorRatio! : null
+  const ratioDiff = showRatio && currentRatio !== null && priorRatio !== null ? currentRatio - priorRatio : null
   const ratioUp = ratioDiff !== null && ratioDiff > 0
+  const currentRatioSafe = showRatio && currentRatio !== null ? currentRatio : 0
+  const ratioDiffSafe = ratioDiff ?? 0
 
   const dollarFormatter = (v: number) =>
     v === 0 ? '$0' : `${v < 0 ? '-' : ''}$${Math.abs(v / 1).toLocaleString('en-AU', { maximumFractionDigits: 0 })}`
@@ -168,10 +170,10 @@ function TrendsSection({ trends, month, onBarClick }: {
             <div className="flex items-center gap-1.5 text-[11px] font-mono">
               <span className="text-muted">Expense ratio</span>
               <span className={cn('font-semibold', ratioUp ? 'text-warn' : 'text-accent')}>
-                {currentRatio!.toFixed(1)}%
+                {currentRatioSafe.toFixed(1)}%
               </span>
               <span className={cn('text-[10px]', ratioUp ? 'text-warn' : 'text-accent')}>
-                {ratioUp ? '↑' : '↓'}{Math.abs(ratioDiff!).toFixed(1)}pp
+                {ratioUp ? '↑' : '↓'}{Math.abs(ratioDiffSafe).toFixed(1)}pp
               </span>
             </div>
           )}

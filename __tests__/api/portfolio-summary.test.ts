@@ -6,7 +6,6 @@ const PROP_ID2 = 'a1b2c3d4-e5f6-4789-a012-111111111112'
 const LOAN_ID  = 'b2c3d4e5-f6a7-4890-b123-222222222222'
 const LOAN_ID2 = 'b2c3d4e5-f6a7-4890-b123-222222222223'
 
-const today = new Date().toISOString().slice(0, 10)
 const future = '2099-01-01'
 const past   = '2020-01-01'
 

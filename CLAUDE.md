@@ -41,7 +41,15 @@ __tests__/            — Vitest unit tests (*.test.ts)
 - Unit tests mock at the boundary (Supabase, DB, AI); no real I/O
 - Integration tests use `pool: 'forks'` and run sequentially (DB safety)
 - **Always verify changes with tests before finishing**: `pnpm test` (unit), `pnpm test:integration` (integration), `pnpm test:e2e` (e2e) — run whichever suites are relevant to the change
-- Run `pnpm test` before every commit
+
+## Pre-commit Checklist
+Run all three before every commit — these match what CI checks:
+```
+pnpm lint
+pnpm tsc --noEmit
+pnpm test
+```
+Integration tests (`pnpm test:integration`) require `supabase start`; run them when the change touches DB queries, migrations, or storage.
 
 ## Key Patterns
 - **API error shape**: `{ error: string, detail?: string }` — `error` is user-facing,
@@ -59,6 +67,10 @@ __tests__/            — Vitest unit tests (*.test.ts)
 - Storage objects delete via SQL is blocked — use Storage API or Studio
 
 ## Known Gotchas
+- **`lib/env.ts` is server-only**: it eagerly calls `requireEnv()` at module load time.
+  Never import it from client components, `middleware.ts`, or `lib/supabase/client.ts` —
+  those run in the browser or edge runtime where server-only env vars don't exist.
+  Use `process.env.NEXT_PUBLIC_*` directly in those files (Next.js inlines them at build time).
 - `StorageApiError`: check `.statusCode` (string, e.g. `'409'`) not `.status`
   (numeric — can be wrong, confirmed in error logs)
 - After schema changes run `pnpm db:generate` then `pnpm db:migrate`

@@ -1,6 +1,5 @@
 // Temporary debug script — delete after use
 import { createClient } from '@supabase/supabase-js'
-import { db } from '../lib/db'
 import { sourceDocuments } from '../db/schema'
 import { like } from 'drizzle-orm'
 import { extractTextFromPdf, extractStatementData } from '../lib/extraction/parse'

@@ -8,8 +8,6 @@ const LOAN_ID   = 'bbbb0001-0000-4000-b000-000000000001'
 
 const entityRow = { id: ENTITY_ID, userId: 'user-123', name: 'Personal', type: 'individual' as const, createdAt: new Date() }
 
-let dbCallCount = 0
-
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockSelect: vi.fn(),
@@ -29,7 +27,6 @@ vi.mock('@/lib/db', () => ({
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockImplementation(() => {
-          dbCallCount++
           // Lazy result — called either when awaited directly or via .limit()
           const getResult = () => mocks.mockSelect()
           return {
@@ -75,7 +72,7 @@ function makeRequest(method: string, body?: unknown, id?: string) {
 describe('GET /api/entities', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    dbCallCount = 0
+
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockSelect.mockResolvedValue([entityRow])
   })
@@ -99,7 +96,7 @@ describe('GET /api/entities', () => {
 describe('POST /api/entities', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    dbCallCount = 0
+
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockInsertValues.mockResolvedValue([entityRow])
   })
@@ -145,7 +142,7 @@ describe('POST /api/entities', () => {
 describe('PATCH /api/entities/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    dbCallCount = 0
+
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockUpdateSet.mockResolvedValue([entityRow])
   })
@@ -185,7 +182,7 @@ describe('PATCH /api/entities/[id]', () => {
 describe('DELETE /api/entities/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    dbCallCount = 0
+
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
     mocks.mockSelect.mockResolvedValue([]) // no assigned properties or loans
     mocks.mockDeleteWhere.mockResolvedValue([entityRow])

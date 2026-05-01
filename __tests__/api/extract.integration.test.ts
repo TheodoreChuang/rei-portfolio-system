@@ -88,7 +88,7 @@ describe('POST /api/extract (integration)', () => {
     }
     const { POST: uploadPost } = await import('@/app/api/upload/route')
     const form = new FormData()
-    const file = new File([buffer], 'extract-fixture.pdf', {
+    const file = new File([new Uint8Array(buffer)], 'extract-fixture.pdf', {
       type: 'application/pdf',
     })
     form.append('file', file)

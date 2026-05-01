@@ -13,7 +13,7 @@ import type { Property } from '@/db/schema'
 export default function OnboardingPage() {
   const router = useRouter()
   const [properties, setProperties] = useState<Property[]>([])
-  const [loading, setLoading] = useState(true)
+  const [_loading, setLoading] = useState(true)
   const [address, setAddress] = useState('')
   const [nickname, setNickname] = useState('')
   const [startDate, setStartDate] = useState('')

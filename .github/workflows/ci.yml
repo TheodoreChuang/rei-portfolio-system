@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint, type-check, and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm tsc --noEmit
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Capture Supabase credentials
+        id: supabase
+        run: |
+          STATUS=$(supabase status --output json)
+          echo "anon_key=$(echo $STATUS | jq -r '.anon_key')" >> $GITHUB_OUTPUT
+          echo "api_url=$(echo $STATUS | jq -r '.api_url')" >> $GITHUB_OUTPUT
+
+      - name: Run migrations
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL_DIRECT: postgresql://postgres:postgres@localhost:54322/postgres
+
+      - name: Integration tests
+        run: pnpm test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:54322/postgres
+          NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
