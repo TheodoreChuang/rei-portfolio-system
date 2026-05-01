@@ -42,11 +42,12 @@ export default tseslint.config(
     },
   },
 
-  // middleware.ts runs in the edge runtime and cannot import lib/env.ts (which eagerly
-  // reads server-only env vars unavailable in edge). NEXT_PUBLIC_ vars are inlined by
-  // Next.js at build time so the ! assertions are safe.
+  // These files cannot import lib/env.ts because it eagerly reads server-only env vars:
+  // - middleware.ts: runs in edge runtime (no DATABASE_URL)
+  // - lib/supabase/client.ts: runs in the browser (no server env vars at all)
+  // NEXT_PUBLIC_ vars are inlined by Next.js at build time so ! assertions are safe.
   {
-    files: ['middleware.ts'],
+    files: ['middleware.ts', 'lib/supabase/client.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
     },
