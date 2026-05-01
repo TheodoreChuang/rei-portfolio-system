@@ -41,7 +41,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 function formDataWithFile(opts: {
-  fileContent?: Buffer | Blob
+  fileContent?: Blob
   fileName?: string
   mimeType?: string
   size?: number
@@ -49,10 +49,10 @@ function formDataWithFile(opts: {
   assignedMonth?: string
 }) {
   const {
-    fileContent = Buffer.from('fake pdf content'),
+    fileContent = new Blob(['fake pdf content']),
     fileName = 'test.pdf',
     mimeType = 'application/pdf',
-    size = fileContent instanceof Buffer ? fileContent.length : (fileContent as Blob).size,
+    size = fileContent.size,
     documentType = 'pm_statement',
     assignedMonth = '2026-03',
   } = opts
