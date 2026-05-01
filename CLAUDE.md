@@ -67,6 +67,10 @@ Integration tests (`pnpm test:integration`) require `supabase start`; run them w
 - Storage objects delete via SQL is blocked — use Storage API or Studio
 
 ## Known Gotchas
+- **`lib/env.ts` is server-only**: it eagerly calls `requireEnv()` at module load time.
+  Never import it from client components, `middleware.ts`, or `lib/supabase/client.ts` —
+  those run in the browser or edge runtime where server-only env vars don't exist.
+  Use `process.env.NEXT_PUBLIC_*` directly in those files (Next.js inlines them at build time).
 - `StorageApiError`: check `.statusCode` (string, e.g. `'409'`) not `.status`
   (numeric — can be wrong, confirmed in error logs)
 - After schema changes run `pnpm db:generate` then `pnpm db:migrate`
