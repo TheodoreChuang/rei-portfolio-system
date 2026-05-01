@@ -5,6 +5,17 @@ Deviations from these are cleanup tasks (Workstream 5), not blockers.
 
 ---
 
+## 0. Git Workflow
+
+- `main` is the production branch — protected, no direct pushes
+- All work happens on branches cut from `main`
+- Branch naming: `{type}/{short-description}` — e.g. `fix/put-to-patch`, `chore/eslint`, `feat/zod-routes`
+- One PR per logical unit of work
+- CI must pass before merging
+- Squash merge into `main` to keep history linear
+
+---
+
 ## 1. File & Folder Structure
 
 ```

@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
@@ -44,6 +44,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^22.10.10",
@@ -53,13 +54,15 @@
     "@vitejs/plugin-react": "^4.3.4",
     "dotenv": "^16.4.7",
     "drizzle-kit": "^0.31.0",
-    "eslint": "^9",
+    "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "postcss": "^8.5.1",
     "shadcn": "^3.8.5",
     "tailwindcss": "^4.2.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.59.1",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.0.18"
   }

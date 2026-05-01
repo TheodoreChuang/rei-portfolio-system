@@ -8,8 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import type { Property } from '@/db/schema'
 
 export default function PropertiesPage() {
@@ -85,7 +83,7 @@ export default function PropertiesPage() {
           <div className="px-5 py-3 border-b border-border">
             <span className="text-[10px] font-mono uppercase tracking-widest text-muted">Your properties ({properties.length})</span>
           </div>
-          {properties.map((p, i) => (
+          {properties.map((p, _i) => (
             <div key={p.id} className="flex items-center gap-4 px-5 py-4 border-b border-ruled last:border-b-0">
               <div className="w-9 h-9 rounded-md bg-screen-bg border border-border flex items-center justify-center text-base flex-shrink-0">🏠</div>
               <div className="flex-1 min-w-0">

@@ -216,7 +216,7 @@ describe('POST /api/upload (integration)', () => {
       refresh_token: sessionB.refresh_token,
     })
     const { data: rows } = await clientB.from('source_documents').select('id')
-    const userARows = rows?.filter((r: { id: string }) => {
+    const _userARows = rows?.filter((_r: { id: string }) => {
       return false
     }) ?? []
     expect(rows).toBeDefined()

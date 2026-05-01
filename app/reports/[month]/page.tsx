@@ -19,10 +19,9 @@ import { AppNav } from '@/components/app-nav'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { formatCents, formatMonth } from '@/lib/format'
-import type { ReportTotals, ReportFlags, PropertyTotals, MissingMortgage } from '@/lib/reports/compute'
+import type { ReportTotals, PropertyTotals } from '@/lib/reports/compute'
 import { cn } from '@/lib/utils'
 
 type Report = {

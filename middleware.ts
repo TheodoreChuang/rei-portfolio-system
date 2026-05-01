@@ -6,6 +6,7 @@
 // The local stack runs full Auth in Docker — no bypass needed.
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { env } from '@/lib/env'
 
 const PROTECTED_ROUTES = ['/dashboard', '/upload', '/properties', '/reports', '/onboarding']
 const AUTH_ROUTES = ['/login', '/signup']
@@ -14,8 +15,8 @@ export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    env.SUPABASE_URL,
+    env.SUPABASE_PUBLISHABLE_KEY,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
