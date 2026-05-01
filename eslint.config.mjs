@@ -42,6 +42,16 @@ export default tseslint.config(
     },
   },
 
+  // middleware.ts runs in the edge runtime and cannot import lib/env.ts (which eagerly
+  // reads server-only env vars unavailable in edge). NEXT_PUBLIC_ vars are inlined by
+  // Next.js at build time so the ! assertions are safe.
+  {
+    files: ['middleware.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
+
   // Workstream 5 cleanup targets: complex TypeScript narrowing limitations
   // These files use ! after runtime checks that TypeScript cannot statically narrow.
   // Remove this override once the narrowing is fixed in cleanup.

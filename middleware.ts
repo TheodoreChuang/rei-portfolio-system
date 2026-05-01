@@ -1,12 +1,5 @@
-// middleware.ts — Supabase Auth session refresh + route protection
-// Runs on every request before the page renders.
-// Required by @supabase/ssr to keep sessions alive via cookie refresh.
-//
-// To run locally: `supabase start` then copy the printed keys into .env.local.
-// The local stack runs full Auth in Docker — no bypass needed.
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { env } from '@/lib/env'
 
 const PROTECTED_ROUTES = ['/dashboard', '/upload', '/properties', '/reports', '/onboarding']
 const AUTH_ROUTES = ['/login', '/signup']
@@ -15,8 +8,8 @@ export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
-    env.SUPABASE_URL,
-    env.SUPABASE_PUBLISHABLE_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
