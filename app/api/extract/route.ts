@@ -5,6 +5,7 @@ import { sourceDocuments } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { extractTextFromPdf, extractStatementData } from '@/lib/extraction/parse'
 import { logger } from '@/lib/logger'
+import { captureError } from '@/lib/api-error'
 
 const ASSIGNED_MONTH_REGEX = /^\d{4}-\d{2}$/
 
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
     .download(doc.filePath)
 
   if (downloadError || !data) {
-    logger.error('[extract] storage download failed:', downloadError)
+    captureError(downloadError ?? new Error('no data'), { route: 'POST /api/extract', phase: 'storage-download' })
     return NextResponse.json(
       {
         error: 'Storage download failed',
@@ -123,15 +124,14 @@ export async function POST(request: Request) {
     )
   }
 
-  logger.debug('[extract] pdfText length:', pdfText.length)
+  logger.debug('pdf text extracted', { textLength: pdfText.length })
 
   let result: Awaited<ReturnType<typeof extractStatementData>>
   try {
     result = await extractStatementData(pdfText, assignedMonthStr)
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : String(err)
-    logger.error('[extract] extractStatementData failed:', message, err)
+    captureError(err, { route: 'POST /api/extract', phase: 'ai-extraction' })
+    const message = err instanceof Error ? err.message : String(err)
     return NextResponse.json(
       {
         error: 'Extraction failed',

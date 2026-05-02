@@ -6,6 +6,7 @@ import {
   sourceDocuments, propertyLedgerEntries,
 } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { captureError } from '@/lib/api-error'
 import { firstDayOfMonth, isActiveInMonth } from '@/lib/date-ranges'
 import { lastDayOfMonth } from '@/lib/format'
 
@@ -30,149 +31,147 @@ function generateMonthRange(months: number): string[] {
 }
 
 export async function GET(request: Request) {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { searchParams } = new URL(request.url)
-  const monthsParam = searchParams.get('months') ?? '12'
-  const months = parseInt(monthsParam, 10)
-  if (isNaN(months) || months < 1 || months > 24) {
-    return NextResponse.json({ error: 'months must be between 1 and 24' }, { status: 400 })
-  }
-
-  const monthRange = generateMonthRange(months)
-  const rangeStart = firstDayOfMonth(monthRange[0])
-  const rangeEnd = lastDayOfMonth(monthRange[monthRange.length - 1])
-
-  // Fetch all data in parallel — entries include soft-deleted for staleness checks
-  const [reports, props, loans, docs, entries] = await Promise.all([
-    db.select()
-      .from(portfolioReports)
-      .where(
-        and(
-          eq(portfolioReports.userId, user.id),
-          gte(portfolioReports.month, monthRange[0]),
-          lte(portfolioReports.month, monthRange[monthRange.length - 1]),
-        )
-      ),
-    db.select()
-      .from(properties)
-      .where(eq(properties.userId, user.id)),
-    db.select()
-      .from(loanAccounts)
-      .where(eq(loanAccounts.userId, user.id)),
-    // All docs (including deleted) — filter in app code per-check
-    db.select()
-      .from(sourceDocuments)
-      .where(eq(sourceDocuments.userId, user.id)),
-    // All entries in range (including deleted) for staleness + payment checks
-    db.select({
-      id: propertyLedgerEntries.id,
-      loanAccountId: propertyLedgerEntries.loanAccountId,
-      category: propertyLedgerEntries.category,
-      lineItemDate: propertyLedgerEntries.lineItemDate,
-      updatedAt: propertyLedgerEntries.updatedAt,
-      deletedAt: propertyLedgerEntries.deletedAt,
-    })
-      .from(propertyLedgerEntries)
-      .where(
-        and(
-          eq(propertyLedgerEntries.userId, user.id),
-          gte(propertyLedgerEntries.lineItemDate, rangeStart),
-          lte(propertyLedgerEntries.lineItemDate, rangeEnd),
-        )
-      ),
-  ])
-
-  const reportMap = new Map(reports.map(r => [r.month, r]))
-
-  const health: MonthHealth[] = monthRange.map(month => {
-    const firstDay = firstDayOfMonth(month)
-    const lastDay = lastDayOfMonth(month)
-    const report = reportMap.get(month)
-
-    // Filter entries for this month
-    const monthEntries = entries.filter(e =>
-      e.lineItemDate >= firstDay && e.lineItemDate <= lastDay
-    )
-    const hasEntries = monthEntries.some(e => e.deletedAt === null)
-
-    if (!report) {
-      // Distinguish: no data at all vs entries exist but no commentary
-      return {
-        month,
-        status: hasEntries ? 'no_commentary' as const : 'no_data' as const,
-        missing: [],
-      }
+    const { searchParams } = new URL(request.url)
+    const monthsParam = searchParams.get('months') ?? '12'
+    const months = parseInt(monthsParam, 10)
+    if (isNaN(months) || months < 1 || months > 24) {
+      return NextResponse.json({ error: 'months must be between 1 and 24' }, { status: 400 })
     }
 
-    const reportUpdatedAt = report.updatedAt
+    const monthRange = generateMonthRange(months)
+    const rangeStart = firstDayOfMonth(monthRange[0])
+    const rangeEnd = lastDayOfMonth(monthRange[monthRange.length - 1])
 
-    // Staleness: any entry (including deleted) updated after report.updatedAt
-    const isStaleFromEntries = monthEntries.some(e =>
-      e.updatedAt && reportUpdatedAt && e.updatedAt > reportUpdatedAt
-    )
+    const [reports, props, loans, docs, entries] = await Promise.all([
+      db.select()
+        .from(portfolioReports)
+        .where(
+          and(
+            eq(portfolioReports.userId, user.id),
+            gte(portfolioReports.month, monthRange[0]),
+            lte(portfolioReports.month, monthRange[monthRange.length - 1]),
+          )
+        ),
+      db.select()
+        .from(properties)
+        .where(eq(properties.userId, user.id)),
+      db.select()
+        .from(loanAccounts)
+        .where(eq(loanAccounts.userId, user.id)),
+      // All docs (including deleted) — filter in app code per-check
+      db.select()
+        .from(sourceDocuments)
+        .where(eq(sourceDocuments.userId, user.id)),
+      // All entries in range (including deleted) for staleness + payment checks
+      db.select({
+        id: propertyLedgerEntries.id,
+        loanAccountId: propertyLedgerEntries.loanAccountId,
+        category: propertyLedgerEntries.category,
+        lineItemDate: propertyLedgerEntries.lineItemDate,
+        updatedAt: propertyLedgerEntries.updatedAt,
+        deletedAt: propertyLedgerEntries.deletedAt,
+      })
+        .from(propertyLedgerEntries)
+        .where(
+          and(
+            eq(propertyLedgerEntries.userId, user.id),
+            gte(propertyLedgerEntries.lineItemDate, rangeStart),
+            lte(propertyLedgerEntries.lineItemDate, rangeEnd),
+          )
+        ),
+    ])
 
-    // Staleness: any doc (including deleted) updated after report.updatedAt and overlapping month
-    const overlappingDocs = docs.filter(d =>
-      d.periodStart !== null && d.periodEnd !== null &&
-      d.periodStart <= lastDay && d.periodEnd >= firstDay
-    )
-    const isStaleFromDocs = overlappingDocs.some(d =>
-      d.updatedAt && reportUpdatedAt && d.updatedAt > reportUpdatedAt
-    )
+    const reportMap = new Map(reports.map(r => [r.month, r]))
 
-    const stale = isStaleFromEntries || isStaleFromDocs
+    const health: MonthHealth[] = monthRange.map(month => {
+      const firstDay = firstDayOfMonth(month)
+      const lastDay = lastDayOfMonth(month)
+      const report = reportMap.get(month)
 
-    // Missing statements: active properties without a covering non-deleted doc
-    const missing: MissingItem[] = []
-    const activeProps = props.filter(p =>
-      isActiveInMonth(p.startDate, p.endDate ?? null, firstDay, lastDay)
-    )
-    for (const p of activeProps) {
-      const hasCoveringDoc = docs.some(d =>
-        d.deletedAt === null &&
-        d.propertyId === p.id &&
+      const monthEntries = entries.filter(e =>
+        e.lineItemDate >= firstDay && e.lineItemDate <= lastDay
+      )
+      const hasEntries = monthEntries.some(e => e.deletedAt === null)
+
+      if (!report) {
+        return {
+          month,
+          status: hasEntries ? 'no_commentary' as const : 'no_data' as const,
+          missing: [],
+        }
+      }
+
+      const reportUpdatedAt = report.updatedAt
+
+      const isStaleFromEntries = monthEntries.some(e =>
+        e.updatedAt && reportUpdatedAt && e.updatedAt > reportUpdatedAt
+      )
+
+      const overlappingDocs = docs.filter(d =>
         d.periodStart !== null && d.periodEnd !== null &&
         d.periodStart <= lastDay && d.periodEnd >= firstDay
       )
-      if (!hasCoveringDoc) {
-        missing.push({ type: 'missing_statement', propertyId: p.id, address: p.address })
-      }
-    }
-
-    // Missing loan payments: active loans without a non-deleted loan_payment entry in month
-    const activeLoans = loans.filter(l =>
-      isActiveInMonth(l.startDate, l.endDate, firstDay, lastDay)
-    )
-    for (const l of activeLoans) {
-      const hasPayment = monthEntries.some(e =>
-        e.loanAccountId === l.id &&
-        e.category === 'loan_payment' &&
-        e.deletedAt === null
+      const isStaleFromDocs = overlappingDocs.some(d =>
+        d.updatedAt && reportUpdatedAt && d.updatedAt > reportUpdatedAt
       )
-      if (!hasPayment) {
-        missing.push({
-          type: 'missing_loan_payment',
-          loanAccountId: l.id,
-          lender: l.lender,
-          nickname: l.nickname,
-        })
+
+      const stale = isStaleFromEntries || isStaleFromDocs
+
+      const missing: MissingItem[] = []
+      const activeProps = props.filter(p =>
+        isActiveInMonth(p.startDate, p.endDate ?? null, firstDay, lastDay)
+      )
+      for (const p of activeProps) {
+        const hasCoveringDoc = docs.some(d =>
+          d.deletedAt === null &&
+          d.propertyId === p.id &&
+          d.periodStart !== null && d.periodEnd !== null &&
+          d.periodStart <= lastDay && d.periodEnd >= firstDay
+        )
+        if (!hasCoveringDoc) {
+          missing.push({ type: 'missing_statement', propertyId: p.id, address: p.address })
+        }
       }
-    }
 
-    let status: MonthHealth['status']
-    if (stale) {
-      status = 'stale'
-    } else if (missing.length > 0) {
-      status = 'incomplete'
-    } else {
-      status = 'healthy'
-    }
+      const activeLoans = loans.filter(l =>
+        isActiveInMonth(l.startDate, l.endDate, firstDay, lastDay)
+      )
+      for (const l of activeLoans) {
+        const hasPayment = monthEntries.some(e =>
+          e.loanAccountId === l.id &&
+          e.category === 'loan_payment' &&
+          e.deletedAt === null
+        )
+        if (!hasPayment) {
+          missing.push({
+            type: 'missing_loan_payment',
+            loanAccountId: l.id,
+            lender: l.lender,
+            nickname: l.nickname,
+          })
+        }
+      }
 
-    return { month, status, missing }
-  })
+      let status: MonthHealth['status']
+      if (stale) {
+        status = 'stale'
+      } else if (missing.length > 0) {
+        status = 'incomplete'
+      } else {
+        status = 'healthy'
+      }
 
-  return NextResponse.json({ health })
+      return { month, status, missing }
+    })
+
+    return NextResponse.json({ health })
+  } catch (err) {
+    captureError(err, { route: 'GET /api/reports/health' })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
 }

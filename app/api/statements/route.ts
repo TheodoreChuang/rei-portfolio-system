@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { properties, sourceDocuments, propertyLedgerEntries, loanAccounts } from '@/db/schema'
 import type { PropertyLedgerEntry } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { captureError } from '@/lib/api-error'
 import { extractionResultSchema } from '@/lib/extraction/schema'
 import { lastDayOfMonth } from '@/lib/format'
 
@@ -29,86 +30,91 @@ function isValidUuid(val: string): boolean {
 //   Used by the report drill-down / property detail page Transactions section.
 //   Response: { entries: Array<PropertyLedgerEntry & { lender: string|null, loanNickname: string|null }> }
 export async function GET(request: Request) {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { searchParams } = new URL(request.url)
-  const month = searchParams.get('month')
-  if (!month || !ASSIGNED_MONTH_REGEX.test(month)) {
-    return NextResponse.json({ error: 'Missing or invalid month (must be YYYY-MM)' }, { status: 400 })
-  }
-
-  const startDate = `${month}-01`
-  const endDate = lastDayOfMonth(month)
-
-  const loanAccountId = searchParams.get('loanAccountId')
-  if (loanAccountId !== null) {
-    if (!isValidUuid(loanAccountId)) {
-      return NextResponse.json({ error: 'Invalid loanAccountId' }, { status: 400 })
+    const { searchParams } = new URL(request.url)
+    const month = searchParams.get('month')
+    if (!month || !ASSIGNED_MONTH_REGEX.test(month)) {
+      return NextResponse.json({ error: 'Missing or invalid month (must be YYYY-MM)' }, { status: 400 })
     }
-    const [entry] = await db
-      .select({ amountCents: propertyLedgerEntries.amountCents })
-      .from(propertyLedgerEntries)
-      .where(
-        and(
-          eq(propertyLedgerEntries.userId, user.id),
-          eq(propertyLedgerEntries.loanAccountId, loanAccountId),
-          eq(propertyLedgerEntries.category, 'loan_payment'),
-          lt(propertyLedgerEntries.lineItemDate, `${month}-01`),
-          isNull(propertyLedgerEntries.deletedAt),
+
+    const startDate = `${month}-01`
+    const endDate = lastDayOfMonth(month)
+
+    const loanAccountId = searchParams.get('loanAccountId')
+    if (loanAccountId !== null) {
+      if (!isValidUuid(loanAccountId)) {
+        return NextResponse.json({ error: 'Invalid loanAccountId' }, { status: 400 })
+      }
+      const [entry] = await db
+        .select({ amountCents: propertyLedgerEntries.amountCents })
+        .from(propertyLedgerEntries)
+        .where(
+          and(
+            eq(propertyLedgerEntries.userId, user.id),
+            eq(propertyLedgerEntries.loanAccountId, loanAccountId),
+            eq(propertyLedgerEntries.category, 'loan_payment'),
+            lt(propertyLedgerEntries.lineItemDate, `${month}-01`),
+            isNull(propertyLedgerEntries.deletedAt),
+          )
         )
-      )
-      .orderBy(desc(propertyLedgerEntries.lineItemDate))
-      .limit(1)
-    return NextResponse.json({ amountCents: entry?.amountCents ?? null })
-  }
-
-  const propertyId = searchParams.get('propertyId')
-  if (propertyId !== null) {
-    if (!isValidUuid(propertyId)) {
-      return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 })
+        .orderBy(desc(propertyLedgerEntries.lineItemDate))
+        .limit(1)
+      return NextResponse.json({ amountCents: entry?.amountCents ?? null })
     }
+
+    const propertyId = searchParams.get('propertyId')
+    if (propertyId !== null) {
+      if (!isValidUuid(propertyId)) {
+        return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 })
+      }
+      const entries = await db
+        .select({
+          ...getTableColumns(propertyLedgerEntries),
+          lender: loanAccounts.lender,
+          loanNickname: loanAccounts.nickname,
+        })
+        .from(propertyLedgerEntries)
+        .leftJoin(loanAccounts, eq(propertyLedgerEntries.loanAccountId, loanAccounts.id))
+        .where(
+          and(
+            eq(propertyLedgerEntries.userId, user.id),
+            eq(propertyLedgerEntries.propertyId, propertyId),
+            gte(propertyLedgerEntries.lineItemDate, startDate),
+            lte(propertyLedgerEntries.lineItemDate, endDate),
+            isNull(propertyLedgerEntries.deletedAt),
+          )
+        )
+        .orderBy(
+          sql`CASE ${propertyLedgerEntries.category}
+            WHEN 'rent' THEN 0
+            WHEN 'loan_payment' THEN 2
+            ELSE 1
+          END`,
+          desc(propertyLedgerEntries.lineItemDate),
+        )
+      return NextResponse.json({ entries })
+    }
+
     const entries = await db
-      .select({
-        ...getTableColumns(propertyLedgerEntries),
-        lender: loanAccounts.lender,
-        loanNickname: loanAccounts.nickname,
-      })
+      .select()
       .from(propertyLedgerEntries)
-      .leftJoin(loanAccounts, eq(propertyLedgerEntries.loanAccountId, loanAccounts.id))
       .where(
         and(
           eq(propertyLedgerEntries.userId, user.id),
-          eq(propertyLedgerEntries.propertyId, propertyId),
           gte(propertyLedgerEntries.lineItemDate, startDate),
           lte(propertyLedgerEntries.lineItemDate, endDate),
           isNull(propertyLedgerEntries.deletedAt),
         )
       )
-      .orderBy(
-        sql`CASE ${propertyLedgerEntries.category}
-          WHEN 'rent' THEN 0
-          WHEN 'loan_payment' THEN 2
-          ELSE 1
-        END`,
-        desc(propertyLedgerEntries.lineItemDate),
-      )
     return NextResponse.json({ entries })
+  } catch (err) {
+    captureError(err, { route: 'GET /api/statements' })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  const entries = await db
-    .select()
-    .from(propertyLedgerEntries)
-    .where(
-      and(
-        eq(propertyLedgerEntries.userId, user.id),
-        gte(propertyLedgerEntries.lineItemDate, startDate),
-        lte(propertyLedgerEntries.lineItemDate, endDate),
-        isNull(propertyLedgerEntries.deletedAt),
-      )
-    )
-  return NextResponse.json({ entries })
 }
 
 // POST /api/statements — persist extraction results as ledger entries.
@@ -118,6 +124,7 @@ export async function GET(request: Request) {
 //
 // Manual loan_payment entries must include loanAccountId on each loan_payment line item.
 export async function POST(request: Request) {
+  try {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -332,6 +339,7 @@ export async function POST(request: Request) {
       inserted = await tx.insert(propertyLedgerEntries).values(rows).returning()
     })
   } catch (err) {
+    captureError(err, { route: 'POST /api/statements', phase: 'transaction' })
     const message = err instanceof Error ? err.message : String(err)
     return NextResponse.json(
       { error: 'Transaction failed', detail: message },
@@ -357,4 +365,8 @@ export async function POST(request: Request) {
     insertedCount: inserted.length,
     replacedCount: deleted.length,
   })
+  } catch (err) {
+    captureError(err, { route: 'POST /api/statements' })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
 }
