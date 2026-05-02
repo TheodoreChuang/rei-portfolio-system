@@ -1,7 +1,5 @@
-import { env } from './env'
-
 const isProd = process.env.NODE_ENV === 'production'
-const isDebug = env.LOG_LEVEL === 'debug'
+const isDebug = process.env.LOG_LEVEL === 'debug'
 
 function log(level: 'debug' | 'info' | 'error', message: string, context?: Record<string, unknown>): void {
   if (level === 'debug' && !isDebug) return
