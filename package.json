@@ -26,6 +26,7 @@
     "@radix-ui/react-separator": "^1.1.1",
     "@radix-ui/react-slot": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.7",
+    "@sentry/nextjs": "^10.51.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.49.1",
     "ai": "^6.0.94",
