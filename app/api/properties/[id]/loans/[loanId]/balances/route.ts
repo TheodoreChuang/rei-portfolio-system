@@ -1,9 +1,9 @@
-// GET + POST /api/properties/[id]/loans/[loanId]/balances
 import { and, desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { loanAccounts, loanBalances } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { captureError } from '@/lib/api-error'
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -12,90 +12,95 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string; loanId: string }> }
 ) {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id, loanId } = await params
-  if (!UUID_REGEX.test(id)) {
-    return NextResponse.json({ error: 'Invalid property ID' }, { status: 400 })
+    const { id, loanId } = await params
+    if (!UUID_REGEX.test(id)) {
+      return NextResponse.json({ error: 'Invalid property ID' }, { status: 400 })
+    }
+    if (!UUID_REGEX.test(loanId)) {
+      return NextResponse.json({ error: 'Invalid loan ID' }, { status: 400 })
+    }
+
+    const [loan] = await db
+      .select()
+      .from(loanAccounts)
+      .where(and(eq(loanAccounts.id, loanId), eq(loanAccounts.propertyId, id), eq(loanAccounts.userId, user.id)))
+      .limit(1)
+
+    if (!loan) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
+    const balances = await db
+      .select()
+      .from(loanBalances)
+      .where(and(eq(loanBalances.loanAccountId, loanId), eq(loanBalances.userId, user.id)))
+      .orderBy(desc(loanBalances.recordedAt))
+
+    return NextResponse.json({ balances })
+  } catch (err) {
+    captureError(err, { route: 'GET /api/properties/[id]/loans/[loanId]/balances' })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-  if (!UUID_REGEX.test(loanId)) {
-    return NextResponse.json({ error: 'Invalid loan ID' }, { status: 400 })
-  }
-
-  const [loan] = await db
-    .select()
-    .from(loanAccounts)
-    .where(and(eq(loanAccounts.id, loanId), eq(loanAccounts.propertyId, id), eq(loanAccounts.userId, user.id)))
-    .limit(1)
-
-  if (!loan) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
-
-  const balances = await db
-    .select()
-    .from(loanBalances)
-    .where(and(eq(loanBalances.loanAccountId, loanId), eq(loanBalances.userId, user.id)))
-    .orderBy(desc(loanBalances.recordedAt))
-
-  return NextResponse.json({ balances })
 }
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string; loanId: string }> }
 ) {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { id, loanId } = await params
-  if (!UUID_REGEX.test(id)) {
-    return NextResponse.json({ error: 'Invalid property ID' }, { status: 400 })
-  }
-  if (!UUID_REGEX.test(loanId)) {
-    return NextResponse.json({ error: 'Invalid loan ID' }, { status: 400 })
-  }
-
-  let body: unknown
   try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const raw = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
+    const { id, loanId } = await params
+    if (!UUID_REGEX.test(id)) {
+      return NextResponse.json({ error: 'Invalid property ID' }, { status: 400 })
+    }
+    if (!UUID_REGEX.test(loanId)) {
+      return NextResponse.json({ error: 'Invalid loan ID' }, { status: 400 })
+    }
 
-  const recordedAt = typeof raw.recordedAt === 'string' ? raw.recordedAt.trim() : ''
-  if (!DATE_REGEX.test(recordedAt)) {
-    return NextResponse.json({ error: 'recordedAt must be YYYY-MM-DD' }, { status: 400 })
-  }
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
 
-  const balanceCents = raw.balanceCents
-  if (typeof balanceCents !== 'number' || !Number.isInteger(balanceCents) || balanceCents < 0) {
-    return NextResponse.json({ error: 'balanceCents must be a non-negative integer' }, { status: 400 })
-  }
+    const raw = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
 
-  const notes = raw.notes != null
-    ? (typeof raw.notes === 'string' ? raw.notes.trim() : null)
-    : null
-  if (notes !== null && notes.length > 500) {
-    return NextResponse.json({ error: 'notes too long (max 500 characters)' }, { status: 400 })
-  }
+    const recordedAt = typeof raw.recordedAt === 'string' ? raw.recordedAt.trim() : ''
+    if (!DATE_REGEX.test(recordedAt)) {
+      return NextResponse.json({ error: 'recordedAt must be YYYY-MM-DD' }, { status: 400 })
+    }
 
-  const [loan] = await db
-    .select()
-    .from(loanAccounts)
-    .where(and(eq(loanAccounts.id, loanId), eq(loanAccounts.propertyId, id), eq(loanAccounts.userId, user.id)))
-    .limit(1)
+    const balanceCents = raw.balanceCents
+    if (typeof balanceCents !== 'number' || !Number.isInteger(balanceCents) || balanceCents < 0) {
+      return NextResponse.json({ error: 'balanceCents must be a non-negative integer' }, { status: 400 })
+    }
 
-  if (!loan) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
+    const notes = raw.notes != null
+      ? (typeof raw.notes === 'string' ? raw.notes.trim() : null)
+      : null
+    if (notes !== null && notes.length > 500) {
+      return NextResponse.json({ error: 'notes too long (max 500 characters)' }, { status: 400 })
+    }
 
-  try {
+    const [loan] = await db
+      .select()
+      .from(loanAccounts)
+      .where(and(eq(loanAccounts.id, loanId), eq(loanAccounts.propertyId, id), eq(loanAccounts.userId, user.id)))
+      .limit(1)
+
+    if (!loan) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
     const [balance] = await db
       .insert(loanBalances)
       .values({
@@ -108,7 +113,7 @@ export async function POST(
       .returning()
 
     return NextResponse.json({ balance }, { status: 201 })
-  } catch (err: unknown) {
+  } catch (err) {
     if (
       err &&
       typeof err === 'object' &&
@@ -120,6 +125,7 @@ export async function POST(
         { status: 409 }
       )
     }
-    throw err
+    captureError(err, { route: 'POST /api/properties/[id]/loans/[loanId]/balances' })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

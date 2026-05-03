@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { sourceDocuments } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { captureError } from '@/lib/api-error'
 import { MAX_UPLOAD_BYTES } from '@/lib/constants'
 const ALLOWED_DOCUMENT_TYPES = ['pm_statement', 'loan_statement', 'bank_statement'] as const
 const ASSIGNED_MONTH_REGEX = /^\d{4}-\d{2}$/
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
     })
 
   if (uploadError) {
-    logger.debug('[upload] storage error', uploadError)
+    logger.debug('storage upload failed', { statusCode: (uploadError as { statusCode?: string }).statusCode })
 
     const statusCode = (uploadError as { statusCode?: string }).statusCode
     if (statusCode === '409') {
@@ -130,6 +131,7 @@ export async function POST(request: Request) {
       )
     }
 
+    captureError(uploadError, { route: 'POST /api/upload', phase: 'storage' })
     return NextResponse.json(
       { error: 'Storage upload failed', detail: uploadError.message ?? String(uploadError) },
       { status: 500 }
@@ -191,6 +193,7 @@ export async function POST(request: Request) {
       }
     }
 
+    captureError(err, { route: 'POST /api/upload' })
     return NextResponse.json(
       {
         error: 'Database insert failed',

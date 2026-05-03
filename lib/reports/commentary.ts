@@ -35,7 +35,7 @@ Note missing data, unusual expense items, and overall portfolio health. Be conci
     })
     return text
   } catch (err) {
-    logger.error('[commentary] generateCommentary failed:', err)
+    logger.error('commentary generation failed', { error: err instanceof Error ? err.message : String(err) })
     return ''
   }
 }

@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { propertyLedgerEntries, sourceDocuments } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { captureError } from '@/lib/api-error'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -48,7 +49,7 @@ export async function DELETE(
         .where(and(eq(sourceDocuments.id, id), eq(sourceDocuments.userId, user.id)))
     })
   } catch (err) {
-    logger.error('[documents/[id]] transaction failed:', err)
+    captureError(err, { route: 'DELETE /api/documents/[id]' })
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
   }
 
@@ -58,7 +59,7 @@ export async function DELETE(
     .remove([doc.filePath])
 
   if (storageError) {
-    logger.error('[documents/[id]] storage delete failed:', storageError)
+    logger.error('storage delete failed', { error: storageError?.message })
   }
 
   return NextResponse.json({ deleted: true, entriesDeleted })
