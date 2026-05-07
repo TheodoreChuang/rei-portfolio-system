@@ -6,11 +6,16 @@ import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
+const d = new Date()
+d.setMonth(d.getMonth() - 1)
+const lastMonth = d.toISOString().slice(0, 7)
+
 const links = [
-  { href: '/dashboard',  label: 'Reports' },
-  { href: '/upload',     label: 'Upload' },
-  { href: '/properties', label: 'Properties' },
-  { href: '/entities',   label: 'Entities' },
+  { href: '/dashboard',                label: 'Dashboard' },
+  { href: `/reports/${lastMonth}`,     label: 'Reports',    activePrefix: '/reports' },
+  { href: '/upload',                       label: 'Upload' },
+  { href: '/properties',                   label: 'Properties' },
+  { href: '/entities',                     label: 'Entities' },
 ]
 
 function getInitials(email: string): string {
@@ -59,7 +64,7 @@ export function AppNav() {
         {links.map(l => (
           <Link key={l.href} href={l.href} className={cn(
             'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-            pathname.startsWith(l.href)
+            pathname.startsWith(l.activePrefix ?? l.href)
               ? 'bg-accent-light text-accent'
               : 'text-muted hover:text-ink hover:bg-screen-bg'
           )}>{l.label}</Link>

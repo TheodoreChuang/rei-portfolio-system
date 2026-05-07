@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import type { Property } from '@/db/schema'
+import type { Property, Entity } from '@/db/schema'
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([])
@@ -16,6 +16,9 @@ export default function PropertiesPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [newAddress, setNewAddress] = useState('')
   const [newNickname, setNewNickname] = useState('')
+  const [newStartDate, setNewStartDate] = useState('')
+  const [newEntityId, setNewEntityId] = useState('')
+  const [availableEntities, setAvailableEntities] = useState<Entity[]>([])
 
   useEffect(() => {
     fetch('/api/properties')
@@ -23,14 +26,23 @@ export default function PropertiesPage() {
       .then(data => setProperties(data.properties ?? []))
       .catch(() => toast.error('Failed to load properties'))
       .finally(() => setLoading(false))
+    fetch('/api/entities')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setAvailableEntities(data.entities ?? []) })
+      .catch(() => {})
   }, [])
 
   async function addProperty() {
-    if (!newAddress.trim()) return
+    if (!newAddress.trim() || !newStartDate) return
     const res = await fetch('/api/properties', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: newAddress.trim(), nickname: newNickname.trim() || null }),
+      body: JSON.stringify({
+        address: newAddress.trim(),
+        nickname: newNickname.trim() || null,
+        startDate: newStartDate,
+        entityId: newEntityId || null,
+      }),
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
@@ -39,7 +51,7 @@ export default function PropertiesPage() {
     }
     const { property } = await res.json()
     setProperties(prev => [...prev, property])
-    setNewAddress(''); setNewNickname(''); setShowAdd(false)
+    setNewAddress(''); setNewNickname(''); setNewStartDate(''); setNewEntityId(''); setShowAdd(false)
     toast.success('Property added')
   }
 
@@ -63,10 +75,24 @@ export default function PropertiesPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="nick">Nickname <span className="font-normal text-muted">(optional)</span></Label>
-                  <Input id="nick" placeholder="e.g. Smith St" value={newNickname} onChange={e => setNewNickname(e.target.value)} onKeyDown={e => e.key === 'Enter' && addProperty()} />
+                  <Input id="nick" placeholder="e.g. Smith St" value={newNickname} onChange={e => setNewNickname(e.target.value)} />
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="start-date">Acquisition date</Label>
+                  <Input id="start-date" type="date" value={newStartDate} onChange={e => setNewStartDate(e.target.value)} />
+                </div>
+                {availableEntities.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="prop-entity">Entity <span className="font-normal text-muted">(optional)</span></Label>
+                    <select id="prop-entity" value={newEntityId} onChange={e => setNewEntityId(e.target.value)}
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm bg-white text-ink">
+                      <option value="">None</option>
+                      {availableEntities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="flex gap-2">
-                  <Button className="flex-1" onClick={addProperty} disabled={!newAddress.trim()}>Add property</Button>
+                  <Button className="flex-1" onClick={addProperty} disabled={!newAddress.trim() || !newStartDate}>Add property</Button>
                   <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
                 </div>
               </div>
