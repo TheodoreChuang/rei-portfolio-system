@@ -107,7 +107,7 @@ in a `try/catch` with `captureError`.
 
 ---
 
-### S-4 · Request body parsing: manual narrowing instead of Zod
+### ~~S-4 · Request body parsing: manual narrowing instead of Zod~~ — FIXED
 
 Convention: Zod for all request body parsing.
 

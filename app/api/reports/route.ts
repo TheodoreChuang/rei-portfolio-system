@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm'
+import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { propertyLedgerEntries, portfolioReports, properties, loanAccounts } from '@/db/schema'
@@ -10,6 +11,11 @@ import { lastDayOfMonth } from '@/lib/format'
 import { flags } from '@/lib/flags'
 
 const MONTH_REGEX = /^\d{4}-\d{2}$/
+
+const bodySchema = z.object({
+  month: z.string({ required_error: 'Missing or invalid month (must be YYYY-MM)' })
+    .regex(MONTH_REGEX, 'Missing or invalid month (must be YYYY-MM)'),
+})
 
 export async function GET(request: Request) {
   try {
@@ -51,18 +57,11 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    let body: unknown
-    try {
-      body = await request.json()
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    const parsed = bodySchema.safeParse(await request.json().catch(() => null))
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
     }
-
-    const raw = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
-    const month = typeof raw.month === 'string' ? raw.month.trim() : ''
-    if (!MONTH_REGEX.test(month)) {
-      return NextResponse.json({ error: 'Missing or invalid month (must be YYYY-MM)' }, { status: 400 })
-    }
+    const { month } = parsed.data
 
     const startDate = `${month}-01`
     const endDate = lastDayOfMonth(month)
