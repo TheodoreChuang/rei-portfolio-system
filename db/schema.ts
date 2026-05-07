@@ -39,7 +39,7 @@ export const properties = pgTable('properties', {
   entityId:  uuid('entity_id').references(() => entities.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
-  index('properties_user_id_idx').on(t.userId),
+  index('idx_properties_user').on(t.userId),
   index('idx_properties_entity').on(t.entityId),
 ])
 

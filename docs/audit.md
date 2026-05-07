@@ -178,7 +178,7 @@ Revisit when the health check and report status UX are reviewed in W6.
 
 ---
 
-### N-2 · Index naming outlier
+### ~~N-2 · Index naming outlier~~ — FIXED
 
 **File:** `db/schema.ts:42`
 
