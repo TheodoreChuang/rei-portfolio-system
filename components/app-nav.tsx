@@ -6,11 +6,13 @@ import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
-const currentMonth = new Date().toISOString().slice(0, 7)
+const d = new Date()
+d.setMonth(d.getMonth() - 1)
+const lastMonth = d.toISOString().slice(0, 7)
 
 const links = [
-  { href: '/dashboard',                    label: 'Dashboard' },
-  { href: `/reports/${currentMonth}`,      label: 'Reports',     activePrefix: '/reports' },
+  { href: '/dashboard',                label: 'Dashboard' },
+  { href: `/reports/${lastMonth}`,     label: 'Reports',    activePrefix: '/reports' },
   { href: '/upload',                       label: 'Upload' },
   { href: '/properties',                   label: 'Properties' },
   { href: '/entities',                     label: 'Entities' },
