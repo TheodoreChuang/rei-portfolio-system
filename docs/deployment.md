@@ -1,4 +1,4 @@
-# PropFlow — Deployment
+# Folio — Deployment
 
 ## Overview
 
@@ -88,7 +88,7 @@ If setting up Sentry:
        silent: true,
        tunnelRoute: '/monitoring',
        org: '<your-sentry-org-slug>',
-       project: 'propflow',
+       project: 'folio',
        authToken: process.env.SENTRY_AUTH_TOKEN,
        widenClientFileUpload: true,
      })
