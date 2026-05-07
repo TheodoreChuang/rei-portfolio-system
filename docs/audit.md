@@ -23,7 +23,7 @@ DB mutations is enforced at the API layer via `supabase.auth.getUser()`.
 
 ## MUST FIX
 
-### M-1 · Soft-delete gap in `GET /api/documents`
+### ~~M-1 · Soft-delete gap in `GET /api/documents`~~ — FIXED
 
 **File:** `app/api/documents/route.ts:43–49`
 

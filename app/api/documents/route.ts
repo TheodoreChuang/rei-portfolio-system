@@ -1,4 +1,4 @@
-import { and, eq, gte, isNotNull, lte } from 'drizzle-orm'
+import { and, eq, gte, isNotNull, isNull, lte } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { propertyLedgerEntries, sourceDocuments } from '@/db/schema'
@@ -45,6 +45,8 @@ export async function GET(request: Request) {
           gte(propertyLedgerEntries.lineItemDate, startDate),
           lte(propertyLedgerEntries.lineItemDate, endDate),
           isNotNull(propertyLedgerEntries.sourceDocumentId),
+          isNull(propertyLedgerEntries.deletedAt),
+          isNull(sourceDocuments.deletedAt),
         )
       )
 
