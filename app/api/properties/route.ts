@@ -54,9 +54,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'endDate cannot be before startDate' }, { status: 400 })
     }
 
+    const entityId = typeof raw.entityId === 'string' ? raw.entityId.trim() || null : null
+
     const [inserted] = await db
       .insert(properties)
-      .values({ userId: user.id, address, nickname, startDate, endDate })
+      .values({ userId: user.id, address, nickname, startDate, endDate, entityId })
       .returning()
 
     return NextResponse.json({ property: inserted }, { status: 201 })
