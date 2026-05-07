@@ -54,8 +54,8 @@ After `pnpm seed`, log in directly with:
 
 | Email | Password | State |
 |---|---|---|
-| `dev-owner@propflow.test` | `password123` | 3 properties, March 2026 report |
-| `dev-new@propflow.test` | `password123` | No data — tests empty state |
+| `dev-owner@folio.test` | `password123` | 3 properties, March 2026 report |
+| `dev-new@folio.test` | `password123` | No data — tests empty state |
 
 Different emails = different `auth.uid()` = fully isolated data via RLS.
 

@@ -1,4 +1,4 @@
-# PropFlow — Prototype
+# Folio — Prototype
 
 Working prototype with correct, verified dependency versions.
 All page data is hardcoded in `lib/mock-data.ts`. Infrastructure stubs are wired and ready to fill in.

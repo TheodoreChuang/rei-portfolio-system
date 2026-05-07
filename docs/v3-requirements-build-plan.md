@@ -1,4 +1,4 @@
-# PropFlow V3 — Functional Requirements & Build Plan
+# Folio V3 — Functional Requirements & Build Plan
 
 ## Context
 

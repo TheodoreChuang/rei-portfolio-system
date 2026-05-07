@@ -3,7 +3,7 @@ import { Toaster as Sonner } from 'sonner'
 
 /*
   Sonner is the toast library recommended by shadcn.
-  Styled to match PropFlow tokens.
+  Styled to match Folio tokens.
   Add <Toaster /> to app/layout.tsx.
   Use: import { toast } from 'sonner'
        toast.success('Report generated')

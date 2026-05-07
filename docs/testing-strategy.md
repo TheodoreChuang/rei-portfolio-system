@@ -1,4 +1,4 @@
-# PropFlow — Testing Strategy
+# Folio — Testing Strategy
 
 Read at the start of any session that touches tests, financial logic, or data-safety code.
 
