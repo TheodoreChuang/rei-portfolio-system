@@ -5,7 +5,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-screen-bg">
       <nav className="bg-white border-b border-border flex items-center justify-between px-6 h-14">
-        <span className="font-serif text-xl text-ink">PropFlow</span>
+        <span className="font-serif text-xl text-ink">Folio</span>
         <div className="flex gap-2">
           <Link href="/login"><Button variant="outline" size="sm">Log in</Button></Link>
           <Link href="/signup"><Button size="sm">Get started</Button></Link>

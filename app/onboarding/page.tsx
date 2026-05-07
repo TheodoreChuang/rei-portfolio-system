@@ -55,7 +55,7 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-screen-bg">
       <nav className="bg-white border-b border-border flex items-center justify-between px-6 h-[52px]">
-        <span className="font-serif text-xl text-ink">PropFlow</span>
+        <span className="font-serif text-xl text-ink">Folio</span>
         <span className="text-sm text-muted">Step 1 of 2</span>
       </nav>
 

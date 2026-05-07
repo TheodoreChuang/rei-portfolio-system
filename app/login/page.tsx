@@ -49,7 +49,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen bg-screen-bg flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
-          <div className="font-serif text-2xl text-center mb-7">PropFlow</div>
+          <div className="font-serif text-2xl text-center mb-7">Folio</div>
           <Card>
             <CardContent className="pt-7 pb-7 text-center">
               <div className="text-5xl mb-4">📬</div>
@@ -77,7 +77,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-screen-bg flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="font-serif text-2xl text-center mb-7">PropFlow</div>
+        <div className="font-serif text-2xl text-center mb-7">Folio</div>
 
         {showExpiredBanner && (
           <div className="mb-4 flex items-start gap-3 rounded-lg border border-warn/40 bg-warn-light px-4 py-3 text-sm text-[#7a3a1a]">

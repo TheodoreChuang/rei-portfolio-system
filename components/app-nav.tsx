@@ -59,7 +59,7 @@ export function AppNav() {
 
   return (
     <nav className="bg-white border-b border-border flex items-center justify-between px-6 min-h-[52px]">
-      <Link href="/" className="font-serif text-xl text-ink">PropFlow</Link>
+      <Link href="/" className="font-serif text-xl text-ink">Folio</Link>
       <div className="flex gap-1">
         {links.map(l => (
           <Link key={l.href} href={l.href} className={cn(
