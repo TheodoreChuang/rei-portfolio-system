@@ -14,68 +14,59 @@ Read at the start of any session that touches tests, financial logic, or data-sa
 
 ### The critical limitation of unit tests
 
-Unit tests mock the DB at the query boundary. They can verify that the route calls the right query *shape*, but **cannot verify that a WHERE clause contains the right conditions** (e.g. `isNull(deletedAt)`).
+Unit tests mock the DB at the query boundary. They can verify that the route calls the right query *shape*, but **cannot verify that a WHERE clause contains the right conditions**.
 
-Anything that depends on a WHERE clause being correct — soft-delete filters, date-range filters, RLS user-scoping — needs an integration test or an explicit code-review checkpoint. Writing a unit test that "covers" a soft-delete query is insufficient if the WHERE clause is wrong.
+Anything that depends on a WHERE clause being correct — soft-delete filters, date-range filters, RLS user-scoping — needs an integration test or an explicit code-review checkpoint. Writing a unit test that "covers" a soft-delete query is insufficient; if the `isNull(deletedAt)` condition is missing, the unit test will still pass.
 
 ---
 
-## Critical Paths — Required Coverage
+## Critical Paths
 
 ### 1. Financial calculations
 
 **Risk:** Wrong totals corrupt every downstream report and flag.
 
-**Coverage:** `__tests__/lib/reports-compute.test.ts` — unit tests against `lib/reports/compute.ts` (pure function, no DB mock needed). Tests cover:
-- Rent, expense (all 7 categories), mortgage aggregation
-- `netBeforeMortgage` and `netAfterMortgage` formulas, including negative net
-- Per-property isolation (entries for property A don't bleed into property B)
-- `hasStatement` flag (any non-`loan_payment` entry = has statement)
-- `hasMortgage` flag
-- `missingStatements` and `missingMortgages` flag generation
-- Multiple loans per property, partial payment (one paid, one not)
+**Rule:** Financial aggregation logic must live in a pure function (no DB, no I/O) so it can be tested exhaustively without mocking. Changes to aggregation logic require unit tests before the change — not after.
 
-**Rule:** any change to `lib/reports/compute.ts` requires updating `reports-compute.test.ts` first.
+**What to test:** all category-to-bucket mappings (rent, expenses, mortgage), net formulas (before and after mortgage), per-property isolation (entries for property A must not affect property B totals), and all flag conditions (missing statement, missing mortgage payment).
+
+**Example:** `lib/reports/compute.ts` + `__tests__/lib/reports-compute.test.ts`
 
 ### 2. Soft-delete WHERE clause correctness
 
-**Risk:** Deleted records reappear in queries — data-integrity regression.
+**Risk:** Soft-deleted records reappear in queries, producing phantom data.
 
-**Affected tables:** `property_ledger_entries.deletedAt`, `source_documents.deletedAt`
+**Rule:** Any query on a table that has a `deletedAt` column must include `isNull(table.deletedAt)` in the WHERE clause. The only exception is intentional staleness checks (e.g. `MAX(updatedAt)` queries that must see deleted rows to detect changes). **This cannot be verified by a unit test** — it requires an integration test that inserts a row, soft-deletes it, and asserts the route no longer returns it.
 
-**Coverage:**
-- `__tests__/api/documents.integration.test.ts` — verifies `GET /api/documents` hides docs when either the ledger entry OR the source document is soft-deleted (tests the M-1 fix)
-- `__tests__/api/statements.integration.test.ts` — verifies re-processing a source document soft-deletes previous entries before inserting new ones
+**What to test:** each soft-deletable table needs at least one integration test that proves the filter is applied. If a route joins multiple soft-deletable tables, both conditions need testing (deleting via table A hides the record; deleting via table B also hides it).
 
-**Rule:** any new query on a table with `deletedAt` must include `isNull(table.deletedAt)`. If it doesn't, it must have an integration test that proves the omission is intentional (e.g. the staleness `MAX(updatedAt)` query in `reports/health`).
+**Example:** `__tests__/api/documents.integration.test.ts` — verifies `GET /api/documents` applies `isNull` to both the ledger entry and the source document
 
-### 3. Loan date-range filter correctness
+### 3. Date-range filter correctness
 
-**Risk:** Ended or future loans generate false-positive `missingMortgages` flags.
+**Risk:** Entities outside the requested period (e.g. ended loan accounts) are included in results, generating false-positive flags.
 
-**Route filter:** `lte(loanAccounts.startDate, periodEnd) + gte(loanAccounts.endDate, periodStart)` — applied in both `POST /api/reports` and `GET /api/ledger/summary`.
+**Rule:** Any route that filters time-bounded entities (loans, properties, etc.) by an overlap condition (`startDate <= periodEnd AND endDate >= periodStart`) must have an integration test with a row that sits outside the period. Unit tests cannot verify this because the filter is in the DB query.
 
-**Coverage:**
-- `__tests__/api/ledger-summary.integration.test.ts` — verifies the date filter excludes loans that ended before the period and loans that start after the period, while correctly flagging active loans with no payment (tests the S-1 fix)
-- `__tests__/lib/reports-compute.test.ts` — "does not flag ended loan accounts (caller filters active loans)" documents that `computeReport` is not responsible for this filtering; the route is
+**What to test:** a record that ended before the period (should be excluded), a record that starts after the period (should be excluded), and a record that overlaps (should be included).
 
-**Rule:** the caller (route) is responsible for passing only date-range-active loans to `computeReport`. Tests for `computeReport` do not need to cover ended loans.
+**Example:** `__tests__/api/ledger-summary.integration.test.ts` — verifies loan accounts are excluded from `missingMortgages` flags when they fall outside the date range
 
-### 4. Auth check coverage
+### 4. Auth check on every route
 
 **Risk:** An unauthenticated request reaches business logic.
 
-**Coverage:** every route test file includes a "returns 401 when not authenticated" test. This is enforced as a code-review checkpoint — any new route must have this test.
+**Rule:** Every route handler must check auth before any business logic. Every route test file must have a "returns 401 when not authenticated" test. This is a code-review checkpoint — no new route is complete without it.
 
 ### 5. RLS user isolation
 
-**Risk:** User A can read or modify User B's data.
+**Risk:** User A reads or modifies User B's data.
 
-**Coverage:** two levels:
-- *Application-layer:* all route unit tests simulate a different user via `mockGetUser` returning a different userId; the DB mock returns `[]` for the wrong user. This verifies the route passes `userId` to the DB query.
-- *DB-layer:* `__tests__/api/statements.integration.test.ts` — if `TEST_USER_B_EMAIL` + `TEST_USER_B_PASSWORD` are set, a cross-user RLS test runs against real Postgres. Requires a second test user in Supabase local dev.
+**Coverage at two levels:**
+- *Application-layer:* route handlers must pass `userId` from the authenticated session into the DB WHERE clause. Unit tests verify this by simulating a different userId and asserting the mock DB returns nothing for that user.
+- *DB-layer:* every table must have an explicit RLS policy (see `docs/conventions.md §4`). Where possible, integration tests should verify cross-user isolation by operating as two different users against the real DB.
 
-**Rule:** application-layer userId checks cover the common case. For any route that accepts an external ID (e.g. `sourceDocumentId` from the request body), verify the route adds `WHERE user_id = caller_id` before trusting that ID.
+**Rule:** any route that accepts an external ID in the request body (e.g. `sourceDocumentId`) must include `AND user_id = caller_id` in the ownership lookup before trusting that ID.
 
 ---
 
@@ -93,11 +84,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<local anon key>
 
 All integration tests use an `if (!hasEnv) return` guard — they silently skip if credentials are not set.
 
-**CI status:** integration tests run in CI (`pnpm test:integration` in `.github/workflows/ci.yml`) but currently skip because `TEST_USER_EMAIL` is not set as a GitHub secret. Unit tests are the only CI-enforced gate. Run integration tests locally before merging any change to:
-- DB query WHERE clauses
-- Soft-delete logic
-- Loan date-range filters
-- Storage + DB transaction paths (upload, document delete)
+**CI status:** integration tests run in CI (`pnpm test:integration`) but currently skip because `TEST_USER_EMAIL` is not set as a GitHub secret. Fix before first production deploy by wiring test user creation via the Supabase admin API.
 
 ---
 
@@ -105,7 +92,5 @@ All integration tests use an `if (!hasEnv) return` guard — they silently skip 
 
 | Gap | Rationale | When to fix |
 |-----|-----------|------------|
-| `hasStatement` semantics | Any non-`loan_payment` entry counts as "has statement" — a manual expense entry triggers this flag even without a PM statement. Deferred (N-1) pending UX review of health check status display. | V4 UX refresh |
-| Integration tests skipped in CI | No `TEST_USER_B_EMAIL` / `TEST_USER_EMAIL` GitHub secrets configured. All integration tests pass locally. | Before first production deploy (W7) — wire up test user creation via Supabase admin API |
-| `DELETE /api/documents/[id]` not integration-tested | The soft-delete cascade (entries then doc) is unit-tested with mock; the storage delete is not verified against real Storage in integration. | If a storage regression is suspected |
-| E2E upload test skipped | Requires `playwright/fixtures/sample-statement.pdf` — no fixture committed. | Before any upload flow UI change |
+| `hasStatement` semantics | Any non-`loan_payment` entry counts as "has statement" — a manual expense entry satisfies the flag even without a PM statement. Deferred pending UX review of health check status display. | V4 UX refresh |
+| Integration tests skipped in CI | No `TEST_USER_EMAIL` GitHub secret configured. All integration tests pass locally. | W7 (deploy) — wire test user creation via admin API |
