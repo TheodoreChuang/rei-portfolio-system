@@ -14,53 +14,58 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { id } = await params
-  if (!UUID_REGEX.test(id)) {
-    return NextResponse.json({ error: 'Invalid document ID' }, { status: 400 })
-  }
-
-  const [doc] = await db
-    .select()
-    .from(sourceDocuments)
-    .where(and(eq(sourceDocuments.id, id), eq(sourceDocuments.userId, user.id)))
-    .limit(1)
-
-  if (!doc) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
-
-  let entriesDeleted = 0
   try {
-    await db.transaction(async (tx) => {
-      const softDeletedEntries = await tx
-        .update(propertyLedgerEntries)
-        .set({ deletedAt: new Date() })
-        .where(eq(propertyLedgerEntries.sourceDocumentId, id))
-        .returning()
-      entriesDeleted = softDeletedEntries.length
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-      await tx
-        .update(sourceDocuments)
-        .set({ deletedAt: new Date() })
-        .where(and(eq(sourceDocuments.id, id), eq(sourceDocuments.userId, user.id)))
-    })
+    const { id } = await params
+    if (!UUID_REGEX.test(id)) {
+      return NextResponse.json({ error: 'Invalid document ID' }, { status: 400 })
+    }
+
+    const [doc] = await db
+      .select()
+      .from(sourceDocuments)
+      .where(and(eq(sourceDocuments.id, id), eq(sourceDocuments.userId, user.id)))
+      .limit(1)
+
+    if (!doc) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
+    let entriesDeleted = 0
+    try {
+      await db.transaction(async (tx) => {
+        const softDeletedEntries = await tx
+          .update(propertyLedgerEntries)
+          .set({ deletedAt: new Date() })
+          .where(eq(propertyLedgerEntries.sourceDocumentId, id))
+          .returning()
+        entriesDeleted = softDeletedEntries.length
+
+        await tx
+          .update(sourceDocuments)
+          .set({ deletedAt: new Date() })
+          .where(and(eq(sourceDocuments.id, id), eq(sourceDocuments.userId, user.id)))
+      })
+    } catch (err) {
+      captureError(err, { route: 'DELETE /api/documents/[id]', phase: 'transaction' })
+      return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
+    }
+
+    // Best-effort storage delete — don't fail the request if this errors
+    const { error: storageError } = await supabase.storage
+      .from('documents')
+      .remove([doc.filePath])
+
+    if (storageError) {
+      logger.error('storage delete failed', { error: storageError?.message })
+    }
+
+    return NextResponse.json({ deleted: true, entriesDeleted })
   } catch (err) {
     captureError(err, { route: 'DELETE /api/documents/[id]' })
-    return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  // Best-effort storage delete — don't fail the request if this errors
-  const { error: storageError } = await supabase.storage
-    .from('documents')
-    .remove([doc.filePath])
-
-  if (storageError) {
-    logger.error('storage delete failed', { error: storageError?.message })
-  }
-
-  return NextResponse.json({ deleted: true, entriesDeleted })
 }

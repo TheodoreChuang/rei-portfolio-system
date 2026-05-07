@@ -88,7 +88,7 @@ Already tracked in `docs/observability.md` as a known gap.
 
 ---
 
-### S-3 · Incomplete `try/catch` coverage — two routes
+### ~~S-3 · Incomplete `try/catch` coverage — two routes~~ — FIXED
 
 Convention: every handler body is wrapped in a top-level `try/catch` with
 `captureError` on the catch branch.
