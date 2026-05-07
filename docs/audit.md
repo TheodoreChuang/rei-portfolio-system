@@ -191,7 +191,7 @@ Requires a migration. Low priority since it has no functional impact.
 
 ---
 
-### N-3 · `DELETE /api/documents/[id]` allows re-deleting a soft-deleted document
+### ~~N-3 · `DELETE /api/documents/[id]` allows re-deleting a soft-deleted document~~ — FIXED
 
 **File:** `app/api/documents/[id]/route.ts:26–30`
 

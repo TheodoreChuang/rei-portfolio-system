@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { propertyLedgerEntries, sourceDocuments } from '@/db/schema'
@@ -27,7 +27,7 @@ export async function DELETE(
     const [doc] = await db
       .select()
       .from(sourceDocuments)
-      .where(and(eq(sourceDocuments.id, id), eq(sourceDocuments.userId, user.id)))
+      .where(and(eq(sourceDocuments.id, id), eq(sourceDocuments.userId, user.id), isNull(sourceDocuments.deletedAt)))
       .limit(1)
 
     if (!doc) {
