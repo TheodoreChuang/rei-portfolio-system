@@ -124,7 +124,7 @@ const lineItemDate = typeof raw.lineItemDate === 'string' ? raw.lineItemDate.tri
 
 ---
 
-### S-5 · RLS: no explicit policies for `entities`, `property_valuations`, `loan_balances`
+### ~~S-5 · RLS: no explicit policies for `entities`, `property_valuations`, `loan_balances`~~ — FIXED
 
 **Migration files:** `drizzle/0004_steady_sir_ram.sql`,
 `drizzle/0005_exotic_inhumans.sql`, `drizzle/0006_thick_tempest.sql`
