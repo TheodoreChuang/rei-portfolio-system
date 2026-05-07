@@ -50,6 +50,20 @@
       "when": 1777589677004,
       "tag": "0006_thick_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1746604800000,
+      "tag": "0007_rls_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1746604801000,
+      "tag": "0008_idx_properties_user",
+      "breakpoints": true
     }
   ]
 }

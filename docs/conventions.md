@@ -147,6 +147,20 @@ const [props, loans] = await Promise.all([
 **Transactions:** Not currently used. If a route ever requires atomic multi-table
 writes, use an explicit Drizzle transaction — do not rely on implicit ordering.
 
+**RLS:** Every application table must have an explicit Row Level Security policy:
+```sql
+ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own {table}"
+  ON {table} FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+Add these in the same migration that creates the table. The auto-enable trigger
+in `drizzle/0001_rls.sql` handles `ENABLE ROW LEVEL SECURITY` automatically for
+new tables, but does **not** add a policy — omitting the policy means deny-all
+via PostgREST, which is inconsistent and will break if direct Supabase client
+queries are ever added.
+
 ---
 
 ## 5. Type Safety

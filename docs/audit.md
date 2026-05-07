@@ -23,7 +23,7 @@ DB mutations is enforced at the API layer via `supabase.auth.getUser()`.
 
 ## MUST FIX
 
-### M-1 · Soft-delete gap in `GET /api/documents`
+### ~~M-1 · Soft-delete gap in `GET /api/documents`~~ — FIXED
 
 **File:** `app/api/documents/route.ts:43–49`
 
@@ -46,7 +46,7 @@ to the import. `isNotNull` is already imported for `sourceDocumentId`.
 
 ## SHOULD FIX
 
-### S-1 · `computeReport` does not filter loans by active date range
+### ~~S-1 · `computeReport` does not filter loans by active date range~~ — FIXED
 
 **Files:** `lib/reports/compute.ts:111`, `app/api/reports/route.ts:86`,
 `app/api/ledger/summary/route.ts:41–48`
@@ -75,7 +75,7 @@ net) are unaffected — expired loans have no entries in the period.
 
 ---
 
-### S-2 · `POST /api/reports` returns 422
+### ~~S-2 · `POST /api/reports` returns 422~~ — FIXED
 
 **File:** `app/api/reports/route.ts:90`
 
@@ -88,7 +88,7 @@ Already tracked in `docs/observability.md` as a known gap.
 
 ---
 
-### S-3 · Incomplete `try/catch` coverage — two routes
+### ~~S-3 · Incomplete `try/catch` coverage — two routes~~ — FIXED
 
 Convention: every handler body is wrapped in a top-level `try/catch` with
 `captureError` on the catch branch.
@@ -107,7 +107,7 @@ in a `try/catch` with `captureError`.
 
 ---
 
-### S-4 · Request body parsing: manual narrowing instead of Zod
+### ~~S-4 · Request body parsing: manual narrowing instead of Zod~~ — FIXED
 
 Convention: Zod for all request body parsing.
 
@@ -124,7 +124,7 @@ const lineItemDate = typeof raw.lineItemDate === 'string' ? raw.lineItemDate.tri
 
 ---
 
-### S-5 · RLS: no explicit policies for `entities`, `property_valuations`, `loan_balances`
+### ~~S-5 · RLS: no explicit policies for `entities`, `property_valuations`, `loan_balances`~~ — FIXED
 
 **Migration files:** `drizzle/0004_steady_sir_ram.sql`,
 `drizzle/0005_exotic_inhumans.sql`, `drizzle/0006_thick_tempest.sql`
@@ -178,7 +178,7 @@ Revisit when the health check and report status UX are reviewed in W6.
 
 ---
 
-### N-2 · Index naming outlier
+### ~~N-2 · Index naming outlier~~ — FIXED
 
 **File:** `db/schema.ts:42`
 
@@ -191,7 +191,7 @@ Requires a migration. Low priority since it has no functional impact.
 
 ---
 
-### N-3 · `DELETE /api/documents/[id]` allows re-deleting a soft-deleted document
+### ~~N-3 · `DELETE /api/documents/[id]` allows re-deleting a soft-deleted document~~ — FIXED
 
 **File:** `app/api/documents/[id]/route.ts:26–30`
 
