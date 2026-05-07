@@ -46,7 +46,7 @@ to the import. `isNotNull` is already imported for `sourceDocumentId`.
 
 ## SHOULD FIX
 
-### S-1 · `computeReport` does not filter loans by active date range
+### ~~S-1 · `computeReport` does not filter loans by active date range~~ — FIXED
 
 **Files:** `lib/reports/compute.ts:111`, `app/api/reports/route.ts:86`,
 `app/api/ledger/summary/route.ts:41–48`

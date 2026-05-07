@@ -39,6 +39,8 @@ export async function GET(request: Request) {
 
     const loansWhere = [
       eq(loanAccounts.userId, user.id),
+      lte(loanAccounts.startDate, to),
+      gte(loanAccounts.endDate, from),
       ...(entityId ? [eq(loanAccounts.entityId, entityId)] : []),
     ]
 

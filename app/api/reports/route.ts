@@ -83,7 +83,13 @@ export async function POST(request: Request) {
         .where(eq(properties.userId, user.id)),
       db.select()
         .from(loanAccounts)
-        .where(eq(loanAccounts.userId, user.id)),
+        .where(
+          and(
+            eq(loanAccounts.userId, user.id),
+            lte(loanAccounts.startDate, endDate),
+            gte(loanAccounts.endDate, startDate),
+          )
+        ),
     ])
 
     if (props.length === 0) {
