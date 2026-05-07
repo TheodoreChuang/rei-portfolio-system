@@ -1,4 +1,4 @@
-# PropFlow — Code Conventions
+# Folio — Code Conventions
 
 Agreed conventions for V3.1 and beyond. Read at the start of every session.
 Deviations from these are cleanup tasks (Workstream 5), not blockers.

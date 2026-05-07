@@ -3,8 +3,8 @@ import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
-  title: 'PropFlow',
-  description: 'Monthly portfolio summaries for Australian property investors',
+  title: 'Folio',
+  description: 'Your property portfolio, clearly summarised',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

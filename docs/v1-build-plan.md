@@ -1,4 +1,4 @@
-# PropFlow — Build Plan
+# Folio — Build Plan
 
 Approach: **vertical slices, hardest feature first.**
 Each slice covers DB → API → UI together in one session.
@@ -208,14 +208,14 @@ Only add `data-testid` where tests actually need them — don't litter the codeb
 
 ### Isolate test users from seed data
 
-Don't reuse `dev-owner@propflow.test` in tests — it has shared mutable state.
+Don't reuse `dev-owner@folio.test` in tests — it has shared mutable state.
 Create a fresh user per test suite, or per test for anything that writes data:
 
 ```typescript
 // vitest
 beforeEach(async () => {
   const { data } = await supabaseAdmin.auth.admin.createUser({
-    email: `test-${crypto.randomUUID()}@propflow.test`,
+    email: `test-${crypto.randomUUID()}@folio.test`,
     password: "password123",
     email_confirm: true,
   });

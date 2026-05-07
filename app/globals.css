@@ -26,7 +26,7 @@
   --font-mono:  'DM Mono', monospace;
   --font-serif: 'Instrument Serif', serif;
 
-  /* PropFlow colour palette */
+  /* Folio colour palette */
   --color-ink:           #1a1a1a;
   --color-paper:         #f5f2eb;
   --color-screen-bg:     #edeae0;
@@ -48,7 +48,7 @@
 /*
   ── SHADCN VARIABLE BRIDGE (:root) ──────────────────────────────────────────
   shadcn components read these specific variable names internally.
-  We map them to PropFlow tokens so every shadcn component inherits
+  We map them to Folio tokens so every shadcn component inherits
   the design system automatically — no per-component restyling needed.
 
   These stay in :root (not @theme) because they are runtime CSS custom

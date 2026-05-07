@@ -1,4 +1,4 @@
-# PropFlow V2 — Functional Requirements & Build Plan
+# Folio V2 — Functional Requirements & Build Plan
 
 ## Context
 
@@ -258,7 +258,7 @@ _Historical context for the portfolio._
 Tremor v3 ships as pure Tailwind-based chart components with no UI framework
 dependency — compatible with the existing Radix UI components, no conflicts.
 Install: `pnpm add @tremor/react`. Design aesthetic is clean and minimal,
-consistent with PropFlow's tone. Compatible with a future shadcn migration.
+consistent with Folio's tone. Compatible with a future shadcn migration.
 
 Note: do not migrate existing Radix UI components as part of this slice.
 Tremor is additive — charts only.

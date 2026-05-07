@@ -22,7 +22,7 @@ function getAdminClient(): SupabaseClient {
 }
 
 export async function createTestUser(email?: string) {
-  const testEmail = email ?? `pw-test-${crypto.randomUUID()}@propflow.test`;
+  const testEmail = email ?? `pw-test-${crypto.randomUUID()}@folio.test`;
   const password = "test-password-123";
 
   const { data, error } = await getAdminClient().auth.admin.createUser({

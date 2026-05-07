@@ -8,7 +8,7 @@ test.describe('Authentication flows', () => {
     // Should stay on /dashboard — not redirected to /login
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 })
     // And the nav should be visible (not the login page)
-    await expect(page.getByText('PropFlow')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Folio')).toBeVisible({ timeout: 10000 })
   })
 
   test('unauthenticated user visiting /dashboard is redirected to /login', async ({ browser }) => {

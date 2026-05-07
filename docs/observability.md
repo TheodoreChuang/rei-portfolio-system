@@ -1,4 +1,4 @@
-# PropFlow — Observability
+# Folio — Observability
 
 Read alongside `conventions.md`.
 

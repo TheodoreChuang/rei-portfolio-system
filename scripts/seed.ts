@@ -37,12 +37,12 @@ const db  = drizzle({ client: sql })
 
 const TEST_USERS = [
   {
-    email:    'dev-owner@propflow.test',
+    email:    'dev-owner@folio.test',
     password: 'password123',
     // Established user — 3 properties, March 2026 data with intentional gaps
   },
   {
-    email:    'dev-new@propflow.test',
+    email:    'dev-new@folio.test',
     password: 'password123',
     // Brand new user — no data, tests empty state UI
   },
@@ -239,7 +239,7 @@ async function main() {
     const userId = data.user!.id
     console.log(`✓  ${user.email} (${userId})`)
 
-    if (user.email === 'dev-owner@propflow.test') {
+    if (user.email === 'dev-owner@folio.test') {
       await seedOwner(userId)
     }
   }

@@ -12,7 +12,7 @@ export default withSentryConfig(nextConfig, {
   tunnelRoute: '/monitoring',
   // Populate for source map uploads in CI:
   // org: 'your-sentry-org',
-  // project: 'propflow',
+  // project: 'folio',
   // authToken: process.env.SENTRY_AUTH_TOKEN,
   // widenClientFileUpload: true,
 })

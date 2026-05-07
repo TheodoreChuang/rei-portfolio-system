@@ -1,4 +1,4 @@
-# PropFlow — CLAUDE.md
+# Folio — CLAUDE.md
 
 ## Stack
 - **Next.js 16** (App Router, TypeScript, `strict: true`)

@@ -41,7 +41,7 @@ export default function SignupPage() {
     return (
       <div className="min-h-screen bg-screen-bg flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
-          <div className="font-serif text-2xl text-center mb-7">PropFlow</div>
+          <div className="font-serif text-2xl text-center mb-7">Folio</div>
           <Card>
             <CardContent className="pt-7 pb-7 text-center">
               <div className="text-5xl mb-4">📬</div>
@@ -69,7 +69,7 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen bg-screen-bg flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="font-serif text-2xl text-center mb-7">PropFlow</div>
+        <div className="font-serif text-2xl text-center mb-7">Folio</div>
         <Card>
           <CardContent className="pt-7 pb-7">
             <h2 className="text-lg font-semibold mb-1">Create your account</h2>
