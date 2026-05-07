@@ -212,14 +212,14 @@ describe('POST /api/reports', () => {
     expect(res.status).toBe(400)
   })
 
-  it('returns 422 when user has no properties', async () => {
+  it('returns 400 when user has no properties', async () => {
     mocks.mockSelectWhere
       .mockReset()
       .mockResolvedValueOnce([])   // entries
       .mockResolvedValueOnce([])   // properties
       .mockResolvedValueOnce([])   // loanAccounts
     const res = await POST(makePostRequest({ month: '2026-03' }))
-    expect(res.status).toBe(422)
+    expect(res.status).toBe(400)
   })
 
   it('generates and upserts report on success', async () => {
@@ -281,6 +281,6 @@ describe('GET /api/reports — RLS cross-user isolation', () => {
       .mockResolvedValueOnce([])   // properties: none for user B
       .mockResolvedValueOnce([])   // loanAccounts: none for user B
     const res = await POST(makePostRequest({ month: '2026-03' }))
-    expect(res.status).toBe(422) // no properties found
+    expect(res.status).toBe(400) // no properties found
   })
 })

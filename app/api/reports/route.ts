@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     ])
 
     if (props.length === 0) {
-      return NextResponse.json({ error: 'No properties found — add a property before generating a report' }, { status: 422 })
+      return NextResponse.json({ error: 'No properties found — add a property before generating a report' }, { status: 400 })
     }
 
     const { totals } = computeReport(entries, props, loans)

@@ -75,7 +75,7 @@ net) are unaffected — expired loans have no entries in the period.
 
 ---
 
-### S-2 · `POST /api/reports` returns 422
+### ~~S-2 · `POST /api/reports` returns 422~~ — FIXED
 
 **File:** `app/api/reports/route.ts:90`
 
