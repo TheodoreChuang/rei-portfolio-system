@@ -76,8 +76,10 @@ Integration tests (`pnpm test:integration`) require `supabase start`; run them w
 - After schema changes run `pnpm db:generate` then `pnpm db:migrate`
 - Supabase migration applied ≠ bucket visible in Studio storage browser sometimes;
   use `curl` with secret key to verify
-- **pdf-parse / pdfjs-dist**: must be in `serverExternalPackages` in `next.config.ts`
-  or Turbopack breaks the worker file path at runtime
+- **unpdf / pdfjs-dist**: must be in `serverExternalPackages` in `next.config.ts`
+  or Turbopack breaks the worker file path at runtime. `pdf-parse@2.x` was removed —
+  it pulled in `pdfjs-dist@5` which requires `DOMMatrix` (browser API) and fails in
+  Vercel serverless. `unpdf` is the replacement — handles Node.js compat internally.
 - **supabase-ssr cookie format** (for curl testing): cookie name `sb-127-auth-token`,
   value = `"base64-" + base64url(JSON.stringify(session))` where `session` is the full
   JSON from the Supabase auth REST endpoint (no double-encoding)

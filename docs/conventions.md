@@ -225,7 +225,7 @@ No comments by default. Add a comment only when:
 - A constraint could be silently violated by a future reader
   (e.g. `// always filter deleted_at IS NULL except staleness MAX query`)
 - A config choice works around a specific platform bug or limitation
-  (e.g. Turbopack + pdf-parse worker path, Supabase Transaction pooler `prepare: false`)
+  (e.g. Turbopack + unpdf worker path, Supabase Transaction pooler `prepare: false`)
 - A storage decision is non-obvious from the column name alone
   (e.g. `// SHA-256 for dedup`, `// always positive — category determines income vs expense`)
 

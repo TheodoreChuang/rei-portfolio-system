@@ -12,7 +12,7 @@ _The core value prop. Everything else depends on having real ledge entries data.
 
 - [x] Supabase Storage create bucket (`documents`)
 - [x] `/api/upload` —
-- [x] `/api/extract` — pdf-parse → `generateObject()` with Zod schema
+- [x] `/api/extract` — unpdf → `generateObject()` with Zod schema
 - [x] Extraction error handling (unreadable PDF, LLM hallucination, missing fields)
 - [x] Save extracted ledge entries to DB via Drizzle
 - [x] Upload UI wired to real API (replace mock processing simulation)

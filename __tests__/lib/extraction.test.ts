@@ -81,11 +81,9 @@ describe('extractedLineItemSchema', () => {
   })
 })
 
-const mockGetText = vi.fn()
-vi.mock('pdf-parse', () => ({
-  PDFParse: vi.fn().mockImplementation(function () {
-    return { getText: mockGetText }
-  }),
+const mockExtractText = vi.hoisted(() => vi.fn())
+vi.mock('unpdf', () => ({
+  extractText: mockExtractText,
 }))
 
 describe('extractTextFromPdf', () => {
@@ -94,14 +92,14 @@ describe('extractTextFromPdf', () => {
   })
 
   it('throws on empty text', async () => {
-    mockGetText.mockResolvedValue({ text: '' })
+    mockExtractText.mockResolvedValue({ totalPages: 1, text: '' })
     await expect(
       extractTextFromPdf(Buffer.from('fake'))
     ).rejects.toThrow('scanned or image-only')
   })
 
   it('throws on text under 50 chars', async () => {
-    mockGetText.mockResolvedValue({ text: 'short' })
+    mockExtractText.mockResolvedValue({ totalPages: 1, text: 'short' })
     await expect(
       extractTextFromPdf(Buffer.from('fake'))
     ).rejects.toThrow('scanned or image-only')
@@ -109,7 +107,7 @@ describe('extractTextFromPdf', () => {
 
   it('returns trimmed text on success', async () => {
     const longText = 'A'.repeat(60)
-    mockGetText.mockResolvedValue({ text: `  ${longText}  ` })
+    mockExtractText.mockResolvedValue({ totalPages: 1, text: `  ${longText}  ` })
     const result = await extractTextFromPdf(Buffer.from('fake'))
     expect(result).toBe(longText)
   })

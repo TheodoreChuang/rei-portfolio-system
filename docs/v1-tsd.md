@@ -33,7 +33,7 @@ Notes:
   - `generateObject()` → structured PDF extraction
   - `generateText()` → commentary
 
-- **PDF Parsing**: `pdf-parse` → raw text → LLM extraction
+- **PDF Parsing**: `unpdf` → raw text → LLM extraction
 - **No RAG**
 - **No vector DB**
 
