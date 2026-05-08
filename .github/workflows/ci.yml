@@ -50,6 +50,8 @@ jobs:
         id: supabase
         run: |
           STATUS=$(supabase status --output json)
+          echo "--- supabase status JSON keys ---"
+          echo "$STATUS" | jq 'keys'
           echo "anon_key=$(echo $STATUS | jq -r '.["anon key"]')" >> $GITHUB_OUTPUT
           echo "api_url=$(echo $STATUS | jq -r '.["API URL"]')" >> $GITHUB_OUTPUT
           echo "service_role_key=$(echo $STATUS | jq -r '.["service_role key"]')" >> $GITHUB_OUTPUT
