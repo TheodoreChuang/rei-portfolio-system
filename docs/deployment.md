@@ -114,15 +114,16 @@ In the Supabase dashboard:
 | `SENTRY_DSN` | Sentry DSN | Optional — skip if not using Sentry |
 | `NEXT_PUBLIC_SENTRY_DSN` | Same Sentry DSN | Optional |
 | `SENTRY_AUTH_TOKEN` | Sentry auth token | Only if source maps configured |
+| `DATABASE_URL_DIRECT` | Session pooler URL (port 5432) | Build-time migrations only |
 
-`SUPABASE_SECRET_KEY` and `DATABASE_URL_DIRECT` are local script vars — do **not** add to Vercel.
+`SUPABASE_SECRET_KEY` is a local script var — do **not** add to Vercel.
 
 4. Click **Deploy**. Vercel will build and deploy from `main`.
 
 ### CD behaviour (automatic after this)
 
-- Push to `main` → production deploy
-- Open a PR → preview deploy on a unique URL
+- Push to `main` → production deploy (runs `pnpm db:migrate && pnpm build` via `vercel.json`)
+- Preview deployments are disabled — CI provides the pre-merge signal
 - No additional config needed
 
 ---
@@ -139,12 +140,15 @@ If the AI extraction fails, check Vercel logs (`vercel logs` or the dashboard) �
 
 ---
 
-## Step 6 — Slice 2 (separate branch)
+## Step 6 — Slice 2
 
 After first deploy is confirmed working:
-- Add GitHub secrets so integration tests run in CI (not just locally):
-  - Create a test user in the Supabase cloud project via the admin API
-  - Set `TEST_USER_EMAIL` and `TEST_USER_PASSWORD` as GitHub secrets
-- Configure Sentry source map uploads in CI (`SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` as GitHub secrets)
 
-See the separate Slice 2 branch for those changes.
+- **DB migrations in CD**: `vercel.json` overrides the build command to `pnpm db:migrate && pnpm build`.
+  Add `DATABASE_URL_DIRECT` (Session mode pooler URL, port 5432) to Vercel production env vars.
+  Migrations now run automatically before every production deploy — if a migration fails, the deploy is blocked.
+
+- **Integration tests in CI**: CI creates an ephemeral test user in the local Supabase instance
+  (via admin API) and passes credentials as env vars to the integration test step.
+  Tests run against the local instance only — never the cloud DB.
+  No GitHub secrets required.

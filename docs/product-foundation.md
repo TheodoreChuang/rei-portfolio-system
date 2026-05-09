@@ -1,15 +1,15 @@
-# PortfolioOS
+# Folio
 
 **Command centre for residential property investors**
 
-> This document defines the product, user, and design principles for PortfolioOS.  
+> This document defines the product, user, and design principles for Folio.  
 > It should be read before making product, UX, or design decisions.
 
 ---
 
 # 1. Product Vision
 
-PortfolioOS is a **centralised decision layer** for residential property investors.
+Folio is a **centralised decision layer** for residential property investors.
 
 It consolidates fragmented financial data, surfaces what matters, and provides
 clarity on portfolio performance—without requiring perfect inputs or complex setup.
@@ -28,7 +28,7 @@ but to become the **system of clarity and control** investors rely on.
 # 2. Target User
 
 **Primary user:**
-Residential property investors with **2–6 properties** who already:
+Residential property investors with **2–10 properties** who likely:
 
 - Use spreadsheets to track performance
 - Rely on email + property managers for operations
@@ -37,7 +37,6 @@ Residential property investors with **2–6 properties** who already:
 **Characteristics:**
 
 - Analytical, but not necessarily technical
-- Skeptical of black-box financial tools
 - Comfortable with numbers, but frustrated by fragmentation
 - Time-constrained and mentally overloaded
 
@@ -246,7 +245,7 @@ Not just totals.
 
 ## Core Mental Model
 
-PortfolioOS is not:
+Folio is not:
 
 - a spreadsheet replacement
 - a reporting tool
@@ -315,7 +314,7 @@ Each view must have a clear purpose.
 
 ---
 
-# 7. What Sets PortfolioOS Apart
+# 7. What Sets Folio Apart
 
 - Built for **real investor workflows**, not idealised ones
 - Accepts **messy, incomplete data**
@@ -326,7 +325,7 @@ Each view must have a clear purpose.
 
 # 8. Scope Discipline (Important)
 
-PortfolioOS is **not trying to be:**
+Folio is **not trying to be:**
 
 - Accounting software
 - Property management software

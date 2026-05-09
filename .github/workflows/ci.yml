@@ -50,13 +50,22 @@ jobs:
         id: supabase
         run: |
           STATUS=$(supabase status --output json)
-          echo "anon_key=$(echo $STATUS | jq -r '.anon_key')" >> $GITHUB_OUTPUT
-          echo "api_url=$(echo $STATUS | jq -r '.api_url')" >> $GITHUB_OUTPUT
+          echo "anon_key=$(echo $STATUS | jq -r '.ANON_KEY')" >> $GITHUB_OUTPUT
+          echo "api_url=$(echo $STATUS | jq -r '.API_URL')" >> $GITHUB_OUTPUT
+          echo "service_role_key=$(echo $STATUS | jq -r '.SERVICE_ROLE_KEY')" >> $GITHUB_OUTPUT
 
       - name: Run migrations
         run: pnpm db:migrate
         env:
           DATABASE_URL_DIRECT: postgresql://postgres:postgres@localhost:54322/postgres
+
+      - name: Create CI test user
+        run: |
+          curl -sf -X POST \
+            "${{ steps.supabase.outputs.api_url }}/auth/v1/admin/users" \
+            -H "Authorization: Bearer ${{ steps.supabase.outputs.service_role_key }}" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"ci@test.local","password":"ci-password-folio","email_confirm":true}'
 
       - name: Integration tests
         run: pnpm test:integration
@@ -64,3 +73,5 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:54322/postgres
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
+          TEST_USER_EMAIL: ci@test.local
+          TEST_USER_PASSWORD: ci-password-folio

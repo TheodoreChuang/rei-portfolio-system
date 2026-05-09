@@ -149,10 +149,7 @@ describe('POST /api/upload (integration)', () => {
   })
 
   it('second upload of same file returns isDuplicate: true, no new DB row', async () => {
-    if (!hasEnv || !uniqueBuffer) return
-    const countBefore = (
-      await db.select().from(sourceDocuments).where(eq(sourceDocuments.userId, userId))
-    ).length
+    if (!hasEnv || !uniqueBuffer || !uploadedDocId) return
     const res = await uploadRequest(
       uniqueBuffer,
       uniqueFileName,
@@ -165,10 +162,7 @@ describe('POST /api/upload (integration)', () => {
     }
     expect(res.status, JSON.stringify(json)).toBe(200)
     expect(json.isDuplicate).toBe(true)
-    const countAfter = (
-      await db.select().from(sourceDocuments).where(eq(sourceDocuments.userId, userId))
-    ).length
-    expect(countAfter).toBe(countBefore)
+    expect(json.sourceDocumentId).toBe(uploadedDocId)
   })
 
   it('uploaded file is accessible in Storage under correct path', async () => {

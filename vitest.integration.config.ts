@@ -8,7 +8,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/__tests__/**/*.integration.test.ts'],
-    // Sequential — avoid parallel DB mutations
+    // Sequential — avoid parallel DB mutations across test files
     pool: 'forks',
+    fileParallelism: false,
   },
 })
