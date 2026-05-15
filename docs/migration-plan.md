@@ -86,6 +86,7 @@ PRs: 1
 **Goal:** Property pages rebuilt on Phase 0 design system.
 
 Scope:
+- **Add shadcn first** — run `shadcn init` before writing any component code; resolve any conflict with existing `lib/utils.ts`; add base components (`Button`, `Card`, `Badge`, `Dialog`) as needed. Better to start here than refactor after all UI phases are done.
 - Property list page
 - Property detail page (ledger, valuations)
 - Existing fields only — no new fields from mockups
