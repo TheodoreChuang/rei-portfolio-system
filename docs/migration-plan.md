@@ -278,6 +278,8 @@ Constraints:
 
 Visual designs locatied in `docs/designs/`. These visual designs represent the ideal state. Many features and field are not support by the backend yet. Anything new is out of scope for the rebuild. New features and sections will be iterative added after the rebuild and stabilization of the app.
 
+As of May 15, the landing page and login UI have not been designed yet. Existing UI can be used as placeholders.
+
 ---
 
 ## Cross-cutting files
