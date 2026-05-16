@@ -17,13 +17,17 @@ vi.mock('@/lib/supabase/server', () => ({
   ),
 }))
 
-vi.mock('@/lib/reporting', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/reporting')>()
+vi.mock('@/lib/reporting', async () => {
+  // importActual targets the pure service file (no db dependency) to avoid
+  // lib/db → lib/env.ts → DATABASE_URL being evaluated in CI unit test env.
+  const { computeReport } = await vi.importActual<typeof import('@/lib/reporting/services/compute')>(
+    '@/lib/reporting/services/compute'
+  )
   return {
-    ...actual,
     fetchPropertiesActiveInRange: mocks.mockFetchProperties,
     fetchLoansActiveInRange: mocks.mockFetchLoans,
     fetchLedgerEntriesInRange: mocks.mockFetchEntries,
+    computeReport,
   }
 })
 
