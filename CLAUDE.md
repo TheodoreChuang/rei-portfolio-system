@@ -1,5 +1,8 @@
 # Folio — CLAUDE.md
 
+@docs/conventions.md
+@docs/testing-strategy.md
+
 ## Stack
 - **Next.js 16** (App Router, TypeScript, `strict: true`)
 - **Supabase** — auth (SSR cookies), Postgres, Storage; local at `http://127.0.0.1:54321`
