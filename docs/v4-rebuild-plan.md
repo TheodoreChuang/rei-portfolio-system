@@ -1,7 +1,11 @@
-# Folio — Migration Plan
+# Folio — Rebuild Plan
 
 Stabilise the app in the target architecture before adding new features.
 Two sequential goals: backend restructured to conventions; UI then rebuilt on the new design system.
+
+As the project is matures, we need to be more deberate in our designs. If this in mnind, we created:
+- docs/architecture.md
+- docs/data-model.md
 
 **Constraints:**
 - No live users — clean DB resets are preferred over incremental migration scripts
