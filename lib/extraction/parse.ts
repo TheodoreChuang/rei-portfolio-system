@@ -21,7 +21,6 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
 
 export async function extractStatementData(
   pdfText: string,
-  assignedMonth: string
 ): Promise<ExtractionResult> {
   const { object } = await generateObject({
     model: gateway('anthropic/claude-haiku-4-5'),
@@ -34,7 +33,7 @@ Rules:
 - confidence: rate 'high' if amount and category are unambiguous, 'medium' if inferred, 'low' if uncertain
 - lineItemDate: use the transaction date shown. If only a period is shown, use the period end date.
 - If a field is missing from the statement, make your best inference and set confidence to 'low'`,
-    prompt: `Extract all line items from this property management statement for ${assignedMonth}:\n\n${pdfText}`,
+    prompt: `Extract all line items from this statement:\n\n${pdfText}`,
   })
 
   return object

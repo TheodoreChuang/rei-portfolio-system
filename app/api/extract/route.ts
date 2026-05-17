@@ -8,8 +8,6 @@ import { stageExtractionResult } from '@/lib/ingestion'
 import { logger } from '@/lib/logger'
 import { captureError } from '@/lib/api-error'
 
-const ASSIGNED_MONTH_REGEX = /^\d{4}-\d{2}$/
-
 function isValidUuid(s: unknown): s is string {
   if (typeof s !== 'string') return false
   const uuidRegex =
@@ -55,23 +53,14 @@ export async function POST(request: Request) {
     )
   }
 
-  const { sourceDocumentId, assignedMonth } =
-    body && typeof body === 'object' && 'sourceDocumentId' in body && 'assignedMonth' in body
-      ? (body as { sourceDocumentId: unknown; assignedMonth: unknown })
-      : { sourceDocumentId: undefined, assignedMonth: undefined }
+  const sourceDocumentId =
+    body && typeof body === 'object' && 'sourceDocumentId' in body
+      ? (body as { sourceDocumentId: unknown }).sourceDocumentId
+      : undefined
 
   if (!isValidUuid(sourceDocumentId)) {
     return NextResponse.json(
       { error: 'Missing or invalid sourceDocumentId' },
-      { status: 400 }
-    )
-  }
-
-  const assignedMonthStr =
-    typeof assignedMonth === 'string' ? assignedMonth.trim() : ''
-  if (!ASSIGNED_MONTH_REGEX.test(assignedMonthStr)) {
-    return NextResponse.json(
-      { error: 'Missing or invalid assignedMonth (must be YYYY-MM)' },
       { status: 400 }
     )
   }
@@ -129,7 +118,7 @@ export async function POST(request: Request) {
 
   let result: Awaited<ReturnType<typeof extractStatementData>>
   try {
-    result = await extractStatementData(pdfText, assignedMonthStr)
+    result = await extractStatementData(pdfText)
   } catch (err) {
     captureError(err, { route: 'POST /api/extract', phase: 'ai-extraction' })
     const message = err instanceof Error ? err.message : String(err)

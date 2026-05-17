@@ -46,7 +46,6 @@ function formDataWithFile(opts: {
   mimeType?: string
   size?: number
   documentType?: string
-  assignedMonth?: string
 }) {
   const {
     fileContent = new Blob(['fake pdf content']),
@@ -54,7 +53,6 @@ function formDataWithFile(opts: {
     mimeType = 'application/pdf',
     size = fileContent.size,
     documentType = 'pm_statement',
-    assignedMonth = '2026-03',
   } = opts
   const file = new File([fileContent], fileName, { type: mimeType })
   if (size !== undefined && file.size !== size) {
@@ -63,7 +61,6 @@ function formDataWithFile(opts: {
   const form = new FormData()
   form.append('file', file)
   form.append('documentType', documentType)
-  form.append('assignedMonth', assignedMonth)
   return form
 }
 
@@ -125,19 +122,6 @@ describe('POST /api/upload', () => {
     const res = await POST(new Request('http://localhost/api/upload', { method: 'POST', body: form }))
     expect(res.status).toBe(400)
     expect(mocks.mockUpload).not.toHaveBeenCalled()
-  })
-
-  it('rejects malformed assignedMonth (400)', async () => {
-    const form = formDataWithFile({ assignedMonth: '2026/03' })
-    const res = await POST(new Request('http://localhost/api/upload', { method: 'POST', body: form }))
-    expect(res.status).toBe(400)
-    expect(mocks.mockUpload).not.toHaveBeenCalled()
-  })
-
-  it('rejects assignedMonth not matching YYYY-MM format (400)', async () => {
-    const form = formDataWithFile({ assignedMonth: '202613' })
-    const res = await POST(new Request('http://localhost/api/upload', { method: 'POST', body: form }))
-    expect(res.status).toBe(400)
   })
 
   it('returns isDuplicate: true when hash already exists', async () => {
