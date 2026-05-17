@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MAX_UPLOAD_BYTES } from '@/lib/constants'
-import { recentMonths } from '@/lib/format'
 
 type DocumentType = 'pm_statement' | 'bank_statement' | 'loan_statement'
 type UploadState = 'idle' | 'review'
@@ -29,25 +28,13 @@ const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
   { value: 'loan_statement', label: 'Loan statement' },
 ]
 
-function currentMonth(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-}
-
-function formatMonthLabel(m: string): string {
-  const [y, mo] = m.split('-').map(Number)
-  return new Date(y, mo - 1).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
-}
-
 export default function UploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [uploadState, setUploadState] = useState<UploadState>('idle')
   const [documentType, setDocumentType] = useState<DocumentType>('pm_statement')
-  const [assignedMonth, setAssignedMonth] = useState(currentMonth)
   const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([])
   const [stagedSessions, setStagedSessions] = useState<StagedSession[]>([])
-  const months = recentMonths(12)
 
   const loadStaged = useCallback(async () => {
     const res = await fetch('/api/ingestion/staged')
@@ -75,7 +62,6 @@ export default function UploadPage() {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('documentType', documentType)
-      formData.append('assignedMonth', assignedMonth)
 
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
       if (!uploadRes.ok) {
@@ -90,7 +76,7 @@ export default function UploadPage() {
       const extractRes = await fetch('/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceDocumentId, assignedMonth }),
+        body: JSON.stringify({ sourceDocumentId }),
       })
 
       if (!extractRes.ok) {
@@ -173,36 +159,22 @@ export default function UploadPage() {
             </div>
           )}
 
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              {DOCUMENT_TYPE_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setDocumentType(opt.value)}
-                  className={[
-                    'py-2 px-3 rounded-md border text-sm font-medium transition-colors',
-                    documentType === opt.value
-                      ? 'bg-accent text-white border-accent'
-                      : 'bg-surface border-border text-muted hover:border-accent hover:text-ink',
-                  ].join(' ')}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-muted font-medium">Statement month:</label>
-              <select
-                className="h-8 rounded-md border border-input bg-transparent px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                value={assignedMonth}
-                onChange={e => setAssignedMonth(e.target.value)}
+          <div className="grid grid-cols-3 gap-3">
+            {DOCUMENT_TYPE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setDocumentType(opt.value)}
+                className={[
+                  'py-2 px-3 rounded-md border text-sm font-medium transition-colors',
+                  documentType === opt.value
+                    ? 'bg-accent text-white border-accent'
+                    : 'bg-surface border-border text-muted hover:border-accent hover:text-ink',
+                ].join(' ')}
               >
-                {months.map(m => (
-                  <option key={m} value={m}>{formatMonthLabel(m)}</option>
-                ))}
-              </select>
-            </div>
+                {opt.label}
+              </button>
+            ))}
           </div>
 
           <div

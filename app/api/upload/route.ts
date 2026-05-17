@@ -8,7 +8,6 @@ import { logger } from '@/lib/logger'
 import { captureError } from '@/lib/api-error'
 import { MAX_UPLOAD_BYTES } from '@/lib/constants'
 const ALLOWED_DOCUMENT_TYPES = ['pm_statement', 'loan_statement', 'bank_statement'] as const
-const ASSIGNED_MONTH_REGEX = /^\d{4}-\d{2}$/
 
 function documentTypeToFolder(documentType: string): string {
   switch (documentType) {
@@ -72,16 +71,6 @@ export async function POST(request: Request) {
   if (!ALLOWED_DOCUMENT_TYPES.includes(documentTypeStr as (typeof ALLOWED_DOCUMENT_TYPES)[number])) {
     return NextResponse.json(
       { error: 'Invalid documentType' },
-      { status: 400 }
-    )
-  }
-
-  const assignedMonth = formData.get('assignedMonth')
-  const assignedMonthStr =
-    typeof assignedMonth === 'string' ? assignedMonth.trim() : ''
-  if (!ASSIGNED_MONTH_REGEX.test(assignedMonthStr)) {
-    return NextResponse.json(
-      { error: 'assignedMonth must be YYYY-MM' },
       { status: 400 }
     )
   }

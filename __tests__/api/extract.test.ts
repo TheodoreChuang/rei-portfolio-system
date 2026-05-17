@@ -98,10 +98,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(res.status).toBe(401)
@@ -113,18 +110,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignedMonth: '2026-03' }),
-      })
-    )
-    expect(res.status).toBe(400)
-  })
-
-  it('rejects missing assignedMonth (400)', async () => {
-    const res = await POST(
-      new Request('http://localhost/api/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceDocumentId: docRow.id }),
+        body: JSON.stringify({}),
       })
     )
     expect(res.status).toBe(400)
@@ -136,10 +122,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(res.status).toBe(404)
@@ -152,10 +135,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(res.status).toBe(404)
@@ -169,10 +149,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(res.status).toBe(422)
@@ -184,10 +161,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(res.status).toBe(500)
@@ -199,10 +173,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(res.status).toBe(200)
@@ -217,10 +188,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(mocks.mockStageExtractionResult).toHaveBeenCalledWith(
@@ -236,10 +204,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(res.status).toBe(500)
@@ -253,10 +218,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(res.status).toBe(429)
@@ -271,10 +233,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     expect(res.status).toBe(200)
@@ -288,10 +247,7 @@ describe('POST /api/extract', () => {
       new Request('http://localhost/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceDocumentId: docRow.id,
-          assignedMonth: '2026-03',
-        }),
+        body: JSON.stringify({ sourceDocumentId: docRow.id }),
       })
     )
     // The count query was invoked (verifies the rate limit check ran)

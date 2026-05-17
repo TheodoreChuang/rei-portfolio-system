@@ -49,7 +49,7 @@ async function main() {
 
   console.log('\n[3] AI extraction...')
   try {
-    const result = await extractStatementData(text, '2025-07')
+    const result = await extractStatementData(text)
     console.log('    OK:', JSON.stringify(result, null, 2))
   } catch (e) {
     console.error('    FAILED:', (e as Error).message)

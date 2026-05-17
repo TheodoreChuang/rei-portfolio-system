@@ -105,14 +105,12 @@ describe('POST /api/upload (integration)', () => {
     fileBuffer: Buffer,
     fileName: string,
     documentType: string,
-    assignedMonth: string
   ) {
     const { POST } = await import('@/app/api/upload/route')
     const form = new FormData()
     const file = new File([new Uint8Array(fileBuffer)], fileName, { type: 'application/pdf' })
     form.append('file', file)
     form.append('documentType', documentType)
-    form.append('assignedMonth', assignedMonth)
     return POST(
       new Request('http://localhost/api/upload', { method: 'POST', body: form })
     )
@@ -124,7 +122,6 @@ describe('POST /api/upload (integration)', () => {
       uniqueBuffer,
       uniqueFileName,
       'pm_statement',
-      '2026-03'
     )
     const json = await res.json()
     if (res.status !== 200) {
@@ -154,7 +151,6 @@ describe('POST /api/upload (integration)', () => {
       uniqueBuffer,
       uniqueFileName,
       'pm_statement',
-      '2026-03'
     )
     const json = await res.json()
     if (res.status !== 200) {
