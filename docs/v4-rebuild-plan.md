@@ -350,18 +350,29 @@ Callouts for downstream PRs:
 
 ---
 
-#### PR 2 — Dashboard
+#### PR 2 — Dashboard ✅ Done
+**Status:** PR #20 merged to main.
 
-New `app/(app)/dashboard/page.tsx` replacing current file.
+Delivered:
+- `app/(app)/dashboard/page.tsx` fully rebuilt as a client component
+- **Prompts strip** — fetches `/api/ledger/summary` for current month; shows `Prompt` (action variant)
+  listing properties without a statement when `statementsReceived < propertyCount`; hidden when clean
+- **Portfolio metrics strip** — 5 `MetricTile` components from `/api/portfolio/summary` + `/api/ledger/summary`:
+  Total value, Total debt, Net equity, Portfolio LVR (with `LvrMeter`), Net cashflow
+- **Cashflow trend chart** — 12-month `ComposedChart` (Recharts directly; no shadcn chart wrapper);
+  stacked bars (rent above zero, expenses + mortgage below, two separate `stackId`s), net cashflow line;
+  bar clicks inert
 
-Layout (top to bottom):
-1. **Prompts strip** — "Needs your attention" — missing statements from `/api/ledger/summary` current month
-2. **Portfolio metrics** (5 `MetricTile`): Total value, Total debt, Net equity, LVR, Net cashflow —
-   data from `/api/portfolio/summary` + `/api/ledger/summary`
-3. **Cashflow trend chart** (12-month Recharts `ComposedChart`) — from `/api/reports/trends?months=12`;
-   bars inert
-
-Removed vs current: date range selector, entity filter, right panel.
+Deviations from plan:
+- **`portfolio.lvr` is a percentage** (e.g. 55.23) from the API response — passed to `LvrMeter` as `lvr / 100`.
+  Plan assumed decimal. No API change made.
+- **No `netEquityCents` field** in `/api/portfolio/summary` — net equity computed client-side as
+  `totalValueCents - totalDebtCents`.
+- **Net cashflow field** is `totals.netAfterMortgage` from ledger summary, not `netCents` (which lives
+  on `TrendPoint`, not `ReportTotals`).
+- **Entity/period chip-select controls** from page-head in design not implemented — no filter backend exists.
+- **Household context metrics strip** confirmed skipped (no income backend, out of scope).
+- **shadcn chart component** not installed — used Recharts directly (no `components/ui/chart.tsx`).
 
 ---
 
@@ -401,37 +412,35 @@ Submit: `POST /api/properties/[id]/loans` → optional balance → redirect to `
 
 ---
 
-#### PR 5a — Ingestion Domain (Backend)
+#### PR 5a — Ingestion Domain (Backend) ✅ Done
+**Status:** PR #22 merged to main.
 
-New schema table `document_staging_items`:
+Delivered:
+- **Migration** `drizzle/0012_ingestion_staging.sql` — new `document_staging_items` table with RLS policy;
+  CHECK constraints on `confidence` (`high|medium|low`) and `status` (`pending|approved|rejected`);
+  UNIQUE index on `(source_document_id, line_item_index)`
+- **`db/schema.ts`** — `documentStagingItems` Drizzle table definition; FK to `source_documents` uses
+  explicit short name `dsi_source_doc_fk` to stay under Postgres's 63-char limit
+- **`lib/ingestion/`** domain module: `repositories/staging.ts` (insert bulk, list by userId/status,
+  patch item), `repositories/documents.ts` (getDocumentsByUser), `services/ingestion.ts`
+  (`stageExtractionResult`, `commitStagedItems`), `index.ts`
+- **`POST /api/extract`** modified — calls `stageExtractionResult()` after extraction; response changed
+  to `{ sourceDocumentId, stagedCount }` (was full extraction result in memory)
+- **`GET /api/ingestion/staged`** — pending items grouped by `sourceDocumentId` with document filename
+- **`PATCH /api/ingestion/staged/[id]`** — patch `propertyId`, `category`, `description`, `status`
+- **`POST /api/ingestion/commit`** — commits approved items to `property_ledger`; items without a
+  resolved `propertyId` are filtered out (not an error — they require review before commit)
+- **`POST /api/statements` deleted** — replaced by ingestion routes
+- Unit tests for all new lib/ingestion functions and routes
 
-```
-id, user_id, source_document_id FK→source_documents ON DELETE CASCADE,
-line_item_index, line_item_date, amount_cents, category (LedgerCategory),
-description, confidence, property_id FK nullable, installment_loan_id FK nullable,
-status (pending|approved|rejected), created_at, updated_at
-UNIQUE (source_document_id, line_item_index)
-```
-
-New `lib/ingestion/` module:
-- `repositories/staging.ts` — insert, list pending by userId, patch item
-- `repositories/documents.ts` — source_documents queries (moved from inline routes)
-- `services/ingestion.ts` — `stageExtractionResult()`, `commitStagedItems()`
-- `index.ts` — public API
-
-Route changes:
-- `POST /api/extract` — persists staged items via `stageExtractionResult()` instead of
-  returning in-memory result. Response: `{ sourceDocumentId, stagedCount }`.
-- New `GET /api/ingestion/staged` — pending items grouped by sourceDocumentId
-- New `PATCH /api/ingestion/staged/[id]` — edit propertyId, category, description, status
-- New `POST /api/ingestion/commit` — commits approved items to `property_ledger`
-- **Delete `POST /api/statements`** — replaced by `POST /api/ingestion/commit` (PDF path)
-  and `POST /api/properties/[id]/loan-payments` (manual loan payments, already exists)
-
-`document_source_mappings` (auto-classification routing memory) — deferred post-rebuild.
-
-Tests: unit tests for all lib/ingestion functions; route tests; integration test for
-upload → stage → commit end-to-end.
+Deviations and callouts:
+- **CI lint fix required after merge** — unused `makeGetRequest` test helper renamed to `_makeGetRequest`;
+  unused `result` variable renamed; non-null assertion in staged route replaced with optional chaining;
+  `item.propertyId!` in service replaced with type-predicate filter (also semantically correct —
+  staging items without a resolved property should not be committed)
+- **`app/(app)/upload/page.tsx` still calls `POST /api/statements`** — that route no longer exists.
+  The upload page will be replaced wholesale in PR 5b, which is the correct fix point.
+- `document_source_mappings` (auto-classification routing memory) — deferred post-rebuild.
 
 ---
 
@@ -457,12 +466,37 @@ Review state (from `GET /api/ingestion/staged`):
 
 ---
 
-#### PR 6 — Entities
+#### PR 6 — Entities ✅ Done
+**Status:** PR #21 merged to main.
 
-New `app/(app)/entities/page.tsx`.
+Delivered:
+- `app/(app)/entities/page.tsx` rebuilt as a client component (541 lines)
+- **Entity cards** — name (click to rename), type + created date meta, 3-column stats grid,
+  status badge, kebab `DropdownMenu`
+- **Inline rename state** — text input pre-filled with current name, Cancel / Save buttons,
+  property-count impact warning text
+- **Delete confirmation** — inline panel; calls `DELETE /api/entities/{id}`; 409 response
+  surfaced as inline error text
+- **Kebab menu** — Rename, Archive (toast), Delete (disabled with explanation when entity has properties)
+- **Add entity inline form** — name + type select, `POST /api/entities`, adds to list on success
+- **Safety footer** — two paragraphs as per design
 
-Entity cards (name, type, properties count, loans count, created date), inline rename,
-delete with confirmation (409 if linked), archived collapsible section.
+API gaps and deviations:
+- **No `archivedAt` column or archive route** — archived section omitted; Archive kebab item shows
+  toast "Archive not yet available". Needs schema column + PATCH route to wire up.
+- **No ABN/ACN fields in schema** — meta row simplified to `{type} · Created {month year}` only.
+- **`GET /api/entities` returns no stats** (loan count, loan balance, last activity) — loans column
+  shows "—", last activity shows "never". Property count fetched via separate `/api/properties` call.
+- **No `GET /api/loans` route** — delete-disabled check gates on property count only.
+- **"Edit details (ABN, type)" kebab item omitted** — `PATCH /api/entities/{id}` only accepts `name`.
+
+Callouts for future:
+- Archive support: add `deletedAt` or `archivedAt` to `entities` schema + PATCH route, then wire
+  the archived collapsible section.
+- Entity stats (loan count, balance, last activity) could be added to `GET /api/entities` response.
+- Legacy badge variants (`green/orange/grey/blue/outline`) in `badge.tsx` were retained for entities
+  in PR 1. Entities is now rebuilt — these variants are only used by the upload page (PR 5b/5c).
+  Clean them up when upload is replaced.
 
 ---
 
@@ -526,11 +560,11 @@ With the backend stable and UI on the new design system, new feature work resume
 | 2 | Borrowings backend (+ move manual loan-payments) | ✅ Done | 1 |
 | 3 | Reporting backend (delete `portfolio_reports`, monthly reports, AI commentary) | ✅ Done | 1 |
 | Frontend PR 1 | Design foundation (shell, shared components, shadcn primitives) | ✅ Done | 1 |
-| Frontend PR 2 | Dashboard | | 1 |
+| Frontend PR 2 | Dashboard | ✅ Done | 1 |
 | Frontend PR 3 | Properties pages (list + add + tabbed detail) | | 1 |
 | Frontend PR 4 | Loans pages (list + add + detail) | | 1 |
-| Frontend PR 5a | Ingestion domain backend + delete `POST /api/statements` | | 1 |
+| Frontend PR 5a | Ingestion domain backend + delete `POST /api/statements` | ✅ Done | 1 |
 | Frontend PR 5b | Upload idle state | | 1 |
 | Frontend PR 5c | Upload review state | | 1 |
-| Frontend PR 6 | Entities | | 1 |
-| **Total remaining** | | | **~8** |
+| Frontend PR 6 | Entities | ✅ Done | 1 |
+| **Total remaining** | | | **~4** |
