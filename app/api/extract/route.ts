@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { sourceDocuments } from '@/db/schema'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { extractTextFromPdf, extractStatementData } from '@/lib/extraction/parse'
+import { stageExtractionResult } from '@/lib/ingestion'
 import { logger } from '@/lib/logger'
 import { captureError } from '@/lib/api-error'
 
@@ -141,5 +142,18 @@ export async function POST(request: Request) {
     )
   }
 
-  return NextResponse.json({ sourceDocumentId, result })
+  let stagedCount: number
+  try {
+    const staged = await stageExtractionResult(user.id, sourceDocumentId, result)
+    stagedCount = staged.stagedCount
+  } catch (err) {
+    captureError(err, { route: 'POST /api/extract', phase: 'staging' })
+    const message = err instanceof Error ? err.message : String(err)
+    return NextResponse.json(
+      { error: 'Staging failed', detail: message },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json({ sourceDocumentId, stagedCount })
 }

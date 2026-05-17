@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
   mockCountSelect: vi.fn(),
   mockExtractTextFromPdf: vi.fn(),
   mockExtractStatementData: vi.fn(),
-  mockInsert: vi.fn(),
+  mockStageExtractionResult: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -63,8 +63,11 @@ vi.mock('@/lib/db', () => ({
         })),
       }),
     }),
-    insert: mocks.mockInsert,
   },
+}))
+
+vi.mock('@/lib/ingestion', () => ({
+  stageExtractionResult: (...args: unknown[]) => mocks.mockStageExtractionResult(...args),
 }))
 
 vi.mock('@/lib/extraction/parse', () => ({
@@ -86,6 +89,7 @@ describe('POST /api/extract', () => {
     })
     mocks.mockExtractTextFromPdf.mockResolvedValue('Extracted PDF text content here.')
     mocks.mockExtractStatementData.mockResolvedValue(sampleResult)
+    mocks.mockStageExtractionResult.mockResolvedValue({ stagedCount: 1 })
   })
 
   it('rejects unauthenticated requests (401)', async () => {
@@ -189,7 +193,8 @@ describe('POST /api/extract', () => {
     expect(res.status).toBe(500)
   })
 
-  it('returns structured result on success', async () => {
+  it('returns sourceDocumentId and stagedCount on success', async () => {
+    mocks.mockStageExtractionResult.mockResolvedValue({ stagedCount: 1 })
     const res = await POST(
       new Request('http://localhost/api/extract', {
         method: 'POST',
@@ -203,13 +208,11 @@ describe('POST /api/extract', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.sourceDocumentId).toBe(docRow.id)
-    expect(json.result).toEqual(sampleResult)
-    expect(json.result.propertyAddress).toBe(sampleResult.propertyAddress)
-    expect(json.result.lineItems).toHaveLength(1)
-    expect(json.result.lineItems[0].amountCents).toBe(400000)
+    expect(json.stagedCount).toBe(1)
+    expect(json.result).toBeUndefined()
   })
 
-  it('does not write to DB (no insert calls)', async () => {
+  it('calls stageExtractionResult with correct args', async () => {
     await POST(
       new Request('http://localhost/api/extract', {
         method: 'POST',
@@ -220,7 +223,28 @@ describe('POST /api/extract', () => {
         }),
       })
     )
-    expect(mocks.mockInsert).not.toHaveBeenCalled()
+    expect(mocks.mockStageExtractionResult).toHaveBeenCalledWith(
+      'user-123',
+      docRow.id,
+      sampleResult,
+    )
+  })
+
+  it('returns 500 when staging fails', async () => {
+    mocks.mockStageExtractionResult.mockRejectedValue(new Error('DB insert failed'))
+    const res = await POST(
+      new Request('http://localhost/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceDocumentId: docRow.id,
+          assignedMonth: '2026-03',
+        }),
+      })
+    )
+    expect(res.status).toBe(500)
+    const json = await res.json()
+    expect(json.error).toMatch(/staging failed/i)
   })
 
   it('returns 429 when upload count is at the daily limit (count >= 20)', async () => {
