@@ -1,6 +1,6 @@
 import {
   pgTable, text, integer, timestamp,
-  date, pgEnum, varchar, uuid, unique, index,
+  date, pgEnum, varchar, uuid, unique, index, foreignKey,
 } from 'drizzle-orm/pg-core'
 
 export const entityTypeEnum = pgEnum('entity_type', [
@@ -132,6 +132,41 @@ export const installmentLoanBalances = pgTable('installment_loan_balances', {
   index('idx_installment_loan_balances_loan_date').on(t.installmentLoanId, t.recordedAt),
 ])
 
+export const documentStagingItems = pgTable('document_staging_items', {
+  id:                uuid('id').primaryKey().defaultRandom(),
+  userId:            uuid('user_id').notNull(),
+  sourceDocumentId:  uuid('source_document_id').notNull(),
+  lineItemIndex:     integer('line_item_index').notNull(),
+  lineItemDate:      date('line_item_date').notNull(),
+  amountCents:       integer('amount_cents').notNull(),
+  category:          ledgerCategoryEnum('category').notNull(),
+  description:       text('description').notNull(),
+  confidence:        text('confidence').notNull(),
+  propertyId:        uuid('property_id'),
+  installmentLoanId: uuid('installment_loan_id'),
+  status:            text('status').notNull().default('pending'),
+  createdAt:         timestamp('created_at').defaultNow().notNull(),
+  updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+                       .$onUpdate(() => new Date()),
+}, (t) => [
+  unique().on(t.sourceDocumentId, t.lineItemIndex),
+  foreignKey({
+    name: 'dsi_source_doc_fk',
+    columns: [t.sourceDocumentId],
+    foreignColumns: [sourceDocuments.id],
+  }).onDelete('cascade'),
+  foreignKey({
+    name: 'dsi_property_fk',
+    columns: [t.propertyId],
+    foreignColumns: [properties.id],
+  }).onDelete('set null'),
+  foreignKey({
+    name: 'dsi_installment_loan_fk',
+    columns: [t.installmentLoanId],
+    foreignColumns: [installmentLoans.id],
+  }).onDelete('set null'),
+])
+
 export type Property               = typeof properties.$inferSelect
 export type SourceDocument         = typeof sourceDocuments.$inferSelect
 export type InstallmentLoan        = typeof installmentLoans.$inferSelect
@@ -141,6 +176,9 @@ export type PropertyValuation      = typeof propertyValuations.$inferSelect
 export type InstallmentLoanBalance = typeof installmentLoanBalances.$inferSelect
 export type Entity                 = typeof entities.$inferSelect
 export type EntityType             = typeof entityTypeEnum.enumValues[number]
+
+export type DocumentStagingItem    = typeof documentStagingItems.$inferSelect
+export type NewDocumentStagingItem = typeof documentStagingItems.$inferInsert
 
 // Backward-compatible aliases — used by frontend pages pending the Frontend rebuild phase
 export type LoanBalance = InstallmentLoanBalance
