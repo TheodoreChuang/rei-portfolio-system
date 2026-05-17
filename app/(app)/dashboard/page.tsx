@@ -1,413 +1,290 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Suspense } from 'react'
-import Link from 'next/link'
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis,
-  CartesianGrid,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  ReferenceLine,
 } from 'recharts'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
-import { ChartTooltip } from '@/components/ui/chart'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import type { ChartConfig } from '@/components/ui/chart'
-import { formatCents, formatMonth } from '@/lib/format'
-import { currentFY, prevFY } from '@/lib/date-ranges'
+import { MetricTile } from '@/components/ui/metric-tile'
+import { LvrMeter } from '@/components/ui/lvr-meter'
+import { Prompt } from '@/components/ui/prompt'
+import { SectionLabel } from '@/components/ui/section-label'
+import { lastDayOfMonth } from '@/lib/format'
 import type { ReportTotals } from '@/lib/reporting'
 import type { TrendPoint } from '@/app/api/reports/trends/route'
 import type { PortfolioLVR } from '@/app/api/portfolio/summary/route'
-import type { Entity } from '@/db/schema'
-import { cn } from '@/lib/utils'
 
-type DateRangeOption = 'last12' | 'current_fy' | 'prev_fy' | 'custom'
-type DateRange = { from: string; to: string; label: string }
+// ---------- helpers ----------
 
-const chartConfig = {
-  rent:   { label: 'Rent',     color: '#2d5a3d' },
-  costs:  { label: 'Costs',    color: '#c4622d' },
-  net:    { label: 'Net',      color: '#1a1a1a' },
+function currentMonthStr(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+function formatMoney(cents: number): string {
+  const abs = Math.abs(cents)
+  const sign = cents < 0 ? '−' : ''
+  if (abs >= 1_000_000) {
+    return `${sign}$${(abs / 100_000_000).toFixed(2)}m`
+  }
+  if (abs >= 100_000) {
+    // e.g. 930_000_00 cents = $930k
+    return `${sign}$${Math.round(abs / 100_000)}k`
+  }
+  // plain thousands with comma
+  return `${sign}$${(abs / 100).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
+
+function formatMillions(cents: number): string {
+  const abs = Math.abs(cents)
+  const sign = cents < 0 ? '−' : ''
+  if (abs >= 1_000_000_00) {
+    return `${sign}$${(abs / 100_000_000).toFixed(2)}m`
+  }
+  return `${sign}$${Math.round(abs / 100_000)}k`
+}
+
+// ---------- types ----------
+
+type LedgerSummaryResponse = {
+  totals: ReportTotals
+  flags: {
+    missingStatements: string[]
+    missingMortgages: unknown[]
+  }
+}
+
+// ---------- chart config ----------
+
+const cashflowChartConfig = {
+  rent:     { label: 'Rent',             color: 'hsl(152 38% 30% / 0.55)' },
+  expenses: { label: 'Expenses',         color: 'hsl(14 58% 42% / 0.5)' },
+  mortgage: { label: 'Loan repayments',  color: 'hsl(32 6% 38% / 0.45)' },
+  net:      { label: 'Net',              color: 'hsl(188 32% 32%)' },
 } satisfies ChartConfig
 
 type ChartPoint = {
   label: string
   month: string
-  rent: number
-  costs: number
-  net: number
-  hasData: boolean
+  rent: number | null
+  expenses: number | null
+  mortgage: number | null
+  net: number | null
 }
 
-function lastDayOfMonth(yyyyMM: string): string {
-  const [year, mon] = yyyyMM.split('-').map(Number)
-  return new Date(year, mon, 0).toISOString().slice(0, 10)
-}
-
-function getActiveRange(option: DateRangeOption, customFrom: string, customTo: string): DateRange {
-  if (option === 'current_fy') return currentFY()
-  if (option === 'prev_fy') return prevFY()
-  if (option === 'custom') {
-    const from = customFrom
-    const to = customFrom > customTo ? customFrom : customTo
-    return {
-      from: `${from}-01`,
-      to: lastDayOfMonth(to),
-      label: from === to ? formatMonth(from) : `${formatMonth(from)} – ${formatMonth(to)}`,
-    }
-  }
-  // last12
-  const now = new Date()
-  const toMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const fromDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-  const fromMonth = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}`
-  return {
-    from: `${fromMonth}-01`,
-    to: lastDayOfMonth(toMonth),
-    label: 'Last 12 months',
-  }
-}
-
-function isSingleMonth(from: string, to: string): boolean {
-  return from.slice(0, 7) === to.slice(0, 7)
-}
-
-function DateRangeSelector({ option, onOptionChange, customFrom, customTo, onCustomFromChange, onCustomToChange }: {
-  option: DateRangeOption
-  onOptionChange: (opt: DateRangeOption) => void
-  customFrom: string
-  customTo: string
-  onCustomFromChange: (v: string) => void
-  onCustomToChange: (v: string) => void
-}) {
-  const buttons: { key: DateRangeOption; label: string }[] = [
-    { key: 'last12', label: 'Last 12m' },
-    { key: 'current_fy', label: 'Current FY' },
-    { key: 'prev_fy', label: 'Previous FY' },
-    { key: 'custom', label: 'Custom ▾' },
-  ]
-
-  return (
-    <div className="bg-white border-b border-border px-6 py-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        {buttons.map(btn => (
-          <button key={btn.key} onClick={() => onOptionChange(btn.key)}
-            className={cn('px-3 py-1 text-xs font-mono rounded border transition-colors',
-              option === btn.key
-                ? 'bg-ink text-white border-ink'
-                : 'border-border text-muted bg-white hover:bg-screen-bg'
-            )}>
-            {btn.label}
-          </button>
-        ))}
-      </div>
-      {option === 'custom' && (
-        <div className="flex items-center gap-3 mt-2 text-xs font-mono text-muted">
-          <span>From</span>
-          <input type="month" value={customFrom} onChange={e => onCustomFromChange(e.target.value)}
-            className="border border-border rounded px-2 py-1 text-xs font-mono text-ink" />
-          <span>To</span>
-          <input type="month" value={customTo} min={customFrom} onChange={e => onCustomToChange(e.target.value)}
-            className="border border-border rounded px-2 py-1 text-xs font-mono text-ink" />
-        </div>
-      )}
-    </div>
-  )
-}
-
-function TrendsSection({ trends }: { trends: TrendPoint[] }) {
-  const data: ChartPoint[] = trends.map(t => ({
-    label: t.month.slice(5),
-    month: t.month,
-    rent: t.rentCents / 100,
-    costs: -((t.expensesCents + t.mortgageCents) / 100),
-    net: t.netCents / 100,
-    hasData: t.hasData,
-  }))
-
-  // Use last 2 months for expense ratio comparison
-  const current = trends.length >= 1 ? trends[trends.length - 1] : null
-  const prior = trends.length >= 2 ? trends[trends.length - 2] : null
-
-  const currentRatio = current?.rentCents && current.expensesCents
-    ? (current.expensesCents / current.rentCents) * 100
-    : null
-  const priorRatio = prior?.rentCents && prior.expensesCents
-    ? (prior.expensesCents / prior.rentCents) * 100
-    : null
-
-  const showRatio = currentRatio !== null && priorRatio !== null
-  const ratioDiff = showRatio && currentRatio !== null && priorRatio !== null ? currentRatio - priorRatio : null
-  const ratioUp = ratioDiff !== null && ratioDiff > 0
-  const currentRatioSafe = showRatio && currentRatio !== null ? currentRatio : 0
-  const ratioDiffSafe = ratioDiff ?? 0
-
-  const dollarFormatter = (v: number) =>
-    v === 0 ? '$0' : `${v < 0 ? '-' : ''}$${Math.abs(v / 1).toLocaleString('en-AU', { maximumFractionDigits: 0 })}`
-
-  return (
-    <div className="px-5 pb-5">
-      <div className="border border-border rounded-lg bg-white">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <p className="text-[10px] font-mono uppercase tracking-wider text-muted">12-month trend</p>
-          {showRatio && (
-            <div className="flex items-center gap-1.5 text-[11px] font-mono">
-              <span className="text-muted">Expense ratio</span>
-              <span className={cn('font-semibold', ratioUp ? 'text-warn' : 'text-accent')}>
-                {currentRatioSafe.toFixed(1)}%
-              </span>
-              <span className={cn('text-[10px]', ratioUp ? 'text-warn' : 'text-accent')}>
-                {ratioUp ? '↑' : '↓'}{Math.abs(ratioDiffSafe).toFixed(1)}pp
-              </span>
-            </div>
-          )}
-        </div>
-
-        <ChartContainer config={chartConfig} className="min-h-[220px] w-full px-2 pt-3 pb-1">
-          <ComposedChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-            <CartesianGrid vertical={false} stroke="#ddd9cf" strokeDasharray="3 3" />
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: 10, fontFamily: 'var(--font-mono)', fill: '#7a7670' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tickFormatter={dollarFormatter}
-              tick={{ fontSize: 10, fontFamily: 'var(--font-mono)', fill: '#7a7670' }}
-              axisLine={false}
-              tickLine={false}
-              width={56}
-            />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  formatter={(value, name) => [
-                    `$${Math.abs(Number(value)).toLocaleString('en-AU', { maximumFractionDigits: 0 })}`,
-                    name === 'costs' ? 'Costs' : name === 'rent' ? 'Rent' : 'Net',
-                  ]}
-                />
-              }
-            />
-
-            <Bar dataKey="rent" stackId="a" fill={chartConfig.rent.color} radius={[2, 2, 0, 0]} maxBarSize={32} />
-            <Bar dataKey="costs" stackId="b" fill={chartConfig.costs.color} radius={[0, 0, 2, 2]} maxBarSize={32} />
-
-            <Line
-              dataKey="net"
-              stroke={chartConfig.net.color}
-              strokeWidth={1.5}
-              dot={{ r: 2, fill: '#1a1a1a' }}
-              connectNulls={false}
-            />
-          </ComposedChart>
-        </ChartContainer>
-
-        <div className="px-4 py-2 border-t border-ruled flex items-center gap-4 text-[10px] font-mono text-muted">
-          <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-accent opacity-60" />Rent</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-warn opacity-60" />Costs</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-6 h-px bg-ink" />Net</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function DashboardContent() {
-  const router = useRouter()
-
-  const now = new Date()
-  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-
-  const [totals, setTotals] = useState<ReportTotals | null>(null)
-  const [loadingTotals, setLoadingTotals] = useState(true)
-  const [trends, setTrends] = useState<TrendPoint[]>([])
-  const [portfolio, setPortfolio] = useState<PortfolioLVR | null>(null)
-  const [rangeOption, setRangeOption] = useState<DateRangeOption>('last12')
-  const [customFrom, setCustomFrom] = useState(currentMonthStr)
-  const [customTo, setCustomTo] = useState(currentMonthStr)
-  const [entities, setEntities] = useState<Entity[]>([])
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
-
-  const activeRange = getActiveRange(rangeOption, customFrom, customTo)
-  const singleMonth = isSingleMonth(activeRange.from, activeRange.to)
-
-  // Fetch entities + trends once on mount
-  useEffect(() => {
-    fetch('/api/entities')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setEntities(data.entities ?? []) })
-      .catch(() => {})
-    fetch('/api/reports/trends?months=12')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setTrends(data.trends ?? []) })
-      .catch(() => {})
-  }, [])
-
-  // Fetch portfolio summary when entity filter changes
-  useEffect(() => {
-    const url = selectedEntityId
-      ? `/api/portfolio/summary?entityId=${selectedEntityId}`
-      : '/api/portfolio/summary'
-    fetch(url)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setPortfolio(data.portfolio ?? null) })
-      .catch(() => {})
-  }, [selectedEntityId])
-
-  // Fetch live totals when active range or entity filter changes
-  useEffect(() => {
-    setTotals(null)
-    setLoadingTotals(true)
-    const entityParam = selectedEntityId ? `&entityId=${selectedEntityId}` : ''
-    fetch(`/api/ledger/summary?from=${activeRange.from}&to=${activeRange.to}${entityParam}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setTotals(data.totals) })
-      .catch(() => {})
-      .finally(() => setLoadingTotals(false))
-  }, [activeRange.from, activeRange.to, selectedEntityId])
-
-  const hasTotals = totals !== null && totals.propertyCount > 0
-
-  return (
-    <div className="min-h-screen bg-screen-bg">
-      {/* Date range selector */}
-      <DateRangeSelector
-        option={rangeOption}
-        onOptionChange={setRangeOption}
-        customFrom={customFrom}
-        customTo={customTo}
-        onCustomFromChange={setCustomFrom}
-        onCustomToChange={setCustomTo}
-      />
-
-      {/* Entity filter — only shown when user has multiple entities */}
-      {entities.length > 1 && (
-        <div className="bg-white border-b border-border px-6 py-2 flex items-center gap-2">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-muted">Entity</span>
-          <select
-            value={selectedEntityId ?? ''}
-            onChange={e => setSelectedEntityId(e.target.value || null)}
-            className="border border-border rounded px-2 py-1 text-xs font-mono text-ink bg-white"
-          >
-            <option value="">All entities</option>
-            {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
-        </div>
-      )}
-
-      {loadingTotals ? (
-        <div className="flex items-center justify-center py-24 text-sm text-muted">Loading…</div>
-      ) : !hasTotals ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center px-4">
-          <div className="text-4xl mb-4">📊</div>
-          <h2 className="text-lg font-semibold mb-2">
-            No data for {activeRange.label}
-          </h2>
-          <p className="text-sm text-muted mb-6 max-w-xs">Upload your PM statements and generate a report for this month.</p>
-          <Button onClick={() => router.push('/upload')}>Upload statements →</Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px]">
-          <div className="border-r border-border">
-            {/* KPI strip */}
-            <div className="grid grid-cols-2 md:grid-cols-4 border-b border-border">
-              {[
-                { label: 'Total rent',    value: formatCents(totals.totalRent),       sub: singleMonth ? `${totals.statementsReceived} of ${totals.propertyCount} statements` : activeRange.label },
-                { label: 'Expenses',      value: formatCents(totals.totalExpenses),    sub: singleMonth ? `across ${totals.statementsReceived} properties` : activeRange.label },
-                { label: 'Mortgage',      value: formatCents(totals.totalMortgage),    sub: singleMonth ? `${totals.mortgagesProvided} of ${totals.propertyCount} provided` : activeRange.label },
-                { label: 'Net cash flow', value: formatCents(totals.netAfterMortgage), sub: 'after mortgage', positive: totals.netAfterMortgage >= 0 },
-              ].map((kpi, i) => (
-                <div key={i} className="bg-white p-5 border-r border-border last:border-r-0">
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted mb-1.5">{kpi.label}</p>
-                  <p className={cn('font-serif text-2xl', kpi.positive ? 'text-accent' : 'text-ink')}>{kpi.value}</p>
-                  <p className="text-[11px] text-muted mt-1">{kpi.sub}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Portfolio LVR — only when at least one valuation AND one balance exist */}
-            {portfolio && portfolio.propertiesValued > 0 && portfolio.loansWithBalance > 0 && (
-              <div className="mx-5 mt-4">
-                <Card>
-                  <CardContent className="py-3 px-5 flex items-center gap-6 flex-wrap">
-                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted">Portfolio</p>
-                    <div>
-                      <span className="text-sm font-serif">{formatCents(portfolio.totalValueCents)}</span>
-                      <span className="text-[11px] text-muted ml-1">({portfolio.propertiesValued} of {portfolio.propertiesTotal} valued)</span>
-                    </div>
-                    <div>
-                      <span className="text-sm font-serif">{formatCents(portfolio.totalDebtCents)}</span>
-                      <span className="text-[11px] text-muted ml-1">({portfolio.loansWithBalance} of {portfolio.activeLoansTotal} loans)</span>
-                    </div>
-                    {portfolio.lvr !== null && (
-                      <div>
-                        <span className={cn('text-sm font-semibold', portfolio.lvr >= 80 ? 'text-warn' : 'text-accent')}>
-                          LVR: {portfolio.lvr.toFixed(1)}%
-                        </span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* Incomplete warning — only for single-month views */}
-            {singleMonth && totals.statementsReceived < totals.propertyCount && (
-              <div className="mx-5 mt-4 border border-warn/40 rounded-lg p-3 bg-warn-light flex gap-3 text-xs text-[#7a3a1a] leading-relaxed">
-                <span className="text-base flex-shrink-0">⚠️</span>
-                <div>
-                  <strong>Incomplete data — {totals.propertyCount - totals.statementsReceived} statement{totals.propertyCount - totals.statementsReceived > 1 ? 's' : ''} missing.</strong>{' '}
-                  {totals.properties.filter(p => !p.hasStatement).map(p => p.address).join(', ')} has no statement for {activeRange.label}. Rent shown as $0.
-                </div>
-              </div>
-            )}
-
-            {/* Trends chart */}
-            {trends.length >= 1 && (
-              <TrendsSection trends={trends} />
-            )}
-          </div>
-
-          {/* Right panel */}
-          <div className="bg-white">
-            <div className="p-4 border-b border-border space-y-2">
-              <Link href="/upload" className="block">
-                <Button variant="outline" className="w-full" size="sm">↻ Upload statements</Button>
-              </Link>
-            </div>
-            {singleMonth && [
-              { title: 'Statements', rows: [
-                { label: 'Expected', value: String(totals.propertyCount) },
-                { label: 'Received', value: String(totals.statementsReceived) },
-                { label: 'Missing',  value: String(totals.propertyCount - totals.statementsReceived), warn: totals.statementsReceived < totals.propertyCount },
-              ]},
-              { title: 'Mortgages', rows: [
-                { label: 'Entered this month', value: `${totals.mortgagesProvided} of ${totals.propertyCount}` },
-                { label: 'Not entered', value: String(totals.propertyCount - totals.mortgagesProvided), warn: totals.mortgagesProvided < totals.propertyCount },
-              ]},
-            ].map(block => (
-              <div key={block.title} className="px-4 py-4 border-b border-border">
-                <p className="text-[10px] font-mono uppercase tracking-widest text-muted mb-2">{block.title}</p>
-                {block.rows.map(row => (
-                  <div key={row.label} className="flex justify-between items-center py-1.5 border-b border-ruled last:border-b-0 text-xs">
-                    <span className="text-muted">{row.label}</span>
-                    <span className={cn('font-mono font-semibold', row.warn && 'text-warn')}>{row.value}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+// ---------- page ----------
 
 export default function DashboardPage() {
+  const [portfolio, setPortfolio] = useState<PortfolioLVR | null>(null)
+  const [ledger, setLedger] = useState<LedgerSummaryResponse | null>(null)
+  const [trends, setTrends] = useState<TrendPoint[] | null>(null)
+
+  useEffect(() => {
+    void fetch('/api/portfolio/summary')
+      .then(r => r.json())
+      .then((data: { portfolio: PortfolioLVR }) => setPortfolio(data.portfolio))
+      .catch(() => null)
+  }, [])
+
+  useEffect(() => {
+    const month = currentMonthStr()
+    const from = `${month}-01`
+    const to = lastDayOfMonth(month)
+    void fetch(`/api/ledger/summary?from=${from}&to=${to}`)
+      .then(r => r.json())
+      .then((data: LedgerSummaryResponse) => setLedger(data))
+      .catch(() => null)
+  }, [])
+
+  useEffect(() => {
+    void fetch('/api/reports/trends?months=12')
+      .then(r => r.json())
+      .then((data: { trends: TrendPoint[] }) => setTrends(data.trends))
+      .catch(() => null)
+  }, [])
+
+  // --- derived values ---
+
+  const totalValueCents = portfolio?.totalValueCents ?? 0
+  const totalDebtCents = portfolio?.totalDebtCents ?? 0
+  const netEquityCents = totalValueCents - totalDebtCents
+  const lvrPct = portfolio?.lvr ?? null
+  const netCashflow = ledger?.totals.netAfterMortgage ?? null
+
+  const missingProperties = ledger
+    ? ledger.totals.properties.filter(p => !p.hasStatement)
+    : []
+
+  const chartData: ChartPoint[] = (trends ?? []).map(pt => ({
+    label: pt.month.slice(5), // 'YYYY-MM' → 'MM'
+    month: pt.month,
+    rent:     pt.hasData ? pt.rentCents / 100 : null,
+    expenses: pt.hasData ? -(pt.expensesCents / 100) : null,
+    mortgage: pt.hasData ? -(pt.mortgageCents / 100) : null,
+    net:      pt.hasData ? pt.netCents / 100 : null,
+  }))
+
+  const monthLabel = (() => {
+    const now = new Date()
+    return now.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })
+  })()
+
   return (
-    <Suspense fallback={<div className="min-h-screen bg-screen-bg" />}>
-      <DashboardContent />
-    </Suspense>
+    <div className="space-y-8">
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">Portfolio</h1>
+
+      {/* Prompts strip — statement completeness only */}
+      {missingProperties.length > 0 && (
+        <div>
+          <SectionLabel>Needs your attention</SectionLabel>
+          <Prompt
+            tone="action"
+            severity="Action needed"
+            message={
+              <>
+                Statements not yet received for:{' '}
+                {missingProperties.map(p => p.nickname ?? p.address).join(', ')}
+              </>
+            }
+          />
+        </div>
+      )}
+
+      {/* Portfolio metrics */}
+      <div>
+        <SectionLabel>Portfolio position · {monthLabel}</SectionLabel>
+        <div className="grid grid-cols-5 gap-4">
+          <MetricTile
+            label="Total value"
+            value={formatMillions(totalValueCents)}
+          />
+          <MetricTile
+            label="Total debt"
+            value={formatMillions(totalDebtCents)}
+          />
+          <MetricTile
+            label="Net equity"
+            value={formatMillions(netEquityCents)}
+          />
+          <MetricTile
+            label="Portfolio LVR"
+            value={lvrPct !== null ? `${lvrPct}%` : '—'}
+            foot={
+              lvrPct !== null ? (
+                <LvrMeter value={lvrPct / 100} className="w-full" />
+              ) : undefined
+            }
+          />
+          <MetricTile
+            label="Net cashflow · monthly"
+            value={netCashflow !== null ? formatMoney(netCashflow) : '—'}
+            valueClassName={netCashflow !== null && netCashflow < 0 ? 'text-negative' : undefined}
+          />
+        </div>
+      </div>
+
+      {/* Cashflow trend chart */}
+      <div>
+        <SectionLabel>Cashflow trend · last 12 months</SectionLabel>
+        <div className="bg-surface border border-border rounded-[7px] p-5">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-ink">Monthly cashflow composition</span>
+            <div className="flex items-center gap-4 text-xs text-muted">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-sm"
+                  style={{ background: 'hsl(152 38% 30% / 0.55)' }}
+                />
+                Rent
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-sm"
+                  style={{ background: 'hsl(14 58% 42% / 0.5)' }}
+                />
+                Expenses
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-sm"
+                  style={{ background: 'hsl(32 6% 38% / 0.45)' }}
+                />
+                Loan repayments
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block w-2.5 h-0.5 rounded-sm"
+                  style={{ background: 'hsl(188 32% 32%)' }}
+                />
+                Net
+              </span>
+            </div>
+          </div>
+          <ChartContainer config={cashflowChartConfig} className="h-[220px] w-full">
+            <ComposedChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: 'hsl(34 5% 56%)' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: 'hsl(34 5% 56%)' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={v => {
+                  const abs = Math.abs(v as number)
+                  if (abs >= 1000) return `${(v as number) < 0 ? '−' : ''}$${abs / 1000}k`
+                  return `$${v}`
+                }}
+                width={48}
+              />
+              <ReferenceLine y={0} stroke="hsl(36 12% 86%)" strokeWidth={1} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              {/* Rent — positive stack */}
+              <Bar
+                dataKey="rent"
+                stackId="positive"
+                fill="hsl(152 38% 30% / 0.55)"
+                radius={[2, 2, 0, 0]}
+                isAnimationActive={false}
+              />
+              {/* Expenses — negative stack */}
+              <Bar
+                dataKey="expenses"
+                stackId="negative"
+                fill="hsl(14 58% 42% / 0.5)"
+                radius={[0, 0, 0, 0]}
+                isAnimationActive={false}
+              />
+              {/* Mortgage — stacked on expenses below zero */}
+              <Bar
+                dataKey="mortgage"
+                stackId="negative"
+                fill="hsl(32 6% 38% / 0.45)"
+                radius={[0, 0, 2, 2]}
+                isAnimationActive={false}
+              />
+              {/* Net cashflow line */}
+              <Line
+                dataKey="net"
+                stroke="hsl(188 32% 32%)"
+                strokeWidth={1.6}
+                dot={{ r: 2.2, fill: 'hsl(188 32% 32%)', strokeWidth: 0 }}
+                activeDot={{ r: 3 }}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            </ComposedChart>
+          </ChartContainer>
+        </div>
+      </div>
+    </div>
   )
 }
