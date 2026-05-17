@@ -229,8 +229,9 @@ export default function UploadPage() {
 
     // Client-side auto-match: exact then includes
     for (let i = 0; i < local.length; i++) {
-      if (!local[i].extractionResult) continue
-      const addr = local[i].extractionResult!.propertyAddress
+      const extractionResult = local[i].extractionResult
+      if (!extractionResult) continue
+      const addr = extractionResult.propertyAddress
       let matched = allProps.find(p => p.address.toLowerCase() === addr.toLowerCase())
       if (!matched) {
         matched = allProps.find(p => p.address.toLowerCase().includes(addr.toLowerCase()))
@@ -535,7 +536,7 @@ export default function UploadPage() {
                       <span className="text-lg flex-shrink-0">📄</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{f.name}</p>
-                        <p className="text-[11px] text-muted font-mono">{f.extractionResult!.propertyAddress}</p>
+                        <p className="text-[11px] text-muted font-mono">{f.extractionResult?.propertyAddress}</p>
                       </div>
                     </div>
                     <select

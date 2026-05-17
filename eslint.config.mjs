@@ -53,19 +53,10 @@ export default tseslint.config(
     },
   },
 
-  // Workstream 5 cleanup targets: complex TypeScript narrowing limitations
-  // These files use ! after runtime checks that TypeScript cannot statically narrow.
-  // Remove this override once the narrowing is fixed in cleanup.
-  {
-    files: ['app/api/statements/route.ts', 'app/(app)/upload/page.tsx'],
-    rules: {
-      '@typescript-eslint/no-non-null-assertion': 'warn',
-    },
-  },
-
   {
     ignores: [
       '.next/**',
+      '.claude/**',
       'node_modules/**',
       'drizzle/**',
       'playwright-report/**',

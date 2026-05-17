@@ -334,7 +334,7 @@ export default function PropertyDetailPage() {
         <MetricTile
           label="LVR"
           value={lvr !== null ? `${lvr}%` : '—'}
-          foot={lvr !== null ? <span className="text-xs text-muted">{formatCents(totalDebt)} / {formatCents(latestValuation!.valueCents)}</span> : undefined}
+          foot={lvr !== null && latestValuation ? <span className="text-xs text-muted">{formatCents(totalDebt)} / {formatCents(latestValuation.valueCents)}</span> : undefined}
           secondary
         />
       </div>
