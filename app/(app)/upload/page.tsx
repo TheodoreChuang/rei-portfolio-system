@@ -283,12 +283,23 @@ export default function UploadPage() {
           <p className="text-sm text-muted mt-0.5">Drop a statement. Folio classifies it and asks only when uncertain.</p>
         </div>
         {stagedSessions.length > 0 && (
-          <Button
-            size="sm"
-            onClick={() => setUploadState(uploadState === 'review' ? 'idle' : 'review')}
-          >
-            {uploadState === 'review' ? '← Back to upload' : `In review · ${stagedSessions.length} ${stagedSessions.length === 1 ? 'doc' : 'docs'}`}
-          </Button>
+          <div className="inline-flex items-center gap-0.5 p-0.5 bg-sunken border border-border rounded-lg">
+            <button
+              onClick={() => setUploadState('idle')}
+              className={`px-3 h-[26px] text-xs font-medium rounded-md transition-colors ${uploadState === 'idle' ? 'bg-surface shadow-sm text-ink' : 'text-muted hover:text-ink'}`}
+            >
+              Idle
+            </button>
+            <button
+              onClick={() => setUploadState('review')}
+              className={`px-3 h-[26px] text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${uploadState === 'review' ? 'bg-surface shadow-sm text-ink' : 'text-muted hover:text-ink'}`}
+            >
+              In review
+              <span className="px-1.5 py-px bg-warn text-white rounded-full text-[10px] font-semibold leading-none">
+                {stagedSessions.length}
+              </span>
+            </button>
+          </div>
         )}
       </div>
 
