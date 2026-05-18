@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Folio — property investment, finally legible</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<body class="public">
+
+  <!-- =================================================================
+       TOP NAV
+       ================================================================= -->
+  <nav class="public-nav" data-screen-label="Public nav">
+    <div class="inner">
+      <span class="wordmark">Folio<em>· beta</em></span>
+      <div class="links">
+        <a href="#how">How it works</a>
+        <a href="#principles">What it is</a>
+        <a href="#pricing">Pricing</a>
+        <a href="login.html" class="btn btn--ghost btn--sm">Sign in</a>
+        <a href="login.html" class="btn btn--primary btn--sm">Get early access</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- =================================================================
+       HERO
+       ================================================================= -->
+  <header class="public-container">
+    <section class="hero">
+      <div class="copy">
+        <span class="eyebrow">
+          <span class="dot"></span>
+          Private beta · Australia
+        </span>
+        <h1>
+          Property investment,<br/>
+          <em>finally legible.</em>
+        </h1>
+        <p class="lede">
+          A calm dashboard for the small landlord who already has three properties, four spreadsheets, and one
+          recurring suspicion that something has slipped through.
+        </p>
+        <div class="cta-row">
+          <a href="login.html" class="btn btn--primary btn--lg">Get early access</a>
+          <a href="#how" class="btn btn--ghost btn--lg">See how it works</a>
+        </div>
+        <div class="helper">
+          <span class="check">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,7 6,10 11,4"/></svg>
+          </span>
+          Free while in beta · No credit card · Read-only by default
+        </div>
+      </div>
+
+      <!-- Hero stage: real Folio primitives, mocked -->
+      <div class="hero-stage" aria-hidden="true">
+        <div class="stage-prompt">
+          <div class="head">
+            <span class="glyph">!</span>
+            <span class="severity">Action needed</span>
+          </div>
+          <p class="message">
+            No rent recorded for 14 Elm Street in April — the McGrath statement hasn't arrived.
+          </p>
+          <div class="context">
+            <span><span class="k">Expected</span>$3,810</span>
+            <span><span class="k">Last received</span>27 Mar</span>
+          </div>
+        </div>
+
+        <div class="stage-tiles">
+          <div class="stage-tile">
+            <div class="label">Total value</div>
+            <div class="value"><span class="unit">$</span>2.07<span class="unit">m</span></div>
+            <div class="foot">
+              <span style="color: hsl(var(--positive));">+1.4%</span>
+              <span>3 properties</span>
+            </div>
+          </div>
+          <div class="stage-tile">
+            <div class="label">Net cashflow · mo</div>
+            <div class="value is-negative">−<span class="unit">$</span>1,110</div>
+            <div class="foot">
+              <span style="color: hsl(var(--negative));">−$240 vs Mar</span>
+              <span>avg, 3mo</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stage-doc">
+          <div class="title">McGrath PM · Apr</div>
+          <div style="font-size: 9px; color: hsl(var(--foreground-subtle)); margin-bottom: var(--space-2);">14 Elm Street · Statement</div>
+          <div class="lines">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+
+        <div class="stage-arrow">
+          extracted &amp; routed automatically
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <!-- =================================================================
+       VALUE PROPS
+       ================================================================= -->
+  <main>
+    <section class="public-section" id="value">
+      <div class="public-container">
+        <div class="section-eyebrow">Why Folio</div>
+        <h2>Three things you stop doing<br/><em>the day you sign up.</em></h2>
+
+        <div class="value-grid">
+          <article class="value-card">
+            <div class="vc-num">01</div>
+            <h3>Manually typing statements into a spreadsheet</h3>
+            <p>
+              Drop a PDF — agent statement, bank statement, rates notice — and Folio reads it, classifies it, and
+              routes the transactions to the right property and loan. It asks only when it's unsure.
+            </p>
+            <div class="vc-foot">Reads PM statements, bank exports, council rates, water, insurance.</div>
+          </article>
+
+          <article class="value-card">
+            <div class="vc-num">02</div>
+            <h3>Reconciling three apps to find your real position</h3>
+            <p>
+              Properties, loans, valuations, household income — modelled as the same connected thing. One number
+              for your equity, your LVR, your monthly cashflow. Always up to date.
+            </p>
+            <div class="vc-foot">Properties · Loans · Cashflow · Equity · LVR — one source of truth.</div>
+          </article>
+
+          <article class="value-card">
+            <div class="vc-num">03</div>
+            <h3>Wondering whether something has slipped</h3>
+            <p>
+              Folio watches for the patterns: a missing statement, an unrouted transaction, an interest-only period
+              ending in 14 months. It tells you what needs attention — and what doesn't.
+            </p>
+            <div class="vc-foot">Calm by default. Speaks up only when there's something to do.</div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         HOW IT WORKS
+         ================================================================= -->
+    <section class="public-section" id="how">
+      <div class="public-container">
+        <div class="section-eyebrow">How it works</div>
+        <h2>Set up in an afternoon.<br/><em>Then mostly forget about it.</em></h2>
+        <p class="section-sub">
+          Folio is built around the rhythm of how property investors actually work: statements arrive monthly, decisions
+          happen quarterly, big moves happen yearly. The product matches that pace.
+        </p>
+
+        <div class="steps">
+          <div class="step">
+            <h3>Add what you own</h3>
+            <p>
+              List your properties, loans, and the entities that hold them. Folio fills in valuations and balances
+              as statements arrive — you don't have to be exact upfront.
+            </p>
+            <div class="step-detail">
+              <strong>14 Elm Street</strong> · House · Randwick<br/>
+              Okafor Family Trust · $920k · 1 loan
+            </div>
+          </div>
+
+          <div class="step">
+            <h3>Drop your documents</h3>
+            <p>
+              Forward your PM emails, drop your bank PDFs, scan a rates notice with your phone.
+              Folio handles the typing.
+            </p>
+            <div class="step-detail">
+              <strong>4 documents</strong> · 2 matched, 2 need input<br/>
+              <span style="color: hsl(var(--positive));">+1 new property found</span>
+            </div>
+          </div>
+
+          <div class="step">
+            <h3>Plan, decide, repeat</h3>
+            <p>
+              Model a rate rise, a sale, a renovation. Track the IO rollover that's three years out.
+              Folio holds the context so you don't have to.
+            </p>
+            <div class="step-detail">
+              <strong>Rate sensitivity</strong> · +0.5%<br/>
+              Cashflow: −$1,110 → <span style="color: hsl(var(--negative));">−$2,150 / mo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         PRINCIPLES — what it is / isn't
+         ================================================================= -->
+    <section class="public-section" id="principles">
+      <div class="public-container">
+        <div class="section-eyebrow">What Folio is — and isn't</div>
+        <h2>An honest shape.<br/><em>No more, no less.</em></h2>
+        <p class="section-sub">
+          Property tools get sold with grand promises. Here's the smaller, more accurate version.
+        </p>
+
+        <div class="principles">
+          <div class="principle is-is">
+            <h4>✦ What Folio is</h4>
+            <ul>
+              <li>
+                <span class="glyph">
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,7 6,10 11,4"/></svg>
+                </span>
+                A single, calm view of your property portfolio
+              </li>
+              <li>
+                <span class="glyph">
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,7 6,10 11,4"/></svg>
+                </span>
+                A document reader that classifies and routes automatically
+              </li>
+              <li>
+                <span class="glyph">
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,7 6,10 11,4"/></svg>
+                </span>
+                A model of your loans, valuations, and net position
+              </li>
+              <li>
+                <span class="glyph">
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,7 6,10 11,4"/></svg>
+                </span>
+                Calculators for what-ifs you actually ask: rate rises, IO rollover, extra repayments, buying, selling
+              </li>
+              <li>
+                <span class="glyph">
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,7 6,10 11,4"/></svg>
+                </span>
+                Built for 1–10 properties. Most users will have three.
+              </li>
+            </ul>
+          </div>
+
+          <div class="principle is-not">
+            <h4>What it isn't</h4>
+            <ul>
+              <li>
+                <span class="glyph">×</span>
+                A tax tool. We don't compute CGT, depreciation, or your return — your accountant does.
+              </li>
+              <li>
+                <span class="glyph">×</span>
+                A broker. We don't shop loans or recommend products.
+              </li>
+              <li>
+                <span class="glyph">×</span>
+                A property data service. We don't sell suburb medians or comparables.
+              </li>
+              <li>
+                <span class="glyph">×</span>
+                Connected to your bank. You upload statements. We never see your password.
+              </li>
+              <li>
+                <span class="glyph">×</span>
+                AI-everything. The chat is on the roadmap; today we prefer specific calculators over open-ended prose.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         PRICING
+         ================================================================= -->
+    <section class="public-section" id="pricing">
+      <div class="public-container">
+        <div class="section-eyebrow">Pricing</div>
+        <h2>Free while we're in beta.<br/><em>Honestly priced after.</em></h2>
+
+        <div class="pricing-strip">
+          <div class="pricing-copy">
+            <div class="price">
+              <em>Free</em> until 30 June 2026 · then <span style="font-family: var(--font-data); font-weight: 600; color: hsl(var(--foreground));">$14 / mo</span>
+            </div>
+            <div class="future">
+              <span class="num">$140</span> / yr paid annually · cancel any time · 30-day refund · everything Folio does, no tiers
+            </div>
+          </div>
+          <a href="login.html" class="btn btn--primary btn--lg">Get early access</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         FINAL CTA
+         ================================================================= -->
+    <section class="final-cta">
+      <div class="public-container">
+        <h2 style="margin: 0 auto;">A quieter way to hold property.<br/><em>Built for the long game.</em></h2>
+        <p class="section-sub">No setup call. No sales email. Just a sign-in link.</p>
+        <div class="cta-row">
+          <a href="login.html" class="btn btn--primary btn--lg">Get early access</a>
+          <a href="login.html" class="btn btn--ghost btn--lg">Already have an account →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- =================================================================
+       FOOTER
+       ================================================================= -->
+  <footer class="public-container">
+    <div class="public-footer">
+      <div>© 2026 Folio · Made in Sydney</div>
+      <div class="links">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="mailto:hello@folio.app">Contact</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

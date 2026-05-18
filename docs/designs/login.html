@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign in · Folio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<body class="public">
+
+  <div class="login-shell">
+
+    <!-- Topbar — minimal -->
+    <div class="login-topbar">
+      <span class="wordmark">Folio<em>· beta</em></span>
+      <a href="landing.html" class="nav-out">← Back to home</a>
+    </div>
+
+    <div class="login-container" data-screen-label="Sign in">
+
+      <div class="login-card">
+
+        <!-- ===========================================================
+             STATE 1 — email entry
+             =========================================================== -->
+        <div class="login-state is-active" data-state="email">
+
+          <div class="login-head">
+            <h1>Sign in</h1>
+            <p class="sub">
+              Enter your email and we'll send you a sign-in link. No passwords to remember.
+            </p>
+          </div>
+
+          <form class="login-form" id="login-form" novalidate>
+            <div>
+              <label class="input-label" for="login-email">Email address</label>
+              <input
+                id="login-email"
+                class="input"
+                type="email"
+                inputmode="email"
+                autocomplete="email"
+                placeholder="you@example.com"
+                value="theo.okafor@example.com"
+                required
+              />
+            </div>
+            <button type="submit" class="btn btn--primary">
+              Send magic link →
+            </button>
+          </form>
+
+          <div class="login-microcopy">
+            <span class="glyph">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="10" height="8" rx="1"/><path d="M5 6V4a3 3 0 0 1 6 0v2"/></svg>
+            </span>
+            <span>
+              We don't use passwords. Each sign-in link is good for 15 minutes and works on one device.
+            </span>
+          </div>
+
+          <div class="login-foot-link">
+            New here? <a href="landing.html">Read what Folio does first →</a>
+          </div>
+        </div>
+
+        <!-- ===========================================================
+             STATE 2 — sent confirmation
+             =========================================================== -->
+        <div class="login-state" data-state="sent">
+
+          <div class="sent-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="6" width="18" height="13" rx="1.5"/>
+              <path d="M3 7l9 7 9-7"/>
+            </svg>
+          </div>
+
+          <div class="sent-state-head">
+            <h1>Check your inbox</h1>
+          </div>
+
+          <div class="sent-state-body">
+            We sent a magic link to
+            <span class="email-display" data-email-display>theo.okafor@example.com</span>
+            <p class="instructions">Click the link to log in.</p>
+          </div>
+
+          <div class="sent-actions">
+            <span class="question">Didn't get it?</span>
+            <button type="button" class="resend" id="resend-btn">Resend email</button>
+          </div>
+
+          <div class="sent-help">
+            Link expires in 15 minutes. Check your spam folder, or
+            <a href="#" data-state-goto="email">use a different email →</a>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- State preview toggle (for review only — would not ship) -->
+      <div style="text-align: center;">
+        <div class="login-state-toggle" role="group" aria-label="Preview state">
+          <span class="lab">Preview</span>
+          <button type="button" class="is-on" data-state-preview="email">Email entry</button>
+          <button type="button" data-state-preview="sent">Confirmation</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const states = document.querySelectorAll('.login-state');
+      const toggleButtons = document.querySelectorAll('[data-state-preview]');
+      const stateGotoLinks = document.querySelectorAll('[data-state-goto]');
+      const form = document.getElementById('login-form');
+      const emailInput = document.getElementById('login-email');
+      const emailDisplay = document.querySelector('[data-email-display]');
+      const resendBtn = document.getElementById('resend-btn');
+
+      function go(state) {
+        states.forEach(s => s.classList.toggle('is-active', s.dataset.state === state));
+        toggleButtons.forEach(b => b.classList.toggle('is-on', b.dataset.statePreview === state));
+      }
+
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        const email = (emailInput.value || '').trim();
+        if (!email) return;
+        emailDisplay.textContent = email;
+        go('sent');
+      });
+
+      toggleButtons.forEach(b => b.addEventListener('click', () => go(b.dataset.statePreview)));
+      stateGotoLinks.forEach(a => a.addEventListener('click', e => {
+        e.preventDefault();
+        go(a.dataset.stateGoto);
+      }));
+
+      // Resend cooldown — 30s
+      resendBtn.addEventListener('click', () => {
+        if (resendBtn.classList.contains('is-cooling')) return;
+        resendBtn.classList.add('is-cooling');
+        let n = 30;
+        resendBtn.textContent = `Resent · try again in ${n}s`;
+        const tick = setInterval(() => {
+          n -= 1;
+          if (n <= 0) {
+            clearInterval(tick);
+            resendBtn.classList.remove('is-cooling');
+            resendBtn.textContent = 'Resend email';
+          } else {
+            resendBtn.textContent = `Resent · try again in ${n}s`;
+          }
+        }, 1000);
+      });
+    })();
+  </script>
+</body>
+</html>
