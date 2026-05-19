@@ -30,7 +30,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
+    // Production build in CI: no Next.js dev overlay to intercept pointer events
+    command: process.env.CI ? 'pnpm start' : 'pnpm dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
   },

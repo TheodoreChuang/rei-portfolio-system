@@ -3,16 +3,12 @@ import { createTestUser, deleteTestUser, getTestSession } from '../fixtures'
 
 test.describe('Authentication flows', () => {
   test('authenticated user visiting /dashboard sees the dashboard', async ({ page }) => {
-    // storageState provides the session cookie via playwright.config.ts
     await page.goto('/dashboard')
-    // Should stay on /dashboard — not redirected to /login
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 })
-    // And the nav should be visible (not the login page)
-    await expect(page.getByText('Folio')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('heading', { name: 'Portfolio' })).toBeVisible({ timeout: 10000 })
   })
 
   test('unauthenticated user visiting /dashboard is redirected to /login', async ({ browser }) => {
-    // Explicitly empty storageState to guarantee no session
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const page = await context.newPage()
     await page.goto('/dashboard')
@@ -21,8 +17,7 @@ test.describe('Authentication flows', () => {
   })
 
   test('sign out returns user to /login', async ({ browser }) => {
-    // Use a dedicated throwaway user so signing out doesn't invalidate the
-    // shared storageState session used by other tests (loans, rls, etc.)
+    // Dedicated throwaway user so sign-out doesn't invalidate the shared storageState session
     const { email, password, user } = await createTestUser()
     try {
       const session = await getTestSession(email, password)
@@ -39,8 +34,9 @@ test.describe('Authentication flows', () => {
         sameSite: 'Lax',
       }])
 
-      await page.goto('/dashboard')
-      await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 })
+      // Navigate to /entities — safe for users with no seeded data (no onboarding redirect)
+      await page.goto('/entities')
+      await expect(page).toHaveURL(/\/entities/, { timeout: 15000 })
 
       await page.getByTestId('user-avatar').click()
       await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible({ timeout: 5000 })

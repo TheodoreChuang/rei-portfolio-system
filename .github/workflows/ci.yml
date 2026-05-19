@@ -75,3 +75,29 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
           TEST_USER_EMAIL: ci@test.local
           TEST_USER_PASSWORD: ci-password-folio
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build app for e2e
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:54322/postgres
+          NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
+
+      - name: E2E tests
+        run: pnpm test:e2e
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:54322/postgres
+          NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
+          SUPABASE_SECRET_KEY: ${{ steps.supabase.outputs.service_role_key }}
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
