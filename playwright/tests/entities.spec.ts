@@ -9,7 +9,7 @@ test.describe('Entities', () => {
 
     await page.locator('#new-entity-name').fill('Smith Family Trust')
     await page.locator('#new-entity-type').selectOption('Discretionary trust')
-    await page.getByRole('button', { name: 'Add entity' }).click()
+    await page.getByRole('button', { name: 'Add entity', exact: true }).click()
 
     await expect(page.getByText('Smith Family Trust')).toBeVisible({ timeout: 5000 })
   })
