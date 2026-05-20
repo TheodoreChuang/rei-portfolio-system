@@ -1,15 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { GET, PUT, DELETE } from '@/app/api/properties/[id]/route'
-
-let selectCallCount = 0
+import { GET, PATCH, DELETE } from '@/app/api/properties/[id]/route'
 
 const mocks = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
-  mockSelectLimit: vi.fn(),       // call 1: property lookup
-  mockValuationLimit: vi.fn(),    // call 2: latest valuation
-  mockLedgerWhere: vi.fn(),       // call 3: ledger entries (no limit/orderBy)
-  mockUpdateReturning: vi.fn(),
-  mockDeleteReturning: vi.fn(),
+  mockGetPropertyWithStats: vi.fn(),
+  mockUpdateProperty: vi.fn(),
+  mockDeleteProperty: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -20,38 +16,12 @@ vi.mock('@/lib/supabase/server', () => ({
   ),
 }))
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: vi.fn(() => {
-      selectCallCount++
-      const call = selectCallCount
-      return {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: call === 1 ? mocks.mockSelectLimit : mocks.mockValuationLimit,
-            orderBy: vi.fn().mockReturnValue({
-              limit: mocks.mockValuationLimit,
-            }),
-            then: call === 3
-              ? (resolve: (v: unknown[]) => void) => Promise.resolve(mocks.mockLedgerWhere()).then(resolve)
-              : undefined,
-          }),
-        }),
-      }
-    }),
-    update: vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: mocks.mockUpdateReturning,
-        }),
-      }),
-    }),
-    delete: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        returning: mocks.mockDeleteReturning,
-      }),
-    }),
-  },
+vi.mock('@/lib/property', () => ({
+  listProperties: vi.fn(),
+  createProperty: vi.fn(),
+  updateProperty: mocks.mockUpdateProperty,
+  deleteProperty: mocks.mockDeleteProperty,
+  getPropertyWithStats: mocks.mockGetPropertyWithStats,
 }))
 
 const VALID_UUID = 'a1b2c3d4-e5f6-4789-a012-345678901234'
@@ -60,16 +30,24 @@ const propRow = {
   userId: 'user-123',
   address: '42 Wallaby Way, Sydney NSW 2000',
   nickname: 'Beach House',
+  startDate: '2020-01-01',
+  endDate: null,
+  entityId: null,
   createdAt: new Date(),
+  propertyType: null,
+  purchasePriceCents: null,
+  saleDate: null,
+  salePriceCents: null,
+  settlementDate: null,
 }
 
 function makeParams(id: string) {
   return { params: Promise.resolve({ id }) }
 }
 
-function makePutRequest(body: unknown) {
+function makePatchRequest(body: unknown) {
   return new Request(`http://localhost/api/properties/${VALID_UUID}`, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -86,11 +64,12 @@ function makeDeleteRequest() {
 describe('GET /api/properties/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    selectCallCount = 0
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
-    mocks.mockSelectLimit.mockResolvedValue([propRow])
-    mocks.mockValuationLimit.mockResolvedValue([]) // no valuations by default
-    mocks.mockLedgerWhere.mockResolvedValue([])    // no ledger entries by default
+    mocks.mockGetPropertyWithStats.mockResolvedValue({
+      property: propRow,
+      latestValuation: null,
+      yield: null,
+    })
   })
 
   it('returns 401 when not authenticated', async () => {
@@ -107,7 +86,7 @@ describe('GET /api/properties/[id]', () => {
   })
 
   it('returns 404 when property does not exist', async () => {
-    mocks.mockSelectLimit.mockResolvedValue([])
+    mocks.mockGetPropertyWithStats.mockResolvedValue(null)
     const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
     expect(res.status).toBe(404)
   })
@@ -120,9 +99,8 @@ describe('GET /api/properties/[id]', () => {
   })
 
   it('returns 404 when property belongs to a different user (cross-user isolation)', async () => {
-    // User B tries to fetch user A's property — DB returns nothing due to userId filter
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
-    mocks.mockSelectLimit.mockResolvedValue([])
+    mocks.mockGetPropertyWithStats.mockResolvedValue(null)
     const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
     expect(res.status).toBe(404)
   })
@@ -136,10 +114,14 @@ describe('GET /api/properties/[id]', () => {
   })
 
   it('returns latestValuation when valuations exist', async () => {
-    mocks.mockValuationLimit.mockResolvedValue([{
-      id: 'v1', userId: 'user-123', propertyId: VALID_UUID,
-      valuedAt: '2026-03-01', valueCents: 65000000, source: 'bank', notes: null, createdAt: new Date(),
-    }])
+    mocks.mockGetPropertyWithStats.mockResolvedValue({
+      property: propRow,
+      latestValuation: {
+        id: 'v1', userId: 'user-123', propertyId: VALID_UUID,
+        valuedAt: '2026-03-01', valueCents: 65000000, source: 'bank', notes: null, createdAt: new Date(),
+      },
+      yield: { grossPercent: 3.5, netPercent: 2.8, periodLabel: 'trailing 12m' },
+    })
     const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
     expect(res.status).toBe(200)
     const json = await res.json()
@@ -148,55 +130,38 @@ describe('GET /api/properties/[id]', () => {
     expect(json.latestValuation.source).toBe('bank')
   })
 
-  it('computes gross yield correctly: (trailing12mRent / valueCents) * 100', async () => {
-    mocks.mockValuationLimit.mockResolvedValue([{
-      id: 'v1', userId: 'user-123', propertyId: VALID_UUID,
-      valuedAt: '2026-03-01', valueCents: 100000000, source: null, notes: null, createdAt: new Date(),
-    }])
-    mocks.mockLedgerWhere.mockResolvedValue([
-      { category: 'rent', amountCents: 5000000 },   // $50,000 rent
-      { category: 'insurance', amountCents: 200000 }, // $2,000 expense
-      { category: 'loan_payment', amountCents: 1000000 }, // excluded from both
-    ])
+  it('returns yield when computed', async () => {
+    mocks.mockGetPropertyWithStats.mockResolvedValue({
+      property: propRow,
+      latestValuation: {
+        id: 'v1', userId: 'user-123', propertyId: VALID_UUID,
+        valuedAt: '2026-03-01', valueCents: 100000000, source: null, notes: null, createdAt: new Date(),
+      },
+      yield: { grossPercent: 5, netPercent: 4.8, periodLabel: 'trailing 12m' },
+    })
     const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
     const json = await res.json()
-    // gross = 5000000 / 100000000 * 100 = 5.00
     expect(json.yield.grossPercent).toBe(5)
-  })
-
-  it('computes net yield excluding loan_payment: ((rent - expenses) / valueCents) * 100', async () => {
-    mocks.mockValuationLimit.mockResolvedValue([{
-      id: 'v1', userId: 'user-123', propertyId: VALID_UUID,
-      valuedAt: '2026-03-01', valueCents: 100000000, source: null, notes: null, createdAt: new Date(),
-    }])
-    mocks.mockLedgerWhere.mockResolvedValue([
-      { category: 'rent', amountCents: 5000000 },    // $50,000 rent
-      { category: 'insurance', amountCents: 200000 },  // $2,000 expense
-      { category: 'loan_payment', amountCents: 1000000 }, // $10,000 — excluded
-    ])
-    const res = await GET(makeGetRequest(), makeParams(VALID_UUID))
-    const json = await res.json()
-    // net = (5000000 - 200000) / 100000000 * 100 = 4.80
     expect(json.yield.netPercent).toBe(4.8)
     expect(json.yield.periodLabel).toBe('trailing 12m')
   })
 })
 
-describe('PUT /api/properties/[id]', () => {
+describe('PATCH /api/properties/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
-    mocks.mockUpdateReturning.mockResolvedValue([propRow])
+    mocks.mockUpdateProperty.mockResolvedValue(propRow)
   })
 
   it('returns 401 when not authenticated', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: null } })
-    const res = await PUT(makePutRequest({ address: 'new' }), makeParams(VALID_UUID))
+    const res = await PATCH(makePatchRequest({ address: 'new' }), makeParams(VALID_UUID))
     expect(res.status).toBe(401)
   })
 
   it('returns 400 for invalid UUID', async () => {
-    const res = await PUT(makePutRequest({ address: 'new' }), makeParams('bad'))
+    const res = await PATCH(makePatchRequest({ address: 'new' }), makeParams('bad'))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('Invalid property ID')
@@ -204,54 +169,54 @@ describe('PUT /api/properties/[id]', () => {
 
   it('returns 400 for invalid JSON body', async () => {
     const req = new Request(`http://localhost/api/properties/${VALID_UUID}`, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: 'not json',
     })
-    const res = await PUT(req, makeParams(VALID_UUID))
+    const res = await PATCH(req, makeParams(VALID_UUID))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('Invalid JSON body')
   })
 
   it('returns 400 when no fields to update', async () => {
-    const res = await PUT(makePutRequest({}), makeParams(VALID_UUID))
+    const res = await PATCH(makePatchRequest({}), makeParams(VALID_UUID))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('No fields to update')
   })
 
   it('returns 400 when address is empty', async () => {
-    const res = await PUT(makePutRequest({ address: '' }), makeParams(VALID_UUID))
+    const res = await PATCH(makePatchRequest({ address: '' }), makeParams(VALID_UUID))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('Address cannot be empty')
   })
 
   it('returns 400 when address exceeds 500 characters', async () => {
-    const res = await PUT(makePutRequest({ address: 'A'.repeat(501) }), makeParams(VALID_UUID))
+    const res = await PATCH(makePatchRequest({ address: 'A'.repeat(501) }), makeParams(VALID_UUID))
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('Address too long (max 500 characters)')
   })
 
   it('returns 404 when property does not exist', async () => {
-    mocks.mockUpdateReturning.mockResolvedValue([])
-    const res = await PUT(makePutRequest({ address: 'new address' }), makeParams(VALID_UUID))
+    mocks.mockUpdateProperty.mockResolvedValue(undefined)
+    const res = await PATCH(makePatchRequest({ address: 'new address' }), makeParams(VALID_UUID))
     expect(res.status).toBe(404)
   })
 
   it('returns 404 when property belongs to a different user (cross-user isolation)', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
-    mocks.mockUpdateReturning.mockResolvedValue([])
-    const res = await PUT(makePutRequest({ address: 'new address' }), makeParams(VALID_UUID))
+    mocks.mockUpdateProperty.mockResolvedValue(undefined)
+    const res = await PATCH(makePatchRequest({ address: 'new address' }), makeParams(VALID_UUID))
     expect(res.status).toBe(404)
   })
 
   it('updates address only', async () => {
     const updated = { ...propRow, address: '99 New St' }
-    mocks.mockUpdateReturning.mockResolvedValue([updated])
-    const res = await PUT(makePutRequest({ address: '99 New St' }), makeParams(VALID_UUID))
+    mocks.mockUpdateProperty.mockResolvedValue(updated)
+    const res = await PATCH(makePatchRequest({ address: '99 New St' }), makeParams(VALID_UUID))
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.property.address).toBe('99 New St')
@@ -259,8 +224,8 @@ describe('PUT /api/properties/[id]', () => {
 
   it('updates nickname only', async () => {
     const updated = { ...propRow, nickname: 'New Name' }
-    mocks.mockUpdateReturning.mockResolvedValue([updated])
-    const res = await PUT(makePutRequest({ nickname: 'New Name' }), makeParams(VALID_UUID))
+    mocks.mockUpdateProperty.mockResolvedValue(updated)
+    const res = await PATCH(makePatchRequest({ nickname: 'New Name' }), makeParams(VALID_UUID))
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.property.nickname).toBe('New Name')
@@ -268,11 +233,59 @@ describe('PUT /api/properties/[id]', () => {
 
   it('clears nickname when set to empty string', async () => {
     const updated = { ...propRow, nickname: null }
-    mocks.mockUpdateReturning.mockResolvedValue([updated])
-    const res = await PUT(makePutRequest({ nickname: '' }), makeParams(VALID_UUID))
+    mocks.mockUpdateProperty.mockResolvedValue(updated)
+    const res = await PATCH(makePatchRequest({ nickname: '' }), makeParams(VALID_UUID))
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.property.nickname).toBeNull()
+  })
+
+  it('accepts propertyType', async () => {
+    const updated = { ...propRow, propertyType: 'house' as const }
+    mocks.mockUpdateProperty.mockResolvedValue(updated)
+    const res = await PATCH(makePatchRequest({ propertyType: 'house' }), makeParams(VALID_UUID))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.property.propertyType).toBe('house')
+  })
+
+  it('returns 400 for invalid propertyType', async () => {
+    const res = await PATCH(makePatchRequest({ propertyType: 'mansion' }), makeParams(VALID_UUID))
+    expect(res.status).toBe(400)
+  })
+
+  it('accepts all 5 new fields', async () => {
+    const updated = {
+      ...propRow,
+      propertyType: 'unit' as const,
+      purchasePriceCents: 75000000,
+      saleDate: '2030-06-01',
+      salePriceCents: 90000000,
+      settlementDate: '2030-06-30',
+    }
+    mocks.mockUpdateProperty.mockResolvedValue(updated)
+    const res = await PATCH(
+      makePatchRequest({
+        propertyType: 'unit',
+        purchasePriceCents: 75000000,
+        saleDate: '2030-06-01',
+        salePriceCents: 90000000,
+        settlementDate: '2030-06-30',
+      }),
+      makeParams(VALID_UUID)
+    )
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.property.propertyType).toBe('unit')
+    expect(json.property.purchasePriceCents).toBe(75000000)
+    expect(json.property.saleDate).toBe('2030-06-01')
+    expect(json.property.salePriceCents).toBe(90000000)
+    expect(json.property.settlementDate).toBe('2030-06-30')
+  })
+
+  it('returns 400 for negative purchasePriceCents', async () => {
+    const res = await PATCH(makePatchRequest({ purchasePriceCents: -1 }), makeParams(VALID_UUID))
+    expect(res.status).toBe(400)
   })
 })
 
@@ -280,7 +293,7 @@ describe('DELETE /api/properties/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } })
-    mocks.mockDeleteReturning.mockResolvedValue([propRow])
+    mocks.mockDeleteProperty.mockResolvedValue(propRow)
   })
 
   it('returns 401 when not authenticated', async () => {
@@ -295,14 +308,14 @@ describe('DELETE /api/properties/[id]', () => {
   })
 
   it('returns 404 when property does not exist', async () => {
-    mocks.mockDeleteReturning.mockResolvedValue([])
+    mocks.mockDeleteProperty.mockResolvedValue(undefined)
     const res = await DELETE(makeDeleteRequest(), makeParams(VALID_UUID))
     expect(res.status).toBe(404)
   })
 
   it('returns 404 when property belongs to a different user (cross-user isolation)', async () => {
     mocks.mockGetUser.mockResolvedValue({ data: { user: { id: 'user-B' } } })
-    mocks.mockDeleteReturning.mockResolvedValue([])
+    mocks.mockDeleteProperty.mockResolvedValue(undefined)
     const res = await DELETE(makeDeleteRequest(), makeParams(VALID_UUID))
     expect(res.status).toBe(404)
   })

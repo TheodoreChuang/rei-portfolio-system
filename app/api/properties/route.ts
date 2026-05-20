@@ -3,6 +3,8 @@ import { listProperties, createProperty } from '@/lib/property'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { captureError } from '@/lib/api-error'
 
+const VALID_PROPERTY_TYPES = ['house', 'unit', 'townhouse', 'land'] as const
+
 export async function GET() {
   try {
     const supabase = await createServerSupabaseClient()
@@ -54,7 +56,23 @@ export async function POST(request: Request) {
 
     const entityId = typeof raw.entityId === 'string' ? raw.entityId.trim() || null : null
 
-    const property = await createProperty({ userId: user.id, address, nickname, startDate, endDate, entityId })
+    let propertyType: typeof VALID_PROPERTY_TYPES[number] | null = null
+    if ('propertyType' in raw && raw.propertyType !== null && raw.propertyType !== undefined) {
+      if (!VALID_PROPERTY_TYPES.includes(raw.propertyType as typeof VALID_PROPERTY_TYPES[number])) {
+        return NextResponse.json({ error: 'Invalid propertyType' }, { status: 400 })
+      }
+      propertyType = raw.propertyType as typeof VALID_PROPERTY_TYPES[number]
+    }
+
+    let purchasePriceCents: number | null = null
+    if ('purchasePriceCents' in raw && raw.purchasePriceCents !== null && raw.purchasePriceCents !== undefined) {
+      if (typeof raw.purchasePriceCents !== 'number' || !Number.isInteger(raw.purchasePriceCents) || raw.purchasePriceCents < 0) {
+        return NextResponse.json({ error: 'purchasePriceCents must be a non-negative integer' }, { status: 400 })
+      }
+      purchasePriceCents = raw.purchasePriceCents
+    }
+
+    const property = await createProperty({ userId: user.id, address, nickname, startDate, endDate, entityId, propertyType, purchasePriceCents })
     return NextResponse.json({ property }, { status: 201 })
   } catch (err) {
     captureError(err, { route: 'POST /api/properties' })

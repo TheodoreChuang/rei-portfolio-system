@@ -1,9 +1,23 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getPropertyWithStats, updateProperty, deleteProperty } from '@/lib/property'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { captureError } from '@/lib/api-error'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const patchSchema = z.object({
+  address: z.string().min(1, 'Address cannot be empty').max(500, 'Address too long (max 500 characters)').optional(),
+  nickname: z.string().nullable().optional().transform((v) => v === undefined ? undefined : (typeof v === 'string' ? v.trim() || null : null)),
+  startDate: z.string().min(1, 'startDate cannot be empty').optional(),
+  endDate: z.string().nullable().optional().transform((v) => v === undefined ? undefined : (typeof v === 'string' ? v.trim() || null : null)),
+  entityId: z.string().nullable().optional().transform((v) => v === undefined ? undefined : (typeof v === 'string' && v.trim() ? v.trim() : null)),
+  propertyType: z.enum(['house', 'unit', 'townhouse', 'land']).nullable().optional(),
+  purchasePriceCents: z.number().int().nonnegative().nullable().optional(),
+  saleDate: z.string().nullable().optional(),
+  salePriceCents: z.number().int().nonnegative().nullable().optional(),
+  settlementDate: z.string().nullable().optional(),
+})
 
 export async function GET(
   _request: Request,
@@ -35,7 +49,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -49,47 +63,17 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid property ID' }, { status: 400 })
     }
 
-    let body: unknown
-    try {
-      body = await request.json()
-    } catch {
+    const body = await request.json().catch(() => null)
+    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
-    const raw = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
-
-    const updates: { address?: string; nickname?: string | null; startDate?: string; endDate?: string | null; entityId?: string | null } = {}
-
-    if ('address' in raw) {
-      const address = typeof raw.address === 'string' ? raw.address.trim() : ''
-      if (!address) {
-        return NextResponse.json({ error: 'Address cannot be empty' }, { status: 400 })
-      }
-      if (address.length > 500) {
-        return NextResponse.json({ error: 'Address too long (max 500 characters)' }, { status: 400 })
-      }
-      updates.address = address
+    const parsed = patchSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
     }
 
-    if ('nickname' in raw) {
-      updates.nickname = typeof raw.nickname === 'string' ? raw.nickname.trim() || null : null
-    }
-
-    if ('startDate' in raw) {
-      const startDate = typeof raw.startDate === 'string' ? raw.startDate.trim() : ''
-      if (!startDate) {
-        return NextResponse.json({ error: 'startDate cannot be empty' }, { status: 400 })
-      }
-      updates.startDate = startDate
-    }
-
-    if ('endDate' in raw) {
-      updates.endDate = typeof raw.endDate === 'string' ? raw.endDate.trim() || null : null
-    }
-
-    if ('entityId' in raw) {
-      updates.entityId = typeof raw.entityId === 'string' && raw.entityId ? raw.entityId : null
-    }
+    const updates = parsed.data
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -106,7 +90,7 @@ export async function PUT(
 
     return NextResponse.json({ property: updated })
   } catch (err) {
-    captureError(err, { route: 'PUT /api/properties/[id]' })
+    captureError(err, { route: 'PATCH /api/properties/[id]' })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

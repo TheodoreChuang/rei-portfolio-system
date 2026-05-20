@@ -1,7 +1,9 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { properties } from '@/db/schema'
-import type { Property } from '@/db/schema'
+import type { Property, PropertyType } from '@/db/schema'
+
+export type PropertyWithLvr = Property & { lvrPercent: number | null }
 
 type CreatePropertyInput = {
   userId: string
@@ -10,6 +12,11 @@ type CreatePropertyInput = {
   startDate: string
   endDate: string | null
   entityId: string | null
+  propertyType?: PropertyType | null
+  purchasePriceCents?: number | null
+  saleDate?: string | null
+  salePriceCents?: number | null
+  settlementDate?: string | null
 }
 
 type UpdatePropertyInput = {
@@ -18,10 +25,63 @@ type UpdatePropertyInput = {
   startDate?: string
   endDate?: string | null
   entityId?: string | null
+  propertyType?: PropertyType | null
+  purchasePriceCents?: number | null
+  saleDate?: string | null
+  salePriceCents?: number | null
+  settlementDate?: string | null
 }
 
-export async function listProperties(userId: string): Promise<Property[]> {
-  return db.select().from(properties).where(eq(properties.userId, userId))
+export async function listProperties(userId: string): Promise<PropertyWithLvr[]> {
+  const rows = await db
+    .select({
+      id: properties.id,
+      userId: properties.userId,
+      address: properties.address,
+      nickname: properties.nickname,
+      startDate: properties.startDate,
+      endDate: properties.endDate,
+      entityId: properties.entityId,
+      createdAt: properties.createdAt,
+      propertyType: properties.propertyType,
+      purchasePriceCents: properties.purchasePriceCents,
+      saleDate: properties.saleDate,
+      salePriceCents: properties.salePriceCents,
+      settlementDate: properties.settlementDate,
+      lvrPercent: sql<number | null>`
+        CASE
+          WHEN (
+            SELECT value_cents FROM property_valuations
+            WHERE property_id = ${properties.id}
+            ORDER BY valued_at DESC
+            LIMIT 1
+          ) > 0
+          THEN ROUND(
+            (
+              SELECT COALESCE(SUM(latest_bal.balance_cents), 0)
+              FROM installment_loans il
+              JOIN LATERAL (
+                SELECT balance_cents FROM installment_loan_balances
+                WHERE installment_loan_id = il.id
+                ORDER BY recorded_at DESC
+                LIMIT 1
+              ) latest_bal ON true
+              WHERE il.property_id = ${properties.id}
+              AND il.user_id = ${properties.userId}
+            )::numeric * 100 / (
+              SELECT value_cents FROM property_valuations
+              WHERE property_id = ${properties.id}
+              ORDER BY valued_at DESC
+              LIMIT 1
+            )
+          )::integer
+          ELSE NULL
+        END
+      `,
+    })
+    .from(properties)
+    .where(eq(properties.userId, userId))
+  return rows
 }
 
 export async function findPropertyById(userId: string, id: string): Promise<Property | undefined> {
