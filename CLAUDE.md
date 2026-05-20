@@ -49,6 +49,7 @@ lib/
 supabase/migrations/  — SQL migrations (applied to local + prod)
 __tests__/            — Vitest unit tests (*.test.ts)
                         integration tests (*.integration.test.ts)
+docs/solutions/       — documented solutions to past bugs and patterns (searchable by module, tags, problem_type)
 ```
 
 ## Testing Conventions

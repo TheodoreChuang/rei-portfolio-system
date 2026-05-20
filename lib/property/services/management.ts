@@ -31,6 +31,7 @@ export async function renewTenancy(
         and(
           eq(propertyTenancies.id, tenancyIdToEnd),
           eq(propertyTenancies.userId, userId),
+          eq(propertyTenancies.propertyId, propertyId),
           isNull(propertyTenancies.deletedAt),
         ),
       )
@@ -96,6 +97,7 @@ export async function softDeleteManagementAgent(
         and(
           eq(propertyManagementAgents.id, agentId),
           eq(propertyManagementAgents.userId, userId),
+          eq(propertyManagementAgents.propertyId, propertyId),
           isNull(propertyManagementAgents.deletedAt),
         ),
       )
