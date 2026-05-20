@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>Folio — Household</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<!--
+  Folio — Household screen
+  ─────────────────────────────────────────────────────────────────
+  Maps to Next.js route:  /household
+  Shared shell:           sidebar.js (injects <aside class="sidebar">)
+                          folio.css  (all design tokens + components)
+                          folio.js   (tabs, collapsibles, in-page state)
+  Screens linked from here use ordinary <a href="X.html"> patterns;
+  in the Next.js port these become <Link href="/X">.
+-->
+<body data-page="household">
+<div class="app">
+
+  <!-- Sidebar is injected here by sidebar.js -->
+
+  <main class="main">
+    <div class="main-inner">
+
+    <section class="screen is-active" data-screen="household" data-screen-label="04 Household">
+
+      <div class="page-head">
+        <div>
+          <h1 class="title">Household</h1>
+          <p class="subtitle">Your personal financial position alongside your portfolio.</p>
+        </div>
+        <div class="controls">
+          <span class="chip-select"><span class="label">View</span>Monthly &amp; annual <span class="chevron"></span></span>
+        </div>
+      </div>
+
+      <div class="stack-7">
+
+        <!-- Position summary table -->
+        <div>
+          <div class="section-label">Position summary</div>
+
+          <div class="household-table">
+            <div class="row-h header">
+              <div></div>
+              <div class="num">Monthly</div>
+              <div class="num">Annual</div>
+              <div></div>
+            </div>
+
+            <!-- Income -->
+            <div class="row-h section-head"><div>Income</div><div></div><div></div><div></div></div>
+            <div class="row-h editable">
+              <div class="label-cell">Employment income <span class="tag-est">Estimated</span></div>
+              <div class="num">$12,000</div>
+              <div class="num">$144,000</div>
+              <div class="edit-glyph">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 8.5L8 2.5l1.5 1.5L3.5 10H2v-1.5z"/></svg>
+              </div>
+            </div>
+            <div class="row-h editable">
+              <div class="label-cell">Other income <span class="tag-est">Estimated</span></div>
+              <div class="num">$500</div>
+              <div class="num">$6,000</div>
+              <div class="edit-glyph">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 8.5L8 2.5l1.5 1.5L3.5 10H2v-1.5z"/></svg>
+              </div>
+            </div>
+            <div class="row-h subtotal">
+              <div>Total income</div>
+              <div class="num">$12,500</div>
+              <div class="num">$150,000</div>
+              <div></div>
+            </div>
+
+            <!-- Expenses -->
+            <div class="row-h section-head"><div>Expenses</div><div></div><div></div><div></div></div>
+            <div class="row-h editable">
+              <div class="label-cell">Living expenses <span class="tag-est">Estimated</span></div>
+              <div class="num">$7,500</div>
+              <div class="num">$90,000</div>
+              <div class="edit-glyph">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 8.5L8 2.5l1.5 1.5L3.5 10H2v-1.5z"/></svg>
+              </div>
+            </div>
+            <div class="row-h subtotal">
+              <div>Total expenses</div>
+              <div class="num">$7,500</div>
+              <div class="num">$90,000</div>
+              <div></div>
+            </div>
+
+            <div class="row-h subtotal">
+              <div>Personal surplus</div>
+              <div class="num positive">$5,000</div>
+              <div class="num positive">$60,000</div>
+              <div></div>
+            </div>
+
+            <!-- Portfolio -->
+            <div class="row-h section-head"><div>From your portfolio</div><div></div><div></div><div></div></div>
+            <div class="row-h is-readonly">
+              <div class="label-cell">
+                Portfolio net cashflow
+                <span class="muted" style="font-size: var(--text-xs);">from your transactions</span>
+              </div>
+              <div class="num negative">−$1,110</div>
+              <div class="num negative">−$13,320</div>
+              <div class="edit-glyph" style="opacity: 0.3; cursor: not-allowed;">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="5" width="6" height="5" rx="0.5"/><path d="M4.5 5V3.5a1.5 1.5 0 0 1 3 0V5"/></svg>
+              </div>
+            </div>
+
+            <!-- Grand total -->
+            <div class="row-h grand">
+              <div>Total surplus</div>
+              <div class="num">$3,890</div>
+              <div class="num">$46,680</div>
+              <div></div>
+            </div>
+          </div>
+
+          <p class="household-foot-note">
+            Income and expense figures are your estimates — Folio doesn't read your personal bank account. Portfolio cashflow is calculated from the transactions on your property ledger.
+          </p>
+        </div>
+
+        <!-- Edit sections -->
+        <div>
+          <div class="section-label">Manage line items</div>
+
+          <div class="collapsible-section is-open">
+            <div class="head">
+              <div style="display: flex; align-items: center;">
+                <span class="twist"></span>
+                <div>
+                  <span class="label">Income sources <span class="count">· 2 items · $12,500 / mo</span></span>
+                </div>
+              </div>
+              <span class="muted" style="font-size: var(--text-xs);">Click to collapse</span>
+            </div>
+            <div class="body">
+              <div class="item">
+                <div>
+                  <div style="font-weight: 500;">Employment income</div>
+                  <div class="muted" style="font-size: var(--text-xs); margin-top: 2px;">Theo · base + super</div>
+                </div>
+                <div class="num" style="text-align: right; font-weight: 500;">$12,000 / mo</div>
+                <button class="btn btn--ghost btn--sm">Edit</button>
+              </div>
+              <div class="item">
+                <div>
+                  <div style="font-weight: 500;">Other income</div>
+                  <div class="muted" style="font-size: var(--text-xs); margin-top: 2px;">Dividends · ETF distributions</div>
+                </div>
+                <div class="num" style="text-align: right; font-weight: 500;">$500 / mo</div>
+                <button class="btn btn--ghost btn--sm">Edit</button>
+              </div>
+              <button class="btn btn--ghost btn--sm add" style="padding-left: 0; margin-top: var(--space-4);">+ Add income source</button>
+            </div>
+          </div>
+
+          <div class="collapsible-section">
+            <div class="head">
+              <div style="display: flex; align-items: center;">
+                <span class="twist"></span>
+                <div>
+                  <span class="label">Living expenses <span class="count">· 1 item · $7,500 / mo</span></span>
+                </div>
+              </div>
+              <span class="muted" style="font-size: var(--text-xs);">Click to expand</span>
+            </div>
+            <div class="body">
+              <div class="item">
+                <div>
+                  <div style="font-weight: 500;">Living expenses</div>
+                  <div class="muted" style="font-size: var(--text-xs); margin-top: 2px;">Single line for now · break into categories later</div>
+                </div>
+                <div class="num" style="text-align: right; font-weight: 500;">$7,500 / mo</div>
+                <button class="btn btn--ghost btn--sm">Edit</button>
+              </div>
+              <button class="btn btn--ghost btn--sm add" style="padding-left: 0; margin-top: var(--space-4);">+ Add expense category</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="sidebar.js"></script>
+<script src="folio.js"></script>
+</body>
+</html>

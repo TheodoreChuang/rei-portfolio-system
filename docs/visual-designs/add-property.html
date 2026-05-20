@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>Folio — Add property</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<!--
+  Folio — Add property screen
+  ─────────────────────────────────────────────────────────────────
+  Maps to Next.js route:  /properties/new
+  Shared shell:           sidebar.js (injects <aside class="sidebar">)
+                          folio.css  (all design tokens + components)
+                          folio.js   (tabs, collapsibles, in-page state)
+  Screens linked from here use ordinary <a href="X.html"> patterns;
+  in the Next.js port these become <Link href="/X">.
+-->
+<body data-page="add-property">
+<div class="app">
+
+  <!-- Sidebar is injected here by sidebar.js -->
+
+  <main class="main">
+    <div class="main-inner">
+
+    <section class="screen is-active" data-screen="add-property" data-screen-label="06 Add property">
+
+      <a href="#" class="crumb-back" data-goto="properties">
+        <svg width="9" height="9" viewBox="0 0 10 10"><polyline points="6,2 2,5 6,8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        All properties
+      </a>
+
+      <div class="page-head">
+        <div>
+          <h1 class="title">Add a property</h1>
+          <p class="subtitle">Tell us the basics. Folio will learn the rest from your statements.</p>
+        </div>
+        <div class="controls">
+          <button class="btn btn--ghost btn--sm" data-goto="properties">Cancel</button>
+          <button class="btn btn--secondary btn--sm">Save as draft</button>
+        </div>
+      </div>
+
+      <div class="add-page">
+
+        <!-- =====================================================
+             LEFT: form
+             ===================================================== -->
+        <div>
+
+          <!-- ===== 1. Identify ===== -->
+          <section class="form-section is-complete">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,9 9,3"/></svg>
+                </span>
+                <div>
+                  <h3>Address</h3>
+                  <div class="sub">Where is the property?</div>
+                </div>
+              </div>
+              <span class="right">Verified with PSMA</span>
+            </div>
+            <div class="form-section-body">
+              <div class="address-result">
+                <span class="pin">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 14s5-4.5 5-8a5 5 0 0 0-10 0c0 3.5 5 8 5 8z"/><circle cx="8" cy="6" r="1.8"/></svg>
+                </span>
+                <div class="text">
+                  <div class="addr-line">14 Elm Street, Randwick NSW 2031</div>
+                  <div class="verified-line">
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,6 5,8.5 9,3.5"/></svg>
+                    Matched to Australian address register · Lot 12 DP 78234
+                  </div>
+                </div>
+                <a href="#" class="change">Change</a>
+              </div>
+
+              <div class="form-grid" style="margin-top: var(--space-5);">
+                <div class="field">
+                  <label class="input-label">Nickname <span class="opt-tag">optional</span></label>
+                  <input class="input" value="Elm St" />
+                  <div class="input-help">A short name to refer to this property in the sidebar.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Property type</label>
+                  <div class="seg" role="radiogroup">
+                    <button type="button" class="is-on">House</button>
+                    <button type="button">Unit</button>
+                    <button type="button">Townhouse</button>
+                    <button type="button">Land</button>
+                  </div>
+                  <div class="input-help">&nbsp;</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 2. Acquisition ===== -->
+          <section class="form-section">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">2</span>
+                <div>
+                  <h3>Acquisition</h3>
+                  <div class="sub">When and how you bought it. Used for capital growth and cost-base calculations.</div>
+                </div>
+              </div>
+            </div>
+            <div class="form-section-body">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="input-label">Purchase date</label>
+                  <input class="input" placeholder="dd / mm / yyyy" />
+                  <div class="input-help">Contract or settlement date — either is fine.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Purchase price</label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="650,000" />
+                  </div>
+                  <div class="input-help">The contract price, not what you paid out of pocket.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Stamp duty <span class="opt-tag">optional</span></label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="—" />
+                  </div>
+                  <div class="input-help">Included in your cost base.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Legal &amp; other costs <span class="opt-tag">optional</span></label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="—" />
+                  </div>
+                  <div class="input-help">Conveyancing, inspections, B&amp;P reports.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 3. Ownership ===== -->
+          <section class="form-section">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">3</span>
+                <div>
+                  <h3>Ownership</h3>
+                  <div class="sub">Which entity holds the title? Filters across the whole app.</div>
+                </div>
+              </div>
+            </div>
+            <div class="form-section-body">
+              <div class="combo">
+                <div class="opt is-on">
+                  <span class="check">
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,5 4.2,7.2 8,3"/></svg>
+                  </span>
+                  <div>
+                    <div style="font-weight: 500;">Okafor Family Trust</div>
+                    <div class="meta">Discretionary trust · ABN 22 444 555 666 · 2 existing properties</div>
+                  </div>
+                  <span class="meta">Default</span>
+                </div>
+                <div class="opt">
+                  <span class="check"></span>
+                  <div>
+                    <div style="font-weight: 500;">Personal · Theo Okafor</div>
+                    <div class="meta">Individual · 1 existing property</div>
+                  </div>
+                  <span class="meta"></span>
+                </div>
+                <div class="opt is-add">
+                  <span class="check">+</span>
+                  <div>Add a new entity</div>
+                  <span></span>
+                </div>
+              </div>
+
+              <div class="form-grid" style="margin-top: var(--space-5);">
+                <div class="field">
+                  <label class="input-label">Ownership share</label>
+                  <div class="input-affix">
+                    <input class="input num" value="100" />
+                    <span class="suffix">%</span>
+                  </div>
+                  <div class="input-help">Leave at 100% unless co-owned outside this entity.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Use of property</label>
+                  <select class="select">
+                    <option>Investment · leased to tenant</option>
+                    <option>Investment · vacant</option>
+                    <option>Owner-occupied</option>
+                    <option>Mixed use</option>
+                  </select>
+                  <div class="input-help">Affects which tax treatments Folio applies.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 4. Current position ===== -->
+          <section class="form-section">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">4</span>
+                <div>
+                  <h3>Current position</h3>
+                  <div class="sub">An opening valuation. You can update it any time on the Valuations tab.</div>
+                </div>
+              </div>
+              <a href="#" class="skip-link">Use purchase price →</a>
+            </div>
+            <div class="form-section-body">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="input-label">Current value</label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="920,000" />
+                  </div>
+                  <div class="input-help">Round to the nearest thousand.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Valuation source</label>
+                  <select class="select">
+                    <option>Manual estimate</option>
+                    <option>Bank valuation</option>
+                    <option>Agent appraisal</option>
+                    <option>Independent valuer</option>
+                    <option>Recent comparable sale</option>
+                  </select>
+                  <div class="input-help">Just for the audit trail.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">As of</label>
+                  <input class="input" value="15 May 2026" />
+                  <div class="input-help">Defaults to today.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Reference <span class="opt-tag">optional</span></label>
+                  <input class="input" placeholder="e.g. CBA valuation #4821" />
+                  <div class="input-help">&nbsp;</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 5. Lease (optional) ===== -->
+          <section class="form-section is-optional">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">5</span>
+                <div>
+                  <h3>Lease &amp; management <span class="opt-tag">optional</span></h3>
+                  <div class="sub">Skip if vacant — you can add this when the lease starts.</div>
+                </div>
+              </div>
+              <div class="inline-toggle">
+                <span style="font-size: var(--text-xs); color: hsl(var(--foreground-muted));">Currently leased</span>
+                <span class="switch">
+                  <button type="button" class="is-on">Yes</button>
+                  <button type="button">No</button>
+                </span>
+              </div>
+            </div>
+            <div class="form-section-body">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="input-label">Managing agent</label>
+                  <select class="select">
+                    <option>McGrath Eastern Suburbs</option>
+                    <option>LJ Hooker Randwick</option>
+                    <option>Ray White Randwick</option>
+                    <option>Self-managed</option>
+                    <option>+ Add new agent</option>
+                  </select>
+                  <div class="input-help">Used to match PM statements automatically.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Weekly rent</label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="880" />
+                    <span class="suffix">/ wk</span>
+                  </div>
+                  <div class="input-help">
+                    <span class="fmt-preview">≈ <span class="num">$3,810</span> / mo · <span class="num">$45,760</span> / yr</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Lease start</label>
+                  <input class="input" placeholder="dd / mm / yyyy" value="15 Sep 2025" />
+                  <div class="input-help">&nbsp;</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Lease end</label>
+                  <input class="input" placeholder="dd / mm / yyyy" value="15 Sep 2026" />
+                  <div class="input-help">Folio prompts you 6 weeks before this date.</div>
+                </div>
+                <div class="field full">
+                  <label class="input-label">Tenant name <span class="opt-tag">optional</span></label>
+                  <input class="input" placeholder="e.g. S. Okafor" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 6. Linked loans (optional) ===== -->
+          <section class="form-section is-optional">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">6</span>
+                <div>
+                  <h3>Linked loans <span class="opt-tag">optional</span></h3>
+                  <div class="sub">Loans this property secures. You can add them now or later.</div>
+                </div>
+              </div>
+              <a href="#" class="skip-link" data-goto="add-loan">+ Add a new loan after this →</a>
+            </div>
+            <div class="form-section-body">
+              <div class="linked-item">
+                <span class="ico">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 4h12v8H2z"/><path d="M2 8h12"/><circle cx="5" cy="10.5" r="0.8" fill="currentColor"/></svg>
+                </span>
+                <div>
+                  <div class="name">CBA Investment Loan · Elm St</div>
+                  <div class="meta">Currently linked to 14 Elm St only</div>
+                </div>
+                <span class="amt">$615,000</span>
+                <button type="button" class="btn btn--ghost btn--sm">Unlink</button>
+              </div>
+              <button type="button" class="btn btn--secondary btn--sm" style="margin-top: var(--space-4);">
+                + Link existing loan
+              </button>
+            </div>
+          </section>
+
+          <!-- Sticky commit footer -->
+          <div class="commit-bar is-sticky">
+            <div class="summary">
+              Will add <strong>14 Elm Street</strong> under <strong>Okafor Family Trust</strong> ·
+              <span class="muted">value $920k · 1 linked loan</span>
+            </div>
+            <div style="display: flex; gap: var(--space-3);">
+              <button class="btn btn--ghost" data-goto="properties">Cancel</button>
+              <button class="btn btn--secondary" data-goto="add-loan">Save &amp; add loan →</button>
+              <button class="btn btn--primary">Add property</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- =====================================================
+             RIGHT: rail
+             ===================================================== -->
+        <aside class="rail">
+
+          <!-- Preview card -->
+          <div class="rail-card">
+            <h4>Preview</h4>
+            <div class="preview-title">14 Elm Street</div>
+            <div class="preview-sub">Randwick NSW 2031 · House · 3 bed</div>
+
+            <div class="summary-line">
+              <span class="k">Entity</span>
+              <span class="v">Okafor Family Trust</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Purchase</span>
+              <span class="v empty">—</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Current value</span>
+              <span class="v empty">—</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Weekly rent</span>
+              <span class="v">$880</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Linked loans</span>
+              <span class="v">1 · $615,000</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Equity at start</span>
+              <span class="v empty">—</span>
+            </div>
+          </div>
+
+          <!-- Helpers -->
+          <div class="rail-card">
+            <h4>Notes</h4>
+            <p class="helper">
+              <strong>Address is the source of truth.</strong>
+              Future statements arriving with this address will route here automatically — even if the wording on the statement is slightly different.
+            </p>
+            <p class="helper">
+              <strong>Skip what you don't have.</strong>
+              You can leave acquisition costs and lease details blank. The only required fields are address, entity, and property type.
+            </p>
+            <p class="helper">
+              <strong>This isn't tax advice.</strong>
+              Cost base calculations are for your reference. Folio is not a tax tool — confirm with your accountant.
+            </p>
+          </div>
+
+        </aside>
+      </div>
+    </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="sidebar.js"></script>
+<script src="folio.js"></script>
+</body>
+</html>

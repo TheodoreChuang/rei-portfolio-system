@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>Folio — Upload</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<!--
+  Folio — Upload screen
+  ─────────────────────────────────────────────────────────────────
+  Maps to Next.js route:  /upload
+  Shared shell:           sidebar.js (injects <aside class="sidebar">)
+                          folio.css  (all design tokens + components)
+                          folio.js   (tabs, collapsibles, in-page state)
+  Screens linked from here use ordinary <a href="X.html"> patterns;
+  in the Next.js port these become <Link href="/X">.
+-->
+<body data-page="upload">
+<div class="app">
+
+  <!-- Sidebar is injected here by sidebar.js -->
+
+  <main class="main">
+    <div class="main-inner">
+
+    <section class="screen is-active" data-screen="upload" data-screen-label="02 Upload">
+
+      <div class="page-head">
+        <div>
+          <h1 class="title">Upload</h1>
+          <p class="subtitle">Drop a statement. Folio classifies it, matches it to a property or loan, and asks only when uncertain.</p>
+        </div>
+        <div class="controls">
+          <div class="upload-state-toggle" data-toggle="upload">
+            <button class="is-on" data-state="idle">Idle</button>
+            <button data-state="review">In review <span class="count">4</span></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===========================================================
+           IDLE STATE — the page you land on by default
+           =========================================================== -->
+      <div class="upload-state is-active" data-state="idle">
+
+        <div class="stack-7">
+
+          <!-- Drop zone hero -->
+          <div class="drop-zone" id="drop-zone-demo">
+            <div class="ico">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4M6 10l6-6 6 6"/>
+                <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
+              </svg>
+            </div>
+            <div class="lede">Drop documents here</div>
+            <div class="sub">PM statements, bank statements, loan statements, rates notices — anything financial.</div>
+            <button type="button" class="btn btn--secondary browse">or click to browse</button>
+            <div class="formats">
+              <span class="chip">PDF</span>
+              <span class="chip">CSV</span>
+              <span class="chip">Multiple files OK</span>
+              <span class="chip">No property selection needed</span>
+            </div>
+          </div>
+
+          <!-- Awaiting input strip — deferred items from previous sessions -->
+          <div>
+            <div class="section-label">From previous sessions</div>
+            <div class="awaiting-strip">
+              <div class="left">
+                <span class="glyph">?</span>
+                <div class="copy">
+                  <div class="lede">2 documents are waiting on your input.</div>
+                  <div class="meta">Routing · 2 questions from your last 2 uploads</div>
+                </div>
+              </div>
+              <button class="btn btn--secondary btn--sm" data-state-goto="review">Resolve now →</button>
+            </div>
+          </div>
+
+          <!-- Supported types -->
+          <div>
+            <div class="section-label">Folio handles</div>
+            <div class="upload-help">
+              <div class="help-card">
+                <div class="label">PM statements</div>
+                <div class="title">Rent &amp; agent fees</div>
+                <div class="examples">McGrath, LJ Hooker, Ray White — monthly statements with rent received and management fees.</div>
+              </div>
+              <div class="help-card">
+                <div class="label">Bank statements</div>
+                <div class="title">Loan repayments &amp; expenses</div>
+                <div class="examples">CBA, Westpac, ANZ, NAB. Folio routes loan repayments and categorises property expenses.</div>
+              </div>
+              <div class="help-card">
+                <div class="label">Loan statements</div>
+                <div class="title">Balance &amp; interest</div>
+                <div class="examples">Quarterly or annual. Folio adds the closing balance to the loan&rsquo;s history.</div>
+              </div>
+              <div class="help-card">
+                <div class="label">Other</div>
+                <div class="title">Rates, water, insurance</div>
+                <div class="examples">Council notices, strata levies, landlord insurance. Folio categorises and assigns to the right property.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent uploads -->
+          <div>
+            <div class="section-label" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Recent uploads</span>
+              <a href="#" style="font-size: var(--text-xs); text-transform: none; letter-spacing: 0; color: hsl(var(--foreground-muted));">View all history →</a>
+            </div>
+            <div class="recent-list">
+              <div class="recent-row">
+                <div class="when">12 Apr 2026<span class="ago">3 days ago</span></div>
+                <div class="what"><strong>4 documents</strong> · McGrath PM, CBA bank, 2 rates notices</div>
+                <div class="outcome"><span class="badge badge--complete"><span class="dot"></span>All matched</span></div>
+                <div class="chev">›</div>
+              </div>
+              <div class="recent-row">
+                <div class="when">28 Mar 2026<span class="ago">3 weeks ago</span></div>
+                <div class="what"><strong>1 document</strong> · Loan statement · CBA Investment Loan</div>
+                <div class="outcome"><span class="badge badge--complete"><span class="dot"></span>Routed to Elm St</span></div>
+                <div class="chev">›</div>
+              </div>
+              <div class="recent-row">
+                <div class="when">11 Mar 2026<span class="ago">5 weeks ago</span></div>
+                <div class="what"><strong>2 documents</strong> · McGrath PM (Feb), Sydney Water</div>
+                <div class="outcome"><span class="badge badge--partial"><span class="dot"></span>1 needed input</span></div>
+                <div class="chev">›</div>
+              </div>
+              <div class="recent-row">
+                <div class="when">14 Feb 2026<span class="ago">3 months ago</span></div>
+                <div class="what"><strong>3 documents</strong> · PM statements, Jan</div>
+                <div class="outcome"><span class="badge badge--complete"><span class="dot"></span>All matched</span></div>
+                <div class="chev">›</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ===========================================================
+           REVIEW STATE — same page, after files arrive
+           =========================================================== -->
+      <div class="upload-state" data-state="review">
+
+      <div class="stack-7">
+
+        <!-- Banner: in review, can return to idle -->
+        <div style="background: hsl(var(--accent-soft)); border: 1px solid hsl(var(--accent) / 0.2); border-radius: var(--radius); padding: var(--space-4) var(--space-5); display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: var(--text-sm); color: hsl(var(--accent));">Reviewing 4 documents you dropped 2 minutes ago. Confirm at the bottom, or <a href="#" data-state-goto="idle" style="font-weight: 500;">return to upload</a>.</span>
+          <button class="btn btn--ghost btn--sm" data-state-goto="idle">Cancel review</button>
+        </div>
+
+        <!-- Upload session summary -->
+        <div class="upload-summary">
+          <div class="who">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="hsl(188 32% 32%)" stroke-width="1.5"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>
+            <div>
+              <div class="files">4 files uploaded</div>
+              <div class="muted" style="font-size: var(--text-xs); margin-top: 2px;">2 mins ago · drag-drop</div>
+            </div>
+          </div>
+          <div class="stats">
+            <span><span class="num">2</span> &nbsp;matched</span>
+            <span><span class="num">2</span> &nbsp;need input</span>
+            <span><span class="num">1</span> &nbsp;new property</span>
+          </div>
+        </div>
+
+        <!-- Low confidence: review section -->
+        <div>
+          <div class="review-section-label">
+            Needs your input
+            <span class="count">2</span>
+          </div>
+
+          <div class="stack-4">
+
+            <!-- Review card 1: bank statement transactions need routing -->
+            <article class="review-card" data-tone="action">
+              <div class="head">
+                <span class="glyph">?</span>
+                <span class="title">Some transactions need routing</span>
+              </div>
+              <p class="question">3 of 24 transactions on your CBA statement couldn't be categorised automatically.</p>
+              <div class="doc-id">
+                <span>From</span> <span class="quote">"CBA — eStatement · April 2026 · account ending 7104"</span>
+              </div>
+
+              <div class="txn-list">
+
+                <div class="txn-row">
+                  <div class="top">
+                    <div class="desc">CBA HOME LOAN REPAY <span class="quote">· 01 Apr</span></div>
+                    <div class="amt negative">−$2,167.00</div>
+                  </div>
+                  <div class="ask-inline">
+                    <span class="label">Which loan?</span>
+                    <select class="select">
+                      <option>Select a loan…</option>
+                      <option>CBA Investment Loan · Elm St</option>
+                      <option>CBA Investment Loan · Daley St</option>
+                      <option>Westpac Line of Credit · Personal</option>
+                      <option>+ Add new loan</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="txn-row">
+                  <div class="top">
+                    <div class="desc">RANDWICK CITY COUNCIL <span class="quote">· 15 Apr</span></div>
+                    <div class="amt negative">−$340.20</div>
+                  </div>
+                  <div class="ask-inline">
+                    <span class="label">Category</span>
+                    <select class="select" style="flex: 0 0 200px; min-width: 0;">
+                      <option>Rates &amp; council</option>
+                    </select>
+                    <span class="label" style="margin-left: var(--space-3);">Property</span>
+                    <select class="select">
+                      <option>Select a property…</option>
+                      <option>14 Elm Street</option>
+                      <option>8 Daley Street</option>
+                      <option>Sutherland Court</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="txn-row">
+                  <div class="top">
+                    <div class="desc">SYDNEY WATER <span class="quote">· 22 Apr</span></div>
+                    <div class="amt negative">−$128.45</div>
+                  </div>
+                  <div class="ask-inline">
+                    <span class="label">Category</span>
+                    <select class="select" style="flex: 0 0 200px; min-width: 0;">
+                      <option>Water</option>
+                    </select>
+                    <span class="label" style="margin-left: var(--space-3);">Property</span>
+                    <select class="select">
+                      <option>Select a property…</option>
+                      <option>14 Elm Street</option>
+                      <option>8 Daley Street</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="footer">
+                <span class="remember">
+                  <span>Remember these routings for future CBA statements?</span>
+                  <span class="toggle">
+                    <button class="is-on">Yes</button>
+                    <button>No</button>
+                  </span>
+                </span>
+                <span style="display: flex; gap: var(--space-3);">
+                  <button class="btn btn--ghost btn--sm">Skip</button>
+                  <button class="btn btn--secondary btn--sm">Confirm →</button>
+                </span>
+              </div>
+            </article>
+
+            <!-- Review card 2: couldn't match to a property -->
+            <article class="review-card" data-tone="action">
+              <div class="head">
+                <span class="glyph">?</span>
+                <span class="title">Couldn't match to a property</span>
+              </div>
+              <p class="question">A PM statement arrived from a managing agent we haven't seen before.</p>
+              <div class="doc-id">
+                <span>From</span> <span class="quote">"Sutherland Property Co — Statement · April 2026"</span>
+              </div>
+
+              <div class="ask">Which property is this for?</div>
+              <div class="controls">
+                <select class="select">
+                  <option>Select a property…</option>
+                  <option>14 Elm Street</option>
+                  <option>8 Daley Street</option>
+                  <option>Sutherland Court</option>
+                </select>
+                <button class="btn btn--ghost btn--sm">+ New property</button>
+              </div>
+
+              <div class="footer">
+                <span class="remember">
+                  <span>Remember Sutherland Property Co as agent for this property?</span>
+                  <span class="toggle">
+                    <button class="is-on">Yes</button>
+                    <button>No</button>
+                  </span>
+                </span>
+                <span style="display: flex; gap: var(--space-3);">
+                  <button class="btn btn--ghost btn--sm">Skip</button>
+                  <button class="btn btn--secondary btn--sm">Confirm →</button>
+                </span>
+              </div>
+            </article>
+
+          </div>
+        </div>
+
+        <!-- New object found -->
+        <div>
+          <div class="review-section-label">
+            New objects found
+            <span class="count">1</span>
+          </div>
+          <article class="new-card">
+            <div class="sparkle">✦</div>
+            <div class="body">
+              <div class="title">New property — 42 Bondi Road, Bondi NSW 2026</div>
+              <div class="meta">Extracted from <span class="num">McGrath PM · Apr 2026 statement</span> · 3-bed apartment · rent $1,050 / wk</div>
+            </div>
+            <div class="actions">
+              <button class="btn btn--ghost btn--sm">Not now</button>
+              <button class="btn btn--primary btn--sm">Add property →</button>
+            </div>
+          </article>
+        </div>
+
+        <!-- High confidence: matched -->
+        <div>
+          <div class="review-section-label">
+            Matched
+            <span class="count">2</span>
+          </div>
+
+          <div class="stack-3">
+            <article class="match-card">
+              <span class="check">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,8 7,12 13,4"/></svg>
+              </span>
+              <div class="body">
+                <div class="title">14 Elm Street · Randwick</div>
+                <div class="sub">PM statement · McGrath · 12 transactions extracted · all categorised</div>
+              </div>
+              <div class="period">March 2026</div>
+              <div class="net positive">+$3,240 net</div>
+              <button class="expand">Expand <svg width="8" height="6" viewBox="0 0 10 6"><polyline points="1,1 5,5 9,1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
+            </article>
+
+            <article class="match-card">
+              <span class="check">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,8 7,12 13,4"/></svg>
+              </span>
+              <div class="body">
+                <div class="title">CBA Investment Loan · Elm St</div>
+                <div class="sub">Loan statement · balance snapshot · interest charged</div>
+              </div>
+              <div class="period">March 2026</div>
+              <div class="net">Bal&nbsp;<span class="num">$615,000</span></div>
+              <button class="expand">Expand <svg width="8" height="6" viewBox="0 0 10 6"><polyline points="1,1 5,5 9,1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
+            </article>
+          </div>
+        </div>
+
+        <!-- Commit bar -->
+        <div class="commit-bar">
+          <div class="summary">
+            Will commit <strong>2 matched</strong> documents and <strong>1 new property</strong>. <span class="muted">2 questions unresolved — they will go to the review queue.</span>
+          </div>
+          <div style="display: flex; gap: var(--space-3);">
+            <button class="btn btn--ghost">Cancel</button>
+            <button class="btn btn--primary">Confirm — add to portfolio →</button>
+          </div>
+        </div>
+
+        </div> <!-- /stack -->
+      </div> <!-- /upload-state review -->
+
+    </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="sidebar.js"></script>
+<script src="folio.js"></script>
+</body>
+</html>

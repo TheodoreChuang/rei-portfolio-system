@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>Folio — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<!--
+  Folio — Dashboard screen
+  ─────────────────────────────────────────────────────────────────
+  Maps to Next.js route:  /dashboard
+  Shared shell:           sidebar.js (injects <aside class="sidebar">)
+                          folio.css  (all design tokens + components)
+                          folio.js   (tabs, collapsibles, in-page state)
+  Screens linked from here use ordinary <a href="X.html"> patterns;
+  in the Next.js port these become <Link href="/X">.
+-->
+<body data-page="dashboard">
+<div class="app">
+
+  <!-- Sidebar is injected here by sidebar.js -->
+
+  <main class="main">
+    <div class="main-inner">
+
+    <section class="screen is-active" data-screen="dashboard" data-screen-label="01 Dashboard">
+
+      <div class="page-head">
+        <div>
+          <h1 class="title">Portfolio</h1>
+          <p class="subtitle">Trailing 12 months · 1 May 2025 – 30 Apr 2026</p>
+        </div>
+        <div class="controls">
+          <span class="chip-select"><span class="label">Entity</span>All entities <span class="chevron"></span></span>
+          <span class="chip-select"><span class="label">Period</span>Last 12 months <span class="chevron"></span></span>
+        </div>
+      </div>
+
+      <!-- Prompts strip -->
+      <div class="stack-7">
+
+        <div>
+          <div class="section-label">Needs your attention · 3</div>
+          <div class="prompts-list">
+
+            <article class="prompt" data-tone="action">
+              <div class="head">
+                <span class="severity"><span class="glyph">!</span>Action needed</span>
+                <span class="timestamp">2 hours ago</span>
+              </div>
+              <p class="message">No rent recorded for 14&nbsp;Elm&nbsp;Street in April — the McGrath statement hasn't arrived.</p>
+              <div class="context">
+                <span class="kv"><span class="k">Expected</span><span class="v">$3,810</span></span>
+                <span class="kv"><span class="k">Last received</span><span class="v">27 Mar</span></span>
+                <span class="kv"><span class="k">Agent</span><span class="v">McGrath PM</span></span>
+              </div>
+              <div class="actions">
+                <button class="btn btn--primary btn--sm">Upload statement</button>
+                <button class="btn btn--ghost btn--sm">Mark estimated</button>
+              </div>
+            </article>
+
+            <article class="prompt" data-tone="action">
+              <div class="head">
+                <span class="severity"><span class="glyph">!</span>Action needed</span>
+                <span class="timestamp">Yesterday</span>
+              </div>
+              <p class="message">3 transactions on your CBA statement couldn't be routed automatically.</p>
+              <div class="context">
+                <span class="kv"><span class="k">Statement</span><span class="v">CBA · Apr 2026</span></span>
+                <span class="kv"><span class="k">Unmatched</span><span class="v">$2,167 · $340 · $128</span></span>
+              </div>
+              <div class="actions">
+                <button class="btn btn--primary btn--sm">Route transactions</button>
+                <button class="btn btn--ghost btn--sm">Open in upload</button>
+              </div>
+            </article>
+
+            <article class="prompt" data-tone="heads-up">
+              <div class="head">
+                <span class="severity"><span class="glyph">i</span>Heads up</span>
+                <span class="timestamp">2 days ago</span>
+              </div>
+              <p class="message">Lease at 14&nbsp;Elm&nbsp;Street renews in 6&nbsp;weeks. Current rent is 4% below market.</p>
+              <div class="context">
+                <span class="kv"><span class="k">Tenant</span><span class="v">S. Okafor</span></span>
+                <span class="kv"><span class="k">Rent</span><span class="v">$880 / wk</span></span>
+                <span class="kv"><span class="k">Market est.</span><span class="v">$920 / wk</span></span>
+              </div>
+              <div class="actions">
+                <button class="btn btn--secondary btn--sm">Open property</button>
+                <button class="btn btn--ghost btn--sm">Snooze</button>
+              </div>
+            </article>
+          </div>
+          <div class="prompts-foot">
+            <a href="#">View all (5) →</a>
+            <span class="subtle" style="font-size: var(--text-xs);">Severity, then most recent.</span>
+          </div>
+        </div>
+
+        <!-- Portfolio metrics -->
+        <div>
+          <div class="section-label">Portfolio position · Apr 2026</div>
+          <div class="metric-strip" data-cols="5">
+
+            <div class="metric">
+              <div class="label">Total value</div>
+              <div class="value"><span class="unit">$</span>2.07<span class="unit">m</span></div>
+              <div class="footrow">
+                <span class="trend trend--up">
+                  <svg viewBox="0 0 10 10"><polyline points="1,7 4,4 6,6 9,2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  +1.4%
+                </span>
+                <span class="subtle">vs Jan</span>
+              </div>
+            </div>
+
+            <div class="metric">
+              <div class="label">Total debt</div>
+              <div class="value"><span class="unit">$</span>1.14<span class="unit">m</span></div>
+              <div class="footrow">
+                <span class="trend trend--down"><svg viewBox="0 0 10 10"><polyline points="1,3 4,6 6,4 9,8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>−$1.2k</span>
+                <span class="subtle">3 loans</span>
+              </div>
+            </div>
+
+            <div class="metric">
+              <div class="label">Net equity</div>
+              <div class="value"><span class="unit">$</span>930<span class="unit">k</span></div>
+              <div class="footrow">
+                <span class="trend trend--up"><svg viewBox="0 0 10 10"><polyline points="1,7 4,4 6,6 9,2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>+3.0%</span>
+                <span class="subtle">45% of value</span>
+              </div>
+            </div>
+
+            <div class="metric">
+              <div class="label">Portfolio LVR</div>
+              <div class="lvr">
+                <span class="num">55<span class="unit" style="font-size: var(--text-md); color: hsl(var(--foreground-muted));">%</span></span>
+              </div>
+              <div class="lvr-meter">
+                <div class="bands"></div>
+                <div class="pip" style="left: 55%;"></div>
+              </div>
+              <div class="footrow">
+                <span class="subtle">Healthy · &lt; 60%</span>
+              </div>
+            </div>
+
+            <div class="metric">
+              <div class="label">Net cashflow · monthly</div>
+              <div class="value is-negative">−<span class="unit">$</span>1,110</div>
+              <div class="footrow">
+                <span class="trend trend--down"><svg viewBox="0 0 10 10"><polyline points="1,3 4,6 6,4 9,8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>−$240 vs Mar</span>
+                <span class="subtle">avg, 3 mo</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Household secondary -->
+          <div style="margin-top: var(--space-7);">
+            <div class="section-label">
+              Household context
+              <span style="margin-left: var(--space-3); font-size: 10px; letter-spacing: 0.06em; text-transform: none; color: hsl(var(--foreground-muted));">— estimates you maintain</span>
+            </div>
+            <div class="metric-strip" data-cols="4">
+              <div class="metric metric--secondary">
+                <div class="label">Household income</div>
+                <div class="value"><span class="unit">$</span>12,500<span class="unit" style="font-size: var(--text-xs);"> /mo</span></div>
+                <div class="footrow">
+                  <span class="tag-est">Estimated</span>
+                  <span class="subtle">$150k / yr</span>
+                </div>
+              </div>
+              <div class="metric metric--secondary">
+                <div class="label">Living expenses</div>
+                <div class="value"><span class="unit">$</span>7,500<span class="unit" style="font-size: var(--text-xs);"> /mo</span></div>
+                <div class="footrow">
+                  <span class="tag-est">Estimated</span>
+                  <span class="subtle">$90k / yr</span>
+                </div>
+              </div>
+              <div class="metric metric--secondary">
+                <div class="label">Personal surplus</div>
+                <div class="value"><span class="unit">$</span>5,000<span class="unit" style="font-size: var(--text-xs);"> /mo</span></div>
+                <div class="footrow">
+                  <span class="subtle">income − expenses</span>
+                </div>
+              </div>
+              <div class="metric">
+                <div class="label">Total surplus</div>
+                <div class="value"><span class="unit">$</span>3,890<span class="unit" style="font-size: var(--text-xs);"> /mo</span></div>
+                <div class="footrow">
+                  <span class="tag-est">Estimated</span>
+                  <span class="subtle">personal + portfolio</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Property performance table lives on /properties.
+             Dashboard answers "Am I okay?" + "What needs attention?";
+             the per-property view is one click away. -->
+
+        <!-- Cashflow chart -->
+        <div>
+          <div class="section-label">Cashflow trend · last 12 months</div>
+          <div class="chart">
+            <div class="chart-head">
+              <div class="chart-title">Monthly cashflow composition</div>
+              <div class="chart-legend">
+                <span class="key"><i style="background: hsl(var(--positive) / 0.55)"></i>Rent</span>
+                <span class="key"><i style="background: hsl(var(--negative) / 0.5)"></i>Expenses</span>
+                <span class="key"><i style="background: hsl(var(--foreground-muted) / 0.45)"></i>Loan repayments</span>
+                <span class="key"><i style="background: hsl(var(--accent))"></i>Net</span>
+              </div>
+            </div>
+            <svg class="cashflow-svg" viewBox="0 0 920 200" preserveAspectRatio="none">
+              <!-- horizontal zero line + grid -->
+              <line x1="40" y1="100" x2="920" y2="100" stroke="hsl(36 12% 86%)" stroke-width="1"/>
+              <line x1="40" y1="50"  x2="920" y2="50"  stroke="hsl(36 14% 92%)" stroke-width="1" stroke-dasharray="2 3"/>
+              <line x1="40" y1="150" x2="920" y2="150" stroke="hsl(36 14% 92%)" stroke-width="1" stroke-dasharray="2 3"/>
+
+              <!-- Y axis labels -->
+              <text x="34" y="54" text-anchor="end" font-size="10" fill="hsl(34 5% 56%)" font-family="Inter">+$10k</text>
+              <text x="34" y="104" text-anchor="end" font-size="10" fill="hsl(34 5% 56%)" font-family="Inter">$0</text>
+              <text x="34" y="154" text-anchor="end" font-size="10" fill="hsl(34 5% 56%)" font-family="Inter">−$10k</text>
+
+              <!-- X axis months -->
+              <g font-size="10" fill="hsl(34 5% 56%)" font-family="Inter" text-anchor="middle">
+                <text x="80"  y="190">May</text>
+                <text x="150" y="190">Jun</text>
+                <text x="220" y="190">Jul</text>
+                <text x="290" y="190">Aug</text>
+                <text x="360" y="190">Sep</text>
+                <text x="430" y="190">Oct</text>
+                <text x="500" y="190">Nov</text>
+                <text x="570" y="190">Dec</text>
+                <text x="640" y="190">Jan</text>
+                <text x="710" y="190">Feb</text>
+                <text x="780" y="190">Mar</text>
+                <text x="850" y="190">Apr</text>
+              </g>
+
+              <!-- Bars: each month: rent (positive, above zero), expenses + loan stacked below.
+                   Bars centered on month x, width 32 -->
+              <g>
+                <!-- May -->
+                <rect x="64" y="62"  width="32" height="38" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="64" y="100" width="32" height="18" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="64" y="118" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Jun -->
+                <rect x="134" y="60"  width="32" height="40" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="134" y="100" width="32" height="16" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="134" y="116" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Jul -->
+                <rect x="204" y="58"  width="32" height="42" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="204" y="100" width="32" height="22" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="204" y="122" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Aug -->
+                <rect x="274" y="61"  width="32" height="39" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="274" y="100" width="32" height="18" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="274" y="118" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Sep -->
+                <rect x="344" y="58"  width="32" height="42" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="344" y="100" width="32" height="14" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="344" y="114" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Oct -->
+                <rect x="414" y="57"  width="32" height="43" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="414" y="100" width="32" height="16" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="414" y="116" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Nov -->
+                <rect x="484" y="60"  width="32" height="40" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="484" y="100" width="32" height="20" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="484" y="120" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Dec -->
+                <rect x="554" y="62"  width="32" height="38" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="554" y="100" width="32" height="22" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="554" y="122" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Jan -->
+                <rect x="624" y="58"  width="32" height="42" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="624" y="100" width="32" height="18" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="624" y="118" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Feb -->
+                <rect x="694" y="59"  width="32" height="41" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="694" y="100" width="32" height="20" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="694" y="120" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Mar -->
+                <rect x="764" y="61"  width="32" height="39" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="764" y="100" width="32" height="20" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="764" y="120" width="32" height="28" fill="hsl(32 6% 38% / 0.45)"/>
+                <!-- Apr (current, missing some data — slightly faded) -->
+                <rect x="834" y="72"  width="32" height="28" fill="hsl(152 38% 30% / 0.35)" stroke="hsl(152 38% 30% / 0.45)" stroke-dasharray="2 2"/>
+                <rect x="834" y="100" width="32" height="22" fill="hsl(14 58% 42% / 0.35)"/>
+                <rect x="834" y="122" width="32" height="28" fill="hsl(32 6% 38% / 0.35)"/>
+              </g>
+
+              <!-- Net line overlay (cumulative net = rent − expenses − loan) -->
+              <!-- All months net negative (below zero) -->
+              <polyline
+                fill="none"
+                stroke="hsl(188 32% 32%)"
+                stroke-width="1.6"
+                points="80,108 150,104 220,110 290,107 360,104 430,101 500,108 570,112 640,104 710,109 780,110 850,124"/>
+              <!-- Dots -->
+              <g fill="hsl(188 32% 32%)">
+                <circle cx="80" cy="108" r="2.2"/>
+                <circle cx="150" cy="104" r="2.2"/>
+                <circle cx="220" cy="110" r="2.2"/>
+                <circle cx="290" cy="107" r="2.2"/>
+                <circle cx="360" cy="104" r="2.2"/>
+                <circle cx="430" cy="101" r="2.2"/>
+                <circle cx="500" cy="108" r="2.2"/>
+                <circle cx="570" cy="112" r="2.2"/>
+                <circle cx="640" cy="104" r="2.2"/>
+                <circle cx="710" cy="109" r="2.2"/>
+                <circle cx="780" cy="110" r="2.2"/>
+                <circle cx="850" cy="124" r="3" stroke="white" stroke-width="1.5"/>
+              </g>
+
+              <!-- Apr annotation -->
+              <text x="850" y="62" text-anchor="middle" font-size="10" font-family="Inter" fill="hsl(34 70% 42%)">Partial</text>
+            </svg>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="sidebar.js"></script>
+<script src="folio.js"></script>
+</body>
+</html>

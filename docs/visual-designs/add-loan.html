@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>Folio — Add loan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<!--
+  Folio — Add loan screen
+  ─────────────────────────────────────────────────────────────────
+  Maps to Next.js route:  /loans/new
+  Shared shell:           sidebar.js (injects <aside class="sidebar">)
+                          folio.css  (all design tokens + components)
+                          folio.js   (tabs, collapsibles, in-page state)
+  Screens linked from here use ordinary <a href="X.html"> patterns;
+  in the Next.js port these become <Link href="/X">.
+-->
+<body data-page="add-loan">
+<div class="app">
+
+  <!-- Sidebar is injected here by sidebar.js -->
+
+  <main class="main">
+    <div class="main-inner">
+
+    <section class="screen is-active" data-screen="add-loan" data-screen-label="07 Add loan">
+
+      <a href="#" class="crumb-back" data-goto="loans">
+        <svg width="9" height="9" viewBox="0 0 10 10"><polyline points="6,2 2,5 6,8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        All loans
+      </a>
+
+      <div class="page-head">
+        <div>
+          <h1 class="title">Add a loan</h1>
+          <p class="subtitle">A snapshot is enough. Folio takes the running balance from your statements.</p>
+        </div>
+        <div class="controls">
+          <button class="btn btn--ghost btn--sm" data-goto="loans">Cancel</button>
+          <button class="btn btn--secondary btn--sm">Save as draft</button>
+        </div>
+      </div>
+
+      <div class="add-page">
+
+        <!-- =====================================================
+             LEFT: form
+             ===================================================== -->
+        <div>
+
+          <!-- ===== 1. Lender ===== -->
+          <section class="form-section">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">1</span>
+                <div>
+                  <h3>Lender &amp; account</h3>
+                  <div class="sub">Which bank holds the loan?</div>
+                </div>
+              </div>
+            </div>
+            <div class="form-section-body">
+
+              <label class="input-label" style="margin-bottom: var(--space-3);">Lender</label>
+              <div style="display: flex; gap: var(--space-3); flex-wrap: wrap;">
+                <button type="button" class="seg" style="padding: 4px; border-radius: var(--radius);">
+                  <span class="lender-glyph" data-lender="CBA">CBA</span>
+                  <span style="padding: 0 var(--space-3); font-size: var(--text-sm); font-weight: 500;">Commonwealth Bank</span>
+                </button>
+                <button type="button" class="seg" style="padding: 4px; border-radius: var(--radius); opacity: 0.55;">
+                  <span class="lender-glyph" data-lender="Westpac">W</span>
+                  <span style="padding: 0 var(--space-3); font-size: var(--text-sm);">Westpac</span>
+                </button>
+                <button type="button" class="seg" style="padding: 4px; border-radius: var(--radius); opacity: 0.55;">
+                  <span class="lender-glyph" data-lender="ANZ">ANZ</span>
+                  <span style="padding: 0 var(--space-3); font-size: var(--text-sm);">ANZ</span>
+                </button>
+                <button type="button" class="seg" style="padding: 4px; border-radius: var(--radius); opacity: 0.55;">
+                  <span class="lender-glyph" data-lender="NAB">NAB</span>
+                  <span style="padding: 0 var(--space-3); font-size: var(--text-sm);">NAB</span>
+                </button>
+                <button type="button" class="seg" style="padding: 4px; border-radius: var(--radius); opacity: 0.55;">
+                  <span class="lender-glyph" data-lender="Macquarie">M</span>
+                  <span style="padding: 0 var(--space-3); font-size: var(--text-sm);">Macquarie</span>
+                </button>
+                <button type="button" class="seg" style="padding: 4px; border-radius: var(--radius); opacity: 0.55;">
+                  <span class="lender-glyph" data-lender="Other">···</span>
+                  <span style="padding: 0 var(--space-3); font-size: var(--text-sm);">Other</span>
+                </button>
+              </div>
+
+              <div class="form-grid" style="margin-top: var(--space-6);">
+                <div class="field">
+                  <label class="input-label">Account / loan reference</label>
+                  <input class="input" placeholder="ending 4821" />
+                  <div class="input-help">Last 4 digits are enough. Used to match statements.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Nickname</label>
+                  <input class="input" value="Inv Loan · Elm St" />
+                  <div class="input-help">How this loan appears in the sidebar.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 2. Security ===== -->
+          <section class="form-section">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">2</span>
+                <div>
+                  <h3>Security</h3>
+                  <div class="sub">What does this loan borrow against?</div>
+                </div>
+              </div>
+              <div class="seg">
+                <button type="button" class="is-on">Secured by property</button>
+                <button type="button">Unsecured</button>
+              </div>
+            </div>
+            <div class="form-section-body">
+              <label class="input-label" style="margin-bottom: var(--space-3);">Property securing this loan</label>
+              <div class="combo">
+                <div class="opt is-on">
+                  <span class="check">
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,5 4.2,7.2 8,3"/></svg>
+                  </span>
+                  <div>
+                    <div style="font-weight: 500;">14 Elm Street, Randwick</div>
+                    <div class="meta">Okafor Family Trust · valued $920,000 · 1 existing loan ($615k)</div>
+                  </div>
+                  <span class="meta">LVR after: 80%</span>
+                </div>
+                <div class="opt">
+                  <span class="check"></span>
+                  <div>
+                    <div style="font-weight: 500;">8 Daley Street, Marrickville</div>
+                    <div class="meta">Okafor Family Trust · valued $640,000 · 1 existing loan ($480k)</div>
+                  </div>
+                  <span class="meta">LVR after: 95%</span>
+                </div>
+                <div class="opt">
+                  <span class="check"></span>
+                  <div>
+                    <div style="font-weight: 500;">Sutherland Court, Kingsford</div>
+                    <div class="meta">Personal · Theo · valued $510,000 · no existing loan</div>
+                  </div>
+                  <span class="meta">LVR after: 39%</span>
+                </div>
+                <div class="opt is-add" data-goto="add-property">
+                  <span class="check">+</span>
+                  <div>Add a new property first</div>
+                  <span></span>
+                </div>
+              </div>
+
+              <div class="form-grid" style="margin-top: var(--space-5);">
+                <div class="field">
+                  <label class="input-label">Cross-collateralised <span class="opt-tag">optional</span></label>
+                  <div class="inline-toggle">
+                    <span class="switch">
+                      <button type="button">Yes</button>
+                      <button type="button" class="is-on">No</button>
+                    </span>
+                    <span style="font-size: var(--text-xs); color: hsl(var(--foreground-muted));">Multiple properties secure this loan</span>
+                  </div>
+                  <div class="input-help">Most investors avoid this. Folio will warn if it changes your LVR profile.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Entity holding the loan</label>
+                  <select class="select">
+                    <option>Okafor Family Trust</option>
+                    <option>Personal · Theo Okafor</option>
+                    <option>+ Add new entity</option>
+                  </select>
+                  <div class="input-help">Usually matches the property's entity.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 3. Terms ===== -->
+          <section class="form-section">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">3</span>
+                <div>
+                  <h3>Loan terms</h3>
+                  <div class="sub">From your loan contract or most recent statement.</div>
+                </div>
+              </div>
+            </div>
+            <div class="form-section-body">
+
+              <label class="input-label" style="margin-bottom: var(--space-3);">Repayment type</label>
+              <div class="seg" style="margin-bottom: var(--space-5);">
+                <button type="button" class="is-on">Interest only</button>
+                <button type="button">Principal &amp; interest</button>
+                <button type="button">Line of credit</button>
+              </div>
+
+              <div class="form-grid">
+                <div class="field">
+                  <label class="input-label">Interest rate</label>
+                  <div class="input-affix">
+                    <input class="input num" placeholder="6.35" />
+                    <span class="suffix">% p.a.</span>
+                  </div>
+                  <div class="input-help">Current variable or fixed rate.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Rate type</label>
+                  <select class="select">
+                    <option>Variable</option>
+                    <option>Fixed</option>
+                    <option>Split (fixed + variable)</option>
+                  </select>
+                  <div class="input-help">&nbsp;</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Loan term</label>
+                  <div class="input-affix">
+                    <input class="input num" placeholder="30" />
+                    <span class="suffix">years</span>
+                  </div>
+                  <div class="input-help">Total contract length.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">IO period ends</label>
+                  <input class="input" value="30 Jun 2027" />
+                  <div class="input-help">Folio prompts you 90 days before this date.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Repayment amount</label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="2,167" />
+                  </div>
+                  <div class="input-help">
+                    <span class="fmt-preview">≈ <span class="num">$26,004</span> / yr at current rate</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Repayment frequency</label>
+                  <select class="select">
+                    <option>Monthly</option>
+                    <option>Fortnightly</option>
+                    <option>Weekly</option>
+                  </select>
+                  <div class="input-help">&nbsp;</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 4. Current balance ===== -->
+          <section class="form-section">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">4</span>
+                <div>
+                  <h3>Opening balance snapshot</h3>
+                  <div class="sub">The current balance on your most recent statement. Folio tracks changes from here.</div>
+                </div>
+              </div>
+              <a href="#" class="skip-link">Use original loan amount →</a>
+            </div>
+            <div class="form-section-body">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="input-label">Current balance</label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="615,000" />
+                  </div>
+                  <div class="input-help">From your latest statement.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">As of</label>
+                  <input class="input" value="1 Mar 2026" />
+                  <div class="input-help">Statement date.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Original loan amount <span class="opt-tag">optional</span></label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="650,000" />
+                  </div>
+                  <div class="input-help">For tracking how much you've paid down.</div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Loan start date <span class="opt-tag">optional</span></label>
+                  <input class="input" placeholder="dd / mm / yyyy" />
+                  <div class="input-help">&nbsp;</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 5. Offset / extras ===== -->
+          <section class="form-section is-optional">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">5</span>
+                <div>
+                  <h3>Offset &amp; redraw <span class="opt-tag">optional</span></h3>
+                  <div class="sub">Linked offset account brings the effective balance down.</div>
+                </div>
+              </div>
+              <div class="inline-toggle">
+                <span style="font-size: var(--text-xs); color: hsl(var(--foreground-muted));">Has offset</span>
+                <span class="switch">
+                  <button type="button" class="is-on">Yes</button>
+                  <button type="button">No</button>
+                </span>
+              </div>
+            </div>
+            <div class="form-section-body">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="input-label">Offset balance</label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="14,820" />
+                  </div>
+                  <div class="input-help">
+                    <span class="fmt-preview">Effective loan balance: <span class="num">$600,180</span></span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="input-label">Redraw available <span class="opt-tag">optional</span></label>
+                  <div class="input-affix">
+                    <span class="prefix">$</span>
+                    <input class="input num" placeholder="—" />
+                  </div>
+                  <div class="input-help">From principal repayments above schedule.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== 6. Statement matching ===== -->
+          <section class="form-section is-optional">
+            <div class="form-section-head">
+              <div class="lede">
+                <span class="step">6</span>
+                <div>
+                  <h3>Statement matching <span class="opt-tag">optional</span></h3>
+                  <div class="sub">Help Folio route future CBA statements to this loan.</div>
+                </div>
+              </div>
+            </div>
+            <div class="form-section-body">
+              <div class="field-list">
+                <div class="field-row">
+                  <div class="k">Match by description</div>
+                  <div class="v" style="font-family: var(--font-data); font-size: var(--text-sm);">
+                    <span style="background: hsl(var(--surface-sunken)); padding: 2px 6px; border-radius: var(--radius-xs); font-variant-numeric: tabular-nums;">CBA HOME LOAN REPAY</span>
+                    <span class="muted" style="margin-left: var(--space-3); font-size: var(--text-xs);">— seen on transactions before</span>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="k">Match by amount</div>
+                  <div class="v">
+                    <span style="background: hsl(var(--surface-sunken)); padding: 2px 6px; border-radius: var(--radius-xs); font-variant-numeric: tabular-nums; font-size: var(--text-sm);">−$2,167.00</span>
+                    <span class="muted" style="margin-left: var(--space-3); font-size: var(--text-xs);">monthly, 1st of month</span>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="k">Match by account</div>
+                  <div class="v">
+                    <span style="background: hsl(var(--surface-sunken)); padding: 2px 6px; border-radius: var(--radius-xs); font-variant-numeric: tabular-nums; font-size: var(--text-sm);">CBA · 062-001 · ···7104</span>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: var(--space-5); font-size: var(--text-xs); color: hsl(var(--foreground-muted));">
+                Future CBA bank statements that contain this description and amount will route to this loan automatically.
+                You can always override in the Upload review.
+              </div>
+            </div>
+          </section>
+
+          <!-- Sticky commit footer -->
+          <div class="commit-bar is-sticky">
+            <div class="summary">
+              Will add <strong>CBA Inv Loan · Elm St</strong> secured by <strong>14 Elm Street</strong> ·
+              <span class="muted">$615k balance · interest only @ 6.35%</span>
+            </div>
+            <div style="display: flex; gap: var(--space-3);">
+              <button class="btn btn--ghost" data-goto="loans">Cancel</button>
+              <button class="btn btn--primary">Add loan</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- =====================================================
+             RIGHT: rail
+             ===================================================== -->
+        <aside class="rail">
+
+          <!-- Preview card -->
+          <div class="rail-card">
+            <h4>Preview</h4>
+            <div class="preview-title">CBA Inv Loan · Elm St</div>
+            <div class="preview-sub">Commonwealth Bank · ending 4821 · IO</div>
+
+            <div class="summary-line">
+              <span class="k">Security</span>
+              <span class="v">14 Elm Street</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Entity</span>
+              <span class="v">Okafor Family Trust</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Current balance</span>
+              <span class="v empty">—</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Rate</span>
+              <span class="v empty">—</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Monthly repayment</span>
+              <span class="v empty">—</span>
+            </div>
+            <div class="summary-line">
+              <span class="k">Offset balance</span>
+              <span class="v">$14,820</span>
+            </div>
+          </div>
+
+          <!-- LVR impact card -->
+          <div class="rail-card">
+            <h4>LVR impact</h4>
+            <p class="helper" style="margin-bottom: var(--space-4);">
+              Adding this loan against <strong style="color: hsl(var(--foreground)); font-weight: 600;">14 Elm Street</strong> moves its LVR from <strong style="color: hsl(var(--foreground)); font-variant-numeric: tabular-nums;">67%</strong> to <strong style="color: hsl(var(--warning)); font-variant-numeric: tabular-nums;">80%</strong>.
+            </p>
+            <div class="lvr-meter" style="margin-bottom: var(--space-3);">
+              <div class="bands"></div>
+              <div class="pip" style="left: 67%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: hsl(var(--foreground-subtle));">
+              <span>Today · 67%</span>
+              <span>0%</span>
+              <span>60%</span>
+              <span>80%</span>
+            </div>
+            <div class="lvr-meter" style="margin-top: var(--space-5); margin-bottom: var(--space-3);">
+              <div class="bands"></div>
+              <div class="pip" style="left: 80%; background: hsl(var(--warning));"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: hsl(var(--foreground-subtle));">
+              <span style="color: hsl(var(--warning)); font-weight: 600;">After · 80%</span>
+            </div>
+          </div>
+
+          <!-- Helpers -->
+          <div class="rail-card">
+            <h4>Notes</h4>
+            <p class="helper">
+              <strong>You don't need to enter every transaction.</strong>
+              Just a current balance and basic terms. Folio learns the rest from your statements.
+            </p>
+            <p class="helper">
+              <strong>Don't have a statement handy?</strong>
+              Use the original loan amount and Folio will treat that as your opening balance. Update it the next time a statement arrives.
+            </p>
+          </div>
+
+        </aside>
+      </div>
+    </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="sidebar.js"></script>
+<script src="folio.js"></script>
+</body>
+</html>

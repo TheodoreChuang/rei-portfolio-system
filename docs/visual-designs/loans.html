@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>Folio — Loans</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<!--
+  Folio — Loans screen
+  ─────────────────────────────────────────────────────────────────
+  Maps to Next.js route:  /loans
+  Shared shell:           sidebar.js (injects <aside class="sidebar">)
+                          folio.css  (all design tokens + components)
+                          folio.js   (tabs, collapsibles, in-page state)
+  Screens linked from here use ordinary <a href="X.html"> patterns;
+  in the Next.js port these become <Link href="/X">.
+-->
+<body data-page="loans">
+<div class="app">
+
+  <!-- Sidebar is injected here by sidebar.js -->
+
+  <main class="main">
+    <div class="main-inner">
+
+    <section class="screen is-active" data-screen="loans" data-screen-label="05 Loans">
+
+      <div class="page-head">
+        <div>
+          <h1 class="title">Loans</h1>
+          <p class="subtitle">All borrowing across the portfolio · filtered to Okafor Family Trust</p>
+        </div>
+        <div class="controls">
+          <button class="btn btn--primary btn--sm" data-goto="add-loan">+ Add loan</button>
+        </div>
+      </div>
+
+      <div class="stack-7">
+
+        <!-- Filters -->
+        <div class="filter-bar">
+          <span class="label-set">Filter</span>
+          <span class="chip-select" style="background: hsl(var(--accent-soft)); border-color: hsl(var(--accent) / 0.2); color: hsl(var(--accent));">
+            <span class="label" style="color: hsl(var(--accent) / 0.7);">Entity</span>Okafor Family Trust
+            <svg width="10" height="10" viewBox="0 0 10 10" style="margin-left: 4px;"><line x1="2" y1="2" x2="8" y2="8" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="8" x2="8" y2="2" stroke="currentColor" stroke-width="1.4"/></svg>
+          </span>
+          <span class="chip-select"><span class="label">Lender</span>All lenders <span class="chevron"></span></span>
+          <span class="chip-select"><span class="label">Type</span>All types <span class="chevron"></span></span>
+        </div>
+
+        <!-- Summary strip -->
+        <div>
+          <div class="section-label">Exposure · Okafor Family Trust</div>
+          <div class="summary-strip">
+            <div class="metric">
+              <div class="label">Total debt</div>
+              <div class="value"><span class="unit">$</span>1.10<span class="unit">m</span></div>
+              <div class="footrow"><span class="subtle">2 loans</span><span class="subtle">−$1.2k vs Jan</span></div>
+            </div>
+            <div class="metric">
+              <div class="label">Monthly repayments</div>
+              <div class="value"><span class="unit">$</span>3,857</div>
+              <div class="footrow"><span class="subtle">$46.3k / yr</span></div>
+            </div>
+            <div class="metric">
+              <div class="label">Weighted avg rate</div>
+              <div class="value">6.35<span class="unit">%</span></div>
+              <div class="footrow"><span class="subtle">all IO</span></div>
+            </div>
+            <div class="metric">
+              <div class="label">Properties secured</div>
+              <div class="value">2<span class="unit"> of 2</span></div>
+              <div class="footrow"><span class="subtle">in this entity</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loan list -->
+        <div>
+          <div class="section-label">All loans</div>
+
+          <div class="loan-list">
+            <div class="loan-row header">
+              <div>Lender</div>
+              <div>Nickname / Account</div>
+              <div>Entity</div>
+              <div>Security</div>
+              <div class="num">Balance</div>
+              <div class="num">Rate</div>
+              <div>Type</div>
+              <div class="num">Repayment</div>
+              <div></div>
+            </div>
+
+            <!-- Row 1: expanded -->
+            <div class="loan-row expanded">
+              <div class="lender">CBA</div>
+              <div>
+                <div class="nickname">Inv Loan · Elm St</div>
+                <div class="muted" style="font-size: var(--text-xs);">acct ending 4821</div>
+              </div>
+              <div>Okafor Family Trust</div>
+              <div>14 Elm St</div>
+              <div class="num balance">$615,000</div>
+              <div class="num">6.35%</div>
+              <div>IO</div>
+              <div class="num">$2,167</div>
+              <div class="chev">▾</div>
+            </div>
+
+            <div class="loan-expand">
+              <div class="col">
+                <h4>Loan details</h4>
+                <div class="field-list">
+                  <div class="field-row">
+                    <div class="k">Lender</div>
+                    <div class="v">Commonwealth Bank</div>
+                  </div>
+                  <div class="field-row">
+                    <div class="k">Account</div>
+                    <div class="v editable">ending 4821</div>
+                  </div>
+                  <div class="field-row">
+                    <div class="k">Entity</div>
+                    <div class="v"><span class="is-dropdown">Okafor Family Trust</span></div>
+                  </div>
+                  <div class="field-row">
+                    <div class="k">Security</div>
+                    <div class="v"><span class="is-dropdown">14 Elm St</span></div>
+                  </div>
+                  <div class="field-row">
+                    <div class="k">Type</div>
+                    <div class="v"><span class="is-dropdown">Interest only</span></div>
+                  </div>
+                  <div class="field-row">
+                    <div class="k">Rate</div>
+                    <div class="v editable num">6.35%</div>
+                  </div>
+                  <div class="field-row">
+                    <div class="k">Repayment</div>
+                    <div class="v editable num">$2,167 / mo</div>
+                  </div>
+                  <div class="field-row">
+                    <div class="k">IO period ends</div>
+                    <div class="v editable">30 Jun 2027</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col">
+                <h4>Balance history</h4>
+                <div class="history">
+                  <div class="snap is-current">
+                    <span class="when">1 Mar 2026 <span class="badge badge--complete" style="margin-left: 8px; height: 18px;">Current</span></span>
+                    <span class="amt">$615,000</span>
+                  </div>
+                  <div class="snap">
+                    <span class="when">1 Dec 2025</span>
+                    <span class="amt">$615,000</span>
+                  </div>
+                  <div class="snap">
+                    <span class="when">1 Sep 2025</span>
+                    <span class="amt">$616,200</span>
+                  </div>
+                  <div class="snap">
+                    <span class="when">1 Jun 2025</span>
+                    <span class="amt">$616,200</span>
+                  </div>
+                </div>
+                <a href="#" class="add-snap">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
+                  Add balance snapshot
+                </a>
+              </div>
+
+              <div class="row-actions">
+                <a href="#" data-goto="loan">Open loan detail →</a>
+                <div class="right">
+                  <button class="btn btn--ghost btn--sm">Archive</button>
+                  <button class="btn btn--secondary btn--sm">Edit</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2 -->
+            <div class="loan-row">
+              <div class="lender">CBA</div>
+              <div>
+                <div class="nickname">Inv Loan · Daley St</div>
+                <div class="muted" style="font-size: var(--text-xs);">acct ending 5102</div>
+              </div>
+              <div>Okafor Family Trust</div>
+              <div>8 Daley St</div>
+              <div class="num balance">$480,000</div>
+              <div class="num">6.35%</div>
+              <div>IO</div>
+              <div class="num">$1,690</div>
+              <div class="chev">▾</div>
+            </div>
+
+            <!-- Row 3 - hidden by filter, shown faded -->
+            <div class="loan-row" style="opacity: 0.4;">
+              <div class="lender">Westpac</div>
+              <div>
+                <div class="nickname">Line of Credit</div>
+                <div class="muted" style="font-size: var(--text-xs);">acct ending 9217</div>
+              </div>
+              <div>Personal · Theo</div>
+              <div class="muted">Unsecured</div>
+              <div class="num balance">$45,000</div>
+              <div class="num">8.20%</div>
+              <div>P&amp;I</div>
+              <div class="num">$890</div>
+              <div class="chev">▾</div>
+            </div>
+          </div>
+
+          <div class="table-foot" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Filtered: 1 loan hidden by entity filter.</span>
+            <span>Balance shown is most recent snapshot. <a href="#" class="muted">Hover for date.</a></span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="sidebar.js"></script>
+<script src="folio.js"></script>
+</body>
+</html>

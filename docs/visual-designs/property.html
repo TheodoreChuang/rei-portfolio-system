@@ -1,0 +1,1269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>Folio — Property detail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<!--
+  Folio — Property detail screen
+  ─────────────────────────────────────────────────────────────────
+  Maps to Next.js route:  /properties/[id]
+  Shared shell:           sidebar.js (injects <aside class="sidebar">)
+                          folio.css  (all design tokens + components)
+                          folio.js   (tabs, collapsibles, in-page state)
+  Screens linked from here use ordinary <a href="X.html"> patterns;
+  in the Next.js port these become <Link href="/X">.
+-->
+<body data-page="property" data-design-state="default">
+<!--
+  ─────────────────────────────────────────────────────────────────
+  DESIGN STATES — this screen has multiple interaction states. To
+  keep the design legible (one state at a time), we drive them off
+  a single attribute on <body>: `data-design-state`.
+
+    State key              | Triggered in production by …          | Dismissed by …
+    ─────────────────────  | ───────────────────────────────────── | ─────────────────
+    default                | (initial; nothing open)               | —
+    menu-open              | Click on the ⋯ overflow trigger       | Click outside · Esc · pick item
+    sold-modal             | Click "Mark as sold…" in overflow     | Backdrop · Esc · Cancel · primary
+    add-entity             | Click "+ Add new entity" in entity    | Back arrow · Cancel · save
+                           | dropdown panel                        |
+    tenancy-modal          | Management → "+ Add tenancy"          | Backdrop · Esc · Cancel · primary
+    agent-modal            | Management → "+ Change agent"         | Backdrop · Esc · Cancel · primary
+    delete-valuation       | Click ⋯ on a valuation row → Delete   | Cancel · Delete (commits)
+
+  Notes for Claude Code (Next.js port):
+    - In production, each state is local component state (useState /
+      useReducer) on its owning component — the overflow menu owns
+      `menu-open`; the property page owns `sold-modal`; the entity
+      dropdown owns `add-entity`; the valuation row owns its own
+      inline-confirm.
+    - The data-design-state attribute on <body> exists ONLY for the
+      static design tool — it lets a reviewer jump between states
+      via the Tweaks panel. It has no production analogue. Do not
+      port it.
+    - Modal contract: focus trap, Escape closes, backdrop click
+      closes, primary submits, has-cascades block is REQUIRED when
+      the action affects records outside the current entity.
+    - Inline-confirm contract: replaces the trigger in place,
+      no backdrop, no focus trap, Esc cancels, named target in copy.
+    - Sale date / Sale price live on the property record as optional
+      fields. Filling them via the modal is the lifecycle action;
+      direct inline-editing them on the details card is not the
+      blessed path (it skips the cascades). Treat the details fields
+      as read-only after sale.
+  ─────────────────────────────────────────────────────────────────
+-->
+<div class="app">
+
+  <!-- Sidebar is injected here by sidebar.js -->
+
+  <main class="main">
+    <div class="main-inner">
+
+    <section class="screen is-active" data-screen="property" data-screen-label="03 Property detail">
+
+      <div class="detail-head">
+        <div>
+          <div class="crumb">
+            <a href="#" data-goto="dashboard">Properties</a> <span>›</span> <span>Randwick · NSW</span>
+          </div>
+          <h1 class="name">14 Elm Street</h1>
+          <div class="addr">
+            Randwick NSW 2031
+            <span class="badge badge--entity">Okafor Family Trust</span>
+          </div>
+        </div>
+        <div class="actions">
+          <div class="more-wrap">
+            <button class="btn btn--ghost btn--icon" aria-label="More actions" aria-expanded="false" data-more-trigger>⋯</button>
+            <!-- Menu opens when body[data-design-state="menu-open"]. -->
+            <div class="more-menu" role="menu">
+              <div class="menu-label">Lifecycle</div>
+              <button type="button" role="menuitem">
+                <span class="glyph">
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 7l3 3 7-7"/></svg>
+                </span>
+                <span>Mark as sold…</span>
+              </button>
+              <div class="sep"></div>
+              <button type="button" role="menuitem" class="is-destructive">
+                <span class="glyph">
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4h8M5.5 4V2.5h3V4M4 4l.7 7.5h4.6L10 4"/></svg>
+                </span>
+                <span>Delete property…</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics strip (4) -->
+      <div class="metric-strip" data-cols="4" style="margin-bottom: var(--space-7);">
+        <div class="metric">
+          <div class="label">Current value</div>
+          <div class="value"><span class="unit">$</span>920,000</div>
+          <div class="footrow"><span class="trend trend--up"><svg viewBox="0 0 10 10"><polyline points="1,7 4,4 6,6 9,2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>+3.4%</span><span class="subtle">as of 12 Mar</span></div>
+        </div>
+        <div class="metric">
+          <div class="label">Gross yield</div>
+          <div class="value">4.2<span class="unit">%</span></div>
+          <div class="footrow"><span class="subtle">$880 / wk rent</span><span class="subtle">trailing 12 mo</span></div>
+        </div>
+        <div class="metric">
+          <div class="label">Net cashflow · monthly</div>
+          <div class="value is-negative">−<span class="unit">$</span>340</div>
+          <div class="footrow"><span class="trend trend--down"><svg viewBox="0 0 10 10"><polyline points="1,3 4,6 6,4 9,8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>−$80 vs Mar</span><span class="subtle">avg, 3 mo</span></div>
+        </div>
+        <div class="metric">
+          <div class="label">LVR</div>
+          <div class="lvr"><span class="num">67<span class="unit" style="font-size: var(--text-md); color: hsl(var(--foreground-muted));">%</span></span></div>
+          <div class="lvr-meter"><div class="bands"></div><div class="pip" style="left: 67%;"></div></div>
+          <div class="footrow"><span class="subtle">$615k loan / $920k value</span></div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs" data-tabs="property">
+        <button class="tab is-active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="management">Management</button>
+        <button class="tab" data-tab="loans">Loans <span class="count">1</span></button>
+        <button class="tab" data-tab="valuations">Valuations <span class="count">3</span></button>
+        <button class="tab" data-tab="transactions">Transactions <span class="count">86</span></button>
+      </div>
+
+      <!-- OVERVIEW PANEL -->
+      <div class="tab-panel is-active" data-tab="overview">
+
+      <!-- Prompt for this property -->
+      <article class="prompt" data-tone="action" style="margin-bottom: var(--space-7);">
+        <div class="head">
+          <span class="severity"><span class="glyph">!</span>Action needed</span>
+          <span class="timestamp">2 hours ago</span>
+        </div>
+        <p class="message">McGrath PM statement for April hasn't arrived — rent for the week of 14 Apr isn't recorded.</p>
+        <div class="context">
+          <span class="kv"><span class="k">Expected</span><span class="v">$3,810</span></span>
+          <span class="kv"><span class="k">Last received</span><span class="v">27 Mar</span></span>
+        </div>
+        <div class="actions">
+          <button class="btn btn--primary btn--sm">Upload statement</button>
+          <button class="btn btn--ghost btn--sm">Mark estimated</button>
+        </div>
+      </article>
+
+      <!-- Three column layout -->
+      <div class="three-col">
+
+        <!-- Left: Property details -->
+        <div class="detail-card">
+          <div class="card-header">
+            <h3>Property details</h3>
+          </div>
+          <div class="field-list">
+            <div class="field-row">
+              <div class="k">Nickname</div>
+              <div class="v editable">Elm St</div>
+            </div>
+            <div class="field-row">
+              <div class="k">Address</div>
+              <div class="v editable">14 Elm Street, Randwick NSW 2031</div>
+            </div>
+            <div class="field-row">
+              <div class="k">Property type</div>
+              <div class="v"><span class="is-dropdown">House</span></div>
+            </div>
+            <div class="field-row">
+              <div class="k">Purchase price</div>
+              <div class="v editable num">$650,000</div>
+            </div>
+            <div class="field-row">
+              <div class="k">Purchase date</div>
+              <div class="v editable">24 Apr 2021</div>
+            </div>
+            <div class="field-row" style="position: relative;">
+              <div class="k">Entity</div>
+              <div class="v"><span class="is-dropdown" data-entity-trigger>Okafor Family Trust</span></div>
+
+              <!-- Inline 'Add entity' form: replaces the dropdown options panel
+                   after the user clicks “+ Add new entity”. Shown here as the
+                   demo state for the new-entity flow. -->
+              <div class="add-entity-form">
+                <div class="form-head">
+                  <button type="button" class="back">
+                    <svg width="9" height="9" viewBox="0 0 10 10"><polyline points="6,2 2,5 6,8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Back
+                  </button>
+                  <span class="title">Add new entity</span>
+                </div>
+
+                <div class="field">
+                  <label>Entity name</label>
+                  <input class="input" placeholder="e.g. Okafor Investment Trust" />
+                </div>
+
+                <div class="field">
+                  <label>Type</label>
+                  <select class="select">
+                    <option>Discretionary trust</option>
+                    <option>Unit trust</option>
+                    <option>Joint — individual</option>
+                    <option>Individual</option>
+                    <option>Company (Pty Ltd)</option>
+                    <option>SMSF</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label>ABN <span class="opt-tag">optional</span></label>
+                  <input class="input" placeholder="11 222 333 444" />
+                </div>
+
+                <div class="footer">
+                  <a href="#" data-goto="entities" style="font-size: var(--text-xs); color: hsl(var(--foreground-muted)); margin-right: auto;">Manage entities →</a>
+                  <button type="button" class="btn btn--ghost btn--sm">Cancel</button>
+                  <button type="button" class="btn btn--primary btn--sm">Add entity</button>
+                </div>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="k">Managing agent</div>
+              <div class="v"><span class="is-dropdown">McGrath Eastern Suburbs</span></div>
+            </div>
+            <div class="field-row">
+              <div class="k">Lease end date</div>
+              <div class="v editable">15 Sep 2026</div>
+            </div>
+            <div class="field-row">
+              <div class="k">Weekly rent</div>
+              <div class="v editable num">$880.00</div>
+            </div>
+            <div class="field-row">
+              <div class="k">
+                Sale date
+                <span class="sub" style="display:block; font-size:10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; margin-top: 2px;">Optional · set when sold</span>
+              </div>
+              <div class="v editable" style="color: hsl(var(--foreground-subtle));">Not sold</div>
+            </div>
+            <div class="field-row">
+              <div class="k">Sale price</div>
+              <div class="v editable num" style="color: hsl(var(--foreground-subtle));">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle: Cashflow summary -->
+        <div class="detail-card cashflow-mini">
+          <div class="card-header">
+            <h3>Cashflow · last 12 months</h3>
+            <span class="chip-select" style="height: 24px; font-size: var(--text-xs); padding: 0 8px;">12 mo <span class="chevron"></span></span>
+          </div>
+          <div class="callout">
+            <span class="v is-negative">−$340</span>
+            <span class="meta">April · <span class="trend trend--down"><svg viewBox="0 0 10 10"><polyline points="1,3 4,6 6,4 9,8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>−$80 vs Mar</span></span>
+          </div>
+
+          <svg viewBox="0 0 360 180" preserveAspectRatio="none" style="width: 100%; height: 180px; margin-top: auto;">
+            <line x1="20" y1="100" x2="360" y2="100" stroke="hsl(36 12% 86%)" stroke-width="1"/>
+            <text x="16" y="54" text-anchor="end" font-size="9" fill="hsl(34 5% 56%)" font-family="Inter">+$4k</text>
+            <text x="16" y="104" text-anchor="end" font-size="9" fill="hsl(34 5% 56%)" font-family="Inter">$0</text>
+            <text x="16" y="150" text-anchor="end" font-size="9" fill="hsl(34 5% 56%)" font-family="Inter">−$4k</text>
+
+            <g>
+              <!-- 12 months, smaller bars; rent above, expenses+loan below -->
+              <!-- Each month, rent = 28-30px tall above; expenses 10-14; loan 18-22 -->
+              <g transform="translate(40 0)">
+                <rect x="0"  y="68" width="18" height="32" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="0"  y="100" width="18" height="14" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="0"  y="114" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="26" y="66" width="18" height="34" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="26" y="100" width="18" height="12" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="26" y="112" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="52" y="64" width="18" height="36" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="52" y="100" width="18" height="16" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="52" y="116" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="78" y="68" width="18" height="32" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="78" y="100" width="18" height="13" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="78" y="113" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="104" y="65" width="18" height="35" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="104" y="100" width="18" height="11" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="104" y="111" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="130" y="63" width="18" height="37" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="130" y="100" width="18" height="13" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="130" y="113" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="156" y="66" width="18" height="34" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="156" y="100" width="18" height="15" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="156" y="115" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="182" y="68" width="18" height="32" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="182" y="100" width="18" height="17" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="182" y="117" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="208" y="65" width="18" height="35" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="208" y="100" width="18" height="14" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="208" y="114" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="234" y="66" width="18" height="34" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="234" y="100" width="18" height="15" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="234" y="115" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="260" y="67" width="18" height="33" fill="hsl(152 38% 30% / 0.55)"/>
+                <rect x="260" y="100" width="18" height="16" fill="hsl(14 58% 42% / 0.5)"/>
+                <rect x="260" y="116" width="18" height="20" fill="hsl(32 6% 38% / 0.45)"/>
+
+                <rect x="286" y="77" width="18" height="23" fill="hsl(152 38% 30% / 0.35)" stroke="hsl(152 38% 30% / 0.4)" stroke-dasharray="2 2"/>
+                <rect x="286" y="100" width="18" height="17" fill="hsl(14 58% 42% / 0.35)"/>
+                <rect x="286" y="117" width="18" height="20" fill="hsl(32 6% 38% / 0.35)"/>
+              </g>
+            </g>
+
+            <!-- Net line -->
+            <polyline
+              fill="none"
+              stroke="hsl(188 32% 32%)"
+              stroke-width="1.5"
+              points="49,108 75,107 101,110 127,107 153,104 179,103 205,108 231,112 257,107 283,108 309,109 335,124"/>
+            <g fill="hsl(188 32% 32%)">
+              <circle cx="49" cy="108" r="1.8"/>
+              <circle cx="75" cy="107" r="1.8"/>
+              <circle cx="101" cy="110" r="1.8"/>
+              <circle cx="127" cy="107" r="1.8"/>
+              <circle cx="153" cy="104" r="1.8"/>
+              <circle cx="179" cy="103" r="1.8"/>
+              <circle cx="205" cy="108" r="1.8"/>
+              <circle cx="231" cy="112" r="1.8"/>
+              <circle cx="257" cy="107" r="1.8"/>
+              <circle cx="283" cy="108" r="1.8"/>
+              <circle cx="309" cy="109" r="1.8"/>
+              <circle cx="335" cy="124" r="2.6" stroke="white" stroke-width="1.2"/>
+            </g>
+
+            <g font-size="8" fill="hsl(34 5% 56%)" font-family="Inter" text-anchor="middle">
+              <text x="49" y="170">May</text>
+              <text x="127" y="170">Aug</text>
+              <text x="205" y="170">Nov</text>
+              <text x="283" y="170">Feb</text>
+              <text x="335" y="170">Apr</text>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Right: Equity -->
+        <div class="detail-card">
+          <div class="card-header">
+            <h3>Equity position</h3>
+            <span class="card-sub-link muted">12 Mar 2026</span>
+          </div>
+          <div class="equity-list field-list">
+            <div class="field-row">
+              <div class="k">
+                Current value
+                <span class="sub">Manual entry · 12 Mar 2026</span>
+              </div>
+              <div class="v">$920,000</div>
+            </div>
+            <div class="field-row">
+              <div class="k">
+                Total debt
+                <span class="sub">1 loan secured</span>
+              </div>
+              <div class="v">$615,000</div>
+            </div>
+            <div class="field-row is-net">
+              <div class="k">
+                Net equity
+                <span class="sub">33% of value</span>
+              </div>
+              <div class="v positive">$305,000</div>
+            </div>
+          </div>
+
+          <!-- LVR meter in right column -->
+          <div style="margin-top: var(--space-6);">
+            <div class="row" style="justify-content: space-between; font-size: var(--text-xs); color: hsl(var(--foreground-muted));">
+              <span>LVR</span><span class="num" style="color: hsl(var(--foreground));">67%</span>
+            </div>
+            <div class="lvr-meter" style="margin-top: var(--space-3);">
+              <div class="bands"></div>
+              <div class="pip" style="left: 67%;"></div>
+            </div>
+            <div class="row" style="justify-content: space-between; font-size: 10px; color: hsl(var(--foreground-subtle)); margin-top: var(--space-2);">
+              <span>0%</span><span>60%</span><span>80%</span><span>100%</span>
+            </div>
+          </div>
+
+          <div style="margin-top: var(--space-7); padding-top: var(--space-5); border-top: 1px solid hsl(var(--rule)); font-size: var(--text-sm); color: hsl(var(--foreground-muted));">
+            Latest valuation is 2 months old. <a href="#" data-tab-goto="valuations">Add a new valuation →</a>
+          </div>
+        </div>
+      </div>
+
+      </div> <!-- /tab-panel overview -->
+
+      <!-- ============================================================
+           MANAGEMENT TAB — tenancy + property management
+           ============================================================ -->
+      <div class="tab-panel" data-tab="management">
+
+        <div class="management-grid">
+
+          <!-- ─── Tenancy & lease ─── -->
+          <div class="detail-card management-card">
+            <div class="card-header">
+              <h3>Tenancy &amp; lease</h3>
+              <button type="button" class="card-add" aria-label="Add new tenancy">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
+                Add tenancy
+              </button>
+            </div>
+
+            <div class="card-eyebrow">
+              <span class="dot is-positive"></span>
+              <span>Current · in lease</span>
+            </div>
+
+            <div class="field-list management-fields">
+              <div class="field-row">
+                <div class="k">Tenants</div>
+                <div class="v editable">Jane &amp; Jack Liu</div>
+              </div>
+              <div class="field-row">
+                <div class="k">Lease type</div>
+                <div class="v">
+                  <span class="badge">Fixed-term</span>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="k">Lease start</div>
+                <div class="v editable">16 Sep 2025</div>
+              </div>
+              <div class="field-row">
+                <div class="k">Lease end</div>
+                <div class="v editable">
+                  <span>15 Sep 2026</span>
+                  <span class="badge badge--partial" style="margin-left: 6px;"><span class="dot"></span>in 17 weeks</span>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="k">Weekly rent</div>
+                <div class="v editable num">$880.00</div>
+              </div>
+              <div class="field-row">
+                <div class="k">
+                  Bond
+                  <span class="sub" style="display:block; font-size:10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; margin-top: 2px;">4 weeks · NSW RBB</span>
+                </div>
+                <div class="v editable num">$3,520</div>
+              </div>
+            </div>
+
+            <div class="history-section">
+              <div class="history-head">
+                <span class="title">Previous tenancies</span>
+                <span class="count">2</span>
+              </div>
+              <div class="history-list">
+                <div class="history-row">
+                  <div class="primary">
+                    <span class="name">Sarah Chen</span>
+                    <span class="badge">Fixed-term</span>
+                  </div>
+                  <div class="span">16 Sep 2023 — 15 Sep 2025</div>
+                  <div class="rent num">$820 / wk</div>
+                </div>
+                <div class="history-row">
+                  <div class="primary">
+                    <span class="name">Michael &amp; Tara Brennan</span>
+                    <span class="badge">Periodic</span>
+                  </div>
+                  <div class="span">12 Aug 2021 — 15 Sep 2023</div>
+                  <div class="rent num">$780 / wk</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── Property management ─── -->
+          <div class="detail-card management-card">
+            <div class="card-header">
+              <h3>Property management</h3>
+              <button type="button" class="card-add" aria-label="Change managing agent">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
+                Change agent
+              </button>
+            </div>
+
+            <div class="card-eyebrow">
+              <span class="dot is-positive"></span>
+              <span>Current · since 28 Jun 2024</span>
+            </div>
+
+            <div class="field-list management-fields">
+              <div class="field-row">
+                <div class="k">Agency</div>
+                <div class="v editable">McGrath Eastern Suburbs</div>
+              </div>
+              <div class="field-row">
+                <div class="k">Contact</div>
+                <div class="v editable">Sarah Mitchell</div>
+              </div>
+              <div class="field-row">
+                <div class="k">Phone</div>
+                <div class="v editable num">0412 345 678</div>
+              </div>
+              <div class="field-row">
+                <div class="k">Email</div>
+                <div class="v editable">sarah.m@mcgrath.com.au</div>
+              </div>
+              <div class="field-row">
+                <div class="k">
+                  Management fee
+                  <span class="sub" style="display:block; font-size:10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; margin-top: 2px;">incl. GST · on rent collected</span>
+                </div>
+                <div class="v editable num">6.6%</div>
+              </div>
+              <div class="field-row">
+                <div class="k">Statement cadence</div>
+                <div class="v">
+                  <span class="is-dropdown">Monthly</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="history-section">
+              <div class="history-head">
+                <span class="title">Previous agents</span>
+                <span class="count">1</span>
+              </div>
+              <div class="history-list">
+                <div class="history-row">
+                  <div class="primary">
+                    <span class="name">Ray White Coogee</span>
+                  </div>
+                  <div class="span">24 Apr 2021 — 27 Jun 2024</div>
+                  <div class="rent num">7.7% fee</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div> <!-- /tab-panel management -->
+
+      <!-- ============================================================
+           LOANS TAB — read-mostly
+           ============================================================ -->
+      <div class="tab-panel" data-tab="loans">
+
+        <div class="section-label" style="display: flex; align-items: center; justify-content: space-between;">
+          <span>Loans secured by this property</span>
+          <a href="#loans" data-goto="loans" style="font-size: var(--text-xs); color: hsl(var(--foreground-muted)); text-transform: none; letter-spacing: 0;">Open Loans section →</a>
+        </div>
+
+        <article class="loan-detail-card">
+          <div class="header">
+            <div class="left">
+              <div class="name">CBA Investment Loan · Elm St</div>
+              <div class="meta">
+                <span>Commonwealth Bank</span>
+                <span class="dot"></span>
+                <span>acct ending 4821</span>
+                <span class="dot"></span>
+                <span>Interest only · IO ends 30 Jun 2027</span>
+                <span class="dot"></span>
+                <span>Linked offset · $14,820</span>
+              </div>
+            </div>
+            <div class="right">
+              <button class="btn btn--ghost btn--sm" data-goto="loan">View in Loans →</button>
+            </div>
+          </div>
+
+          <div class="body">
+            <div>
+              <h4>Snapshot</h4>
+              <div class="kv-row">
+                <span class="k">Current balance</span>
+                <span class="v">$615,000 <span class="when">as of 1 Mar 2026</span></span>
+              </div>
+              <div class="kv-row">
+                <span class="k">Monthly repayment</span>
+                <span class="v">$2,167</span>
+              </div>
+              <div class="kv-row">
+                <span class="k">Interest rate</span>
+                <span class="v">6.35% <span class="when">variable</span></span>
+              </div>
+              <div class="kv-row">
+                <span class="k">Entity</span>
+                <span class="v">Okafor Family Trust</span>
+              </div>
+              <div class="kv-row">
+                <span class="k">Offset balance</span>
+                <span class="v">$14,820 <span class="when">net effective $600,180</span></span>
+              </div>
+            </div>
+
+            <div>
+              <h4>Balance history</h4>
+              <div class="kv-row">
+                <span class="k">1 Mar 2026 <span class="badge badge--complete" style="margin-left: 6px; height: 18px; font-size: 9px;">Current</span></span>
+                <span class="v">$615,000</span>
+              </div>
+              <div class="kv-row">
+                <span class="k">1 Dec 2025</span>
+                <span class="v">$615,000</span>
+              </div>
+              <div class="kv-row">
+                <span class="k">1 Sep 2025</span>
+                <span class="v">$616,200</span>
+              </div>
+              <div class="kv-row">
+                <span class="k">1 Jun 2025</span>
+                <span class="v">$616,200</span>
+              </div>
+              <button type="button" class="btn btn--secondary btn--sm" style="margin-top: var(--space-4);">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
+                Add balance snapshot
+              </button>
+            </div>
+          </div>
+
+          <div class="footer-actions">
+            <span class="lock-note">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5.5" width="6" height="4.5" rx="0.6"/><path d="M4.2 5.5V4a1.8 1.8 0 0 1 3.6 0v1.5"/></svg>
+              Loan record lives in the Loans section · only balance snapshots can be added here.
+            </span>
+            <a href="#loans" data-goto="loans">Edit in Loans →</a>
+          </div>
+        </article>
+
+        <div class="add-loan-prompt">
+          <span>This property could secure additional borrowing. Equity available: <span class="num" style="color: hsl(var(--foreground)); font-weight: 600;">$305,000</span></span>
+          <button class="btn btn--ghost btn--sm" data-goto="loans">+ Add another loan</button>
+        </div>
+
+      </div> <!-- /tab-panel loans -->
+
+      <!-- ============================================================
+           VALUATIONS TAB
+           ============================================================ -->
+      <div class="tab-panel" data-tab="valuations">
+
+        <div class="section-label">Valuation summary</div>
+
+        <div class="valuations-summary">
+          <div class="metric">
+            <div class="label">Current value</div>
+            <div class="value"><span class="unit">$</span>920,000</div>
+            <div class="footrow">
+              <span class="trend trend--up">
+                <svg viewBox="0 0 10 10"><polyline points="1,7 4,4 6,6 9,2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                +$45,000
+              </span>
+              <span class="subtle">vs Jun 2025</span>
+            </div>
+          </div>
+          <div class="metric">
+            <div class="label">Growth · since purchase</div>
+            <div class="value">+41.5<span class="unit">%</span></div>
+            <div class="footrow">
+              <span class="subtle">$650k → $920k</span>
+              <span class="subtle">5 yrs</span>
+            </div>
+          </div>
+          <div class="metric">
+            <div class="label">Last valuation</div>
+            <div class="value" style="font-size: var(--text-xl);">2 months ago</div>
+            <div class="footrow">
+              <span class="subtle">12 Mar 2026</span>
+              <span class="badge badge--complete" style="height: 18px; font-size: 9px;">Recent</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Valuation history chart -->
+        <div class="valuation-chart" style="margin-top: var(--space-5);">
+          <div class="chart-head">
+            <div class="chart-title">Value over time</div>
+            <div class="chart-legend">
+              <span class="key"><i style="background: hsl(var(--accent))"></i>Valuation</span>
+              <span class="key"><i style="background: hsl(var(--foreground-faint))"></i>Purchase price</span>
+            </div>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 900 220" preserveAspectRatio="none">
+            <!-- Y axis baseline -->
+            <line x1="60" y1="190" x2="880" y2="190" stroke="hsl(36 12% 86%)" stroke-width="1"/>
+            <line x1="60" y1="150" x2="880" y2="150" stroke="hsl(36 14% 92%)" stroke-width="1" stroke-dasharray="2 3"/>
+            <line x1="60" y1="110" x2="880" y2="110" stroke="hsl(36 14% 92%)" stroke-width="1" stroke-dasharray="2 3"/>
+            <line x1="60" y1="70" x2="880" y2="70" stroke="hsl(36 14% 92%)" stroke-width="1" stroke-dasharray="2 3"/>
+            <line x1="60" y1="30" x2="880" y2="30" stroke="hsl(36 14% 92%)" stroke-width="1" stroke-dasharray="2 3"/>
+
+            <g font-size="10" fill="hsl(34 5% 56%)" font-family="Inter" text-anchor="end">
+              <text x="54" y="194">$600k</text>
+              <text x="54" y="154">$700k</text>
+              <text x="54" y="114">$800k</text>
+              <text x="54" y="74">$900k</text>
+              <text x="54" y="34">$1m</text>
+            </g>
+
+            <!-- Purchase price baseline -->
+            <line x1="100" y1="170" x2="880" y2="170" stroke="hsl(var(--foreground-faint))" stroke-width="1.2" stroke-dasharray="4 4"/>
+            <text x="105" y="165" font-size="10" font-family="Inter" fill="hsl(var(--foreground-subtle))">Purchase · $650k</text>
+
+            <!-- Value line: 4 points over time -->
+            <!-- Apr 2021: $650k (170), Jan 2025: $875k (90), Jun 2025: $890k (84), Mar 2026: $920k (72) -->
+            <polyline
+              fill="none"
+              stroke="hsl(188 32% 32%)"
+              stroke-width="1.8"
+              points="100,170 580,90 660,84 820,72"/>
+
+            <!-- Points -->
+            <g fill="hsl(188 32% 32%)">
+              <circle cx="100" cy="170" r="3.5" fill="white" stroke="hsl(188 32% 32%)" stroke-width="1.4"/>
+              <circle cx="580" cy="90" r="3.5" fill="white" stroke="hsl(188 32% 32%)" stroke-width="1.4"/>
+              <circle cx="660" cy="84" r="3.5" fill="white" stroke="hsl(188 32% 32%)" stroke-width="1.4"/>
+              <circle cx="820" cy="72" r="4" fill="hsl(188 32% 32%)" stroke="white" stroke-width="1.5"/>
+            </g>
+
+            <!-- Point labels -->
+            <g font-size="10" font-family="Inter" fill="hsl(var(--foreground-muted))" text-anchor="middle">
+              <text x="100" y="210">Apr 2021</text>
+              <text x="580" y="210">Jan 2025</text>
+              <text x="660" y="210">Jun 2025</text>
+              <text x="820" y="210">Mar 2026</text>
+            </g>
+            <g font-size="10" font-family="Inter" fill="hsl(var(--foreground))" text-anchor="middle" font-weight="500">
+              <text x="100" y="185">$650k</text>
+              <text x="580" y="78">$875k</text>
+              <text x="660" y="72">$890k</text>
+              <text x="820" y="58" fill="hsl(188 32% 32%)" font-weight="600">$920k</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="section-label" style="margin-top: var(--space-7);">Valuation history</div>
+        <div class="valuation-list">
+          <div class="row-v header">
+            <div>Date</div>
+            <div>Source</div>
+            <div class="num" style="text-align: right;">Value</div>
+            <div class="num" style="text-align: right;">Change</div>
+            <div></div>
+          </div>
+          <div class="row-v">
+            <div class="when">12 Mar 2026</div>
+            <div>
+              <span class="source-badge">
+                <svg class="ico" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 8.5L8 2.5l1.5 1.5L3.5 10H2v-1.5z"/></svg>
+                Manual entry · Theo Okafor
+              </span>
+            </div>
+            <div class="num value">$920,000</div>
+            <div class="num delta positive">+$30,000 · +3.4%</div>
+            <div class="more">⋯</div>
+          </div>
+          <div class="row-v" data-confirm-anchor="valuation">
+            <div class="when">15 Jun 2025</div>
+            <div>
+              <span class="source-badge">
+                <svg class="ico" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 8.5L8 2.5l1.5 1.5L3.5 10H2v-1.5z"/></svg>
+                Manual entry · Theo Okafor
+              </span>
+            </div>
+            <div class="num value">$890,000</div>
+            <div class="num delta positive">+$15,000 · +1.7%</div>
+            <div class="more">⋯</div>
+            <!-- Inline confirm — replaces the row's trailing area when in delete-valuation state. -->
+            <div class="row-confirm">
+              <span class="inline-confirm inline-confirm--block">
+                <span class="copy">Delete <strong>$890,000 · 15 Jun 2025</strong>?</span>
+                <span class="actions">
+                  <button class="btn btn--ghost btn--sm">Cancel</button>
+                  <button class="btn btn--danger btn--sm">Delete</button>
+                </span>
+              </span>
+            </div>
+          </div>
+          <div class="row-v">
+            <div class="when">20 Jan 2025</div>
+            <div>
+              <span class="source-badge">
+                <svg class="ico" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 1h7l2 2v8H2z"/><path d="M9 1v2h2M5 8h3"/></svg>
+                Bank valuation · CBA
+              </span>
+            </div>
+            <div class="num value">$875,000</div>
+            <div class="num delta muted">baseline</div>
+            <div class="more">⋯</div>
+          </div>
+        </div>
+
+        <!-- Add valuation form (always visible — the brief’s primary action on this tab) -->
+        <div class="add-valuation" style="margin-top: var(--space-6);">
+          <div class="head">
+            <h4>Add a new valuation</h4>
+            <span class="sub">Typically once every 6–12 months</span>
+          </div>
+          <div class="grid">
+            <div>
+              <label class="input-label">Date</label>
+              <input class="input" value="15 May 2026" />
+              <div class="input-help">Defaults to today.</div>
+            </div>
+            <div>
+              <label class="input-label">Value</label>
+              <input class="input num" value="$&nbsp;" placeholder="$ —" />
+              <div class="input-help">Round to nearest thousand.</div>
+            </div>
+            <div>
+              <label class="input-label">Source</label>
+              <select class="select">
+                <option>Manual entry</option>
+                <option>Bank valuation</option>
+                <option>Agent appraisal</option>
+                <option>Independent valuer</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label class="input-label">Reference <span style="font-size: 10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; margin-left: 4px;">optional</span></label>
+              <input class="input" placeholder="e.g. CBA ref 4821" />
+            </div>
+            <div class="full">
+              <label class="input-label">Notes <span style="font-size: 10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; margin-left: 4px;">optional</span></label>
+              <textarea class="textarea" placeholder="e.g. Comparable sale: 18 Elm Street, $935k March 2026."></textarea>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn--ghost btn--sm">Cancel</button>
+            <button class="btn btn--primary btn--sm">Save valuation</button>
+          </div>
+        </div>
+
+      </div> <!-- /tab-panel valuations -->
+
+      <!-- Placeholder panels for tabs not yet designed.
+           Empty intentionally — no filler content. -->
+      <div class="tab-panel" data-tab="transactions"></div>
+
+    </section>
+
+    </div>
+  </main>
+
+  <!-- ============================================================
+       Mark-as-sold modal — design-time demo state.
+       Triggered from the "⋯ → Mark as sold…" overflow item.
+       ============================================================ -->
+  <div class="modal-backdrop" data-demo="mark-as-sold">
+    <div class="modal modal--lg" role="dialog" aria-modal="true" aria-labelledby="sold-title">
+      <div class="head">
+        <div class="eyebrow">Lifecycle · state transition</div>
+        <h2 id="sold-title">Mark 14 Elm Street as sold?</h2>
+        <p class="sub">This is an explicit decision — Folio will stop tracking cashflow and equity for this property after the sale date.</p>
+      </div>
+
+      <div class="body">
+        <div class="field-grid">
+          <div>
+            <label class="input-label">Sale date</label>
+            <input class="input" value="15 May 2026" />
+            <div class="input-help">Records lock at this date.</div>
+          </div>
+          <div>
+            <label class="input-label">Sale price</label>
+            <div class="input-prefix">
+              <span class="glyph">$</span>
+              <input class="input num" value="945,000" />
+            </div>
+            <div class="input-help is-positive">+$25,000 vs current valuation ($920,000).</div>
+          </div>
+          <div>
+            <label class="input-label">Settlement date <span style="font-size: 10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; margin-left: 4px;">optional</span></label>
+            <input class="input" placeholder="e.g. 17 Jun 2026" />
+            <div class="input-help">Used for capital gains timing.</div>
+          </div>
+          <div>
+            <label class="input-label">Buyer <span style="font-size: 10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; margin-left: 4px;">optional</span></label>
+            <input class="input" placeholder="For your records" />
+          </div>
+          <div class="full">
+            <label class="input-label">Notes <span style="font-size: 10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; margin-left: 4px;">optional</span></label>
+            <textarea class="textarea" placeholder="e.g. Off-market sale via McGrath. Settlement in 4 weeks."></textarea>
+          </div>
+        </div>
+
+        <div class="consequences">
+          <div class="label">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6" r="4.5"/><line x1="6" y1="4" x2="6" y2="6.5"/><circle cx="6" cy="8.2" r="0.5" fill="currentColor"/></svg>
+            What this changes
+          </div>
+          <ul>
+            <li><span>Property moves from <strong>Active</strong> to <strong>Sold</strong> · stays in your records.</span></li>
+            <li><span>Cashflow, yield and equity stop updating <strong>after 15 May 2026</strong>.</span></li>
+            <li><span>The CBA loan (<strong>$615,000</strong>) needs a closing balance — Folio will prompt you for it next.</span></li>
+            <li><span>Portfolio totals on the dashboard recalculate to exclude this property.</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="foot">
+        <a href="#" class="secondary-action">What if I sold it years ago?</a>
+        <button class="btn btn--ghost">Cancel</button>
+        <button class="btn btn--primary">Mark as sold</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Add-tenancy modal — design-time demo state.
+       Triggered from Management tab → "+ Add tenancy" card-add.
+       Two sub-modes via the mode toggle:
+         · New tenants  — different people moving in (default; shown)
+         · Renew lease  — same tenants, new term (tenants field
+                          becomes read-only & locked to current;
+                          bond reminder omitted)
+       The toggle is visual-only in the design tool; in production
+       it filters the field set and consequences below.
+       ============================================================ -->
+  <div class="modal-backdrop" data-demo="add-tenancy">
+    <div class="modal modal--lg" role="dialog" aria-modal="true" aria-labelledby="tenancy-title">
+      <div class="head">
+        <div class="eyebrow">Lifecycle · tenancy</div>
+        <h2 id="tenancy-title">Add a new tenancy?</h2>
+        <p class="sub">Closes the current lease and starts a fresh record. Both stay on the property's history.</p>
+      </div>
+
+      <div class="body">
+        <div class="mode-toggle" role="group" aria-label="Tenancy type">
+          <button type="button" class="is-on">
+            <span class="key">New tenants</span>
+            <span class="sub">Different people moving in</span>
+          </button>
+          <button type="button">
+            <span class="key">Renew lease</span>
+            <span class="sub">Same tenants, new term</span>
+          </button>
+        </div>
+
+        <!-- Read-only context: the current lease being replaced.
+             If tenants vacate earlier than scheduled, the user closes
+             this modal and edits the current lease's end date from
+             the Management tab — keeps one source of truth for the
+             current record. -->
+        <div class="modal-context">
+          <span>Closes <strong>Jane &amp; Jack Liu's</strong> lease on <span class="num">14 Sep 2026</span> (current end date).</span>
+          <a href="#" class="context-link">Vacating earlier?</a>
+        </div>
+
+        <div class="field-grid">
+          <div class="full">
+            <label class="input-label">Tenants</label>
+            <input class="input" placeholder="e.g. Adam &amp; Priya Chen" />
+            <div class="input-help">Full names on the lease, joined with &amp;.</div>
+          </div>
+          <div>
+            <label class="input-label">New lease starts</label>
+            <input class="input" value="15 Sep 2026" />
+            <div class="input-help">Vacancy gap: 0 days.</div>
+          </div>
+          <div>
+            <label class="input-label">Lease type</label>
+            <select class="select">
+              <option>Fixed-term</option>
+              <option>Periodic (month-to-month)</option>
+            </select>
+          </div>
+          <div>
+            <label class="input-label">Lease end</label>
+            <input class="input" value="14 Sep 2027" />
+            <div class="input-help">12-month term · standard.</div>
+          </div>
+          <div>
+            <label class="input-label">Weekly rent</label>
+            <div class="input-prefix">
+              <span class="glyph">$</span>
+              <input class="input num" value="920" />
+            </div>
+            <div class="input-help is-positive">+$40 / wk vs Jane &amp; Jack ($880).</div>
+          </div>
+          <div class="full">
+            <label class="input-label">Bond <span style="font-size: 10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; margin-left: 4px;">optional</span></label>
+            <div class="input-prefix">
+              <span class="glyph">$</span>
+              <input class="input num" value="3,680" />
+            </div>
+            <div class="input-help">4 weeks · NSW maximum.</div>
+          </div>
+        </div>
+
+        <div class="consequences">
+          <div class="label">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6" r="4.5"/><line x1="6" y1="4" x2="6" y2="6.5"/><circle cx="6" cy="8.2" r="0.5" fill="currentColor"/></svg>
+            What this changes
+          </div>
+          <ul>
+            <li><span><strong>Jane &amp; Jack Liu's</strong> tenancy moves to history on 14 Sep 2026.</span></li>
+            <li><span>Cashflow from 15 Sep 2026 reflects <strong>$920 / wk</strong> (+$40 vs current).</span></li>
+            <li><span>Lease-end heads-up reschedules to <strong>14 Sep 2027</strong>.</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="foot">
+        <button class="btn btn--ghost">Cancel</button>
+        <button class="btn btn--primary">Save tenancy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Change-agent modal — design-time demo state.
+       Triggered from Management tab → "+ Change agent" card-add.
+       Two sub-modes via the mode toggle:
+         · Agency-managed — hand off to a property manager (shown)
+         · Self-managed   — owner manages directly (rare; collapses
+                            the field grid to just an effective-from
+                            date; consequences include "Statements
+                            no longer expected — manual entry only")
+       ============================================================ -->
+  <div class="modal-backdrop" data-demo="change-agent">
+    <div class="modal modal--lg" role="dialog" aria-modal="true" aria-labelledby="agent-title">
+      <div class="head">
+        <div class="eyebrow">Lifecycle · management</div>
+        <h2 id="agent-title">Change managing agent?</h2>
+        <p class="sub">Closes the current engagement on the effective date. The previous agent moves to history.</p>
+      </div>
+
+      <div class="body">
+        <div class="mode-toggle" role="group" aria-label="Management type">
+          <button type="button" class="is-on">
+            <span class="key">Agency-managed</span>
+            <span class="sub">Hand off to a property manager</span>
+          </button>
+          <button type="button">
+            <span class="key">Self-managed</span>
+            <span class="sub">Manage this property yourself</span>
+          </button>
+        </div>
+
+        <div class="field-grid">
+          <div>
+            <label class="input-label">Effective from</label>
+            <input class="input" value="1 Jun 2026" />
+            <div class="input-help">McGrath's last day: 31 May 2026.</div>
+          </div>
+          <div>
+            <label class="input-label">End date <span style="font-size: 10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; margin-left: 4px;">optional</span></label>
+            <input class="input" placeholder="e.g. 31 May 2027" />
+            <div class="input-help">For fixed-term contracts. Folio reminds you 60 days out.</div>
+          </div>
+          <div>
+            <label class="input-label">Agency</label>
+            <input class="input" placeholder="e.g. Ray White Coogee" />
+          </div>
+          <div>
+            <label class="input-label">Primary contact</label>
+            <input class="input" placeholder="e.g. Anna Park" />
+          </div>
+          <div>
+            <label class="input-label">Phone</label>
+            <input class="input num" placeholder="0412 345 678" />
+          </div>
+          <div>
+            <label class="input-label">Email <span style="font-size: 10px; color: hsl(var(--foreground-subtle)); text-transform: uppercase; letter-spacing: 0.06em; margin-left: 4px;">optional</span></label>
+            <input class="input" placeholder="e.g. anna@raywhite.com.au" />
+          </div>
+          <div>
+            <label class="input-label">Management fee</label>
+            <input class="input num" placeholder="e.g. 6.6%" />
+            <div class="input-help">% incl. GST · on rent collected.</div>
+          </div>
+          <div>
+            <label class="input-label">Statement cadence</label>
+            <select class="select">
+              <option>Weekly</option>
+              <option>Fortnightly</option>
+              <option selected>Monthly</option>
+              <option>Bi-monthly</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="consequences">
+          <div class="label">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6" r="4.5"/><line x1="6" y1="4" x2="6" y2="6.5"/><circle cx="6" cy="8.2" r="0.5" fill="currentColor"/></svg>
+            What this changes
+          </div>
+          <ul>
+            <li><span><strong>McGrath Eastern Suburbs</strong> moves to history on 31 May 2026.</span></li>
+            <li><span>Statements after 1 Jun 2026 are expected from the new agency.</span></li>
+            <li><span>Folio's "missing statement" prompts adjust to the new cadence.</span></li>
+            <li><span>Past transactions stay attached to whichever agent was active at the time.</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="foot">
+        <button class="btn btn--ghost">Cancel</button>
+        <button class="btn btn--primary">Save change</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────
+     TWEAKS PANEL — design-time state switcher.
+     Lives outside production. Surfaces every interaction state on
+     this screen as a one-click jump-to. Hidden until the Tweaks
+     toolbar toggle is on.
+     ───────────────────────────────────────────────────────────── -->
+<aside class="tweaks-panel" data-tweaks-panel hidden>
+  <header class="tweaks-head">
+    <div>
+      <div class="title">Tweaks</div>
+      <div class="sub">Design states · property detail</div>
+    </div>
+    <button type="button" class="tweaks-close" data-tweaks-close aria-label="Close tweaks">✕</button>
+  </header>
+  <div class="tweaks-body">
+    <div class="tweaks-section-label">State</div>
+    <div class="tweaks-states" role="radiogroup" aria-label="Design state">
+      <label class="tweaks-state">
+        <input type="radio" name="design-state" value="default" />
+        <span class="row">
+          <span class="key">Default</span>
+          <span class="desc">Calm baseline. Nothing open.</span>
+        </span>
+      </label>
+      <label class="tweaks-state">
+        <input type="radio" name="design-state" value="menu-open" />
+        <span class="row">
+          <span class="key">Overflow menu</span>
+          <span class="desc">⋯ opened — lifecycle &amp; record actions.</span>
+        </span>
+      </label>
+      <label class="tweaks-state">
+        <input type="radio" name="design-state" value="sold-modal" />
+        <span class="row">
+          <span class="key">Mark-as-sold modal</span>
+          <span class="desc">State transition with inputs &amp; cascades.</span>
+        </span>
+      </label>
+      <label class="tweaks-state">
+        <input type="radio" name="design-state" value="add-entity" />
+        <span class="row">
+          <span class="key">Add-entity form</span>
+          <span class="desc">Inline picker → "+ Add new entity".</span>
+        </span>
+      </label>
+      <label class="tweaks-state">
+        <input type="radio" name="design-state" value="tenancy-modal" />
+        <span class="row">
+          <span class="key">Add-tenancy modal</span>
+          <span class="desc">Renew or replace tenants (Management tab).</span>
+        </span>
+      </label>
+      <label class="tweaks-state">
+        <input type="radio" name="design-state" value="agent-modal" />
+        <span class="row">
+          <span class="key">Change-agent modal</span>
+          <span class="desc">Agency or self-managed (Management tab).</span>
+        </span>
+      </label>
+      <label class="tweaks-state">
+        <input type="radio" name="design-state" value="delete-valuation" />
+        <span class="row">
+          <span class="key">Delete valuation</span>
+          <span class="desc">Inline confirm on a single row (Valuations tab).</span>
+        </span>
+      </label>
+    </div>
+    <p class="tweaks-foot">
+      Switcher only exists in the design tool. Each state maps to local
+      component state in the Next.js port.
+    </p>
+  </div>
+</aside>
+
+<script>
+// =====================================================================
+// Design-state defaults — EDITED BY THE TWEAKS PANEL.
+// The host parses this JSON when the user changes a value via
+// __edit_mode_set_keys and writes it back here so refresh preserves
+// the chosen state.
+// =====================================================================
+const FOLIO_TWEAKS = /*EDITMODE-BEGIN*/{
+  "designState": "default"
+}/*EDITMODE-END*/;
+
+(function () {
+  const body = document.body;
+  const panel = document.querySelector('[data-tweaks-panel]');
+  if (!panel) return;
+
+  // --- Apply persisted state on load --------------------------------
+  function setState(value) {
+    body.setAttribute('data-design-state', value);
+    panel.querySelectorAll('input[name="design-state"]').forEach(r => {
+      r.checked = (r.value === value);
+    });
+    // Side-effect: some states live inside a specific tab.
+    const tabFor = {
+      'delete-valuation': 'valuations',
+      'tenancy-modal':    'management',
+      'agent-modal':      'management',
+    };
+    const tabName = tabFor[value];
+    if (tabName) {
+      const tab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+      if (tab && !tab.classList.contains('is-active')) tab.click();
+    }
+  }
+  setState(FOLIO_TWEAKS.designState || 'default');
+
+  // --- Wire radios --------------------------------------------------
+  panel.querySelectorAll('input[name="design-state"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const v = r.value;
+      setState(v);
+      window.parent.postMessage({
+        type: '__edit_mode_set_keys',
+        edits: { designState: v }
+      }, '*');
+    });
+  });
+
+  // --- Tweaks toolbar protocol --------------------------------------
+  window.addEventListener('message', e => {
+    const t = e && e.data && e.data.type;
+    if (t === '__activate_edit_mode')   panel.hidden = false;
+    if (t === '__deactivate_edit_mode') panel.hidden = true;
+  });
+  panel.querySelector('[data-tweaks-close]').addEventListener('click', () => {
+    panel.hidden = true;
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  });
+  window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+})();
+</script>
+
+<script src="sidebar.js"></script>
+<script src="folio.js"></script>
+</body>
+</html>

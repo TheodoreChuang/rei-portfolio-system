@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Folio — Screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+<!--
+  Folio — design-mockup index
+  ─────────────────────────────────────────────────────────────────
+  Each screen now lives in its own HTML file so iterating on one
+  doesn't risk touching another. The previous monolithic version
+  is preserved at folio.html.bak for reference.
+
+  Shared shell:  sidebar.js (renders <aside class="sidebar">)
+                 folio.css  (all design tokens + components)
+                 folio.js   (tabs, collapsibles, in-page state)
+
+  Next.js port — file ↔ route mapping is listed beside each link
+  below and reiterated in the comment header of each file.
+-->
+<style>
+  /* This index is the only page that uses a non-app shell, so the
+     few overrides it needs live inline rather than polluting folio.css. */
+  body { background: hsl(36 24% 94%); }
+  .index {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: var(--space-9) var(--space-6);
+  }
+  .index-head { margin-bottom: var(--space-8); }
+  .index-head h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(40px, 5vw, 56px);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin: 0 0 var(--space-3);
+  }
+  .index-head h1 em {
+    font-style: italic;
+    color: hsl(var(--accent));
+  }
+  .index-head p {
+    color: hsl(var(--foreground-muted));
+    font-size: var(--text-md);
+    max-width: 60ch;
+    margin: 0;
+    line-height: 1.55;
+  }
+  .index-group { margin-top: var(--space-8); }
+  .index-group .section-label { margin-bottom: var(--space-4); }
+  .index-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: hsl(var(--border));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .index-link {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-6);
+    background: white;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.12s ease;
+  }
+  .index-link:hover { background: hsl(36 30% 96%); }
+  .index-link .name {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: -0.005em;
+    line-height: 1.1;
+  }
+  .index-link .desc {
+    font-size: var(--text-sm);
+    color: hsl(var(--foreground-muted));
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+  .index-link .route {
+    font-family: var(--font-data);
+    font-size: 11px;
+    color: hsl(var(--foreground-faint));
+    white-space: nowrap;
+  }
+  .index-foot {
+    margin-top: var(--space-9);
+    padding-top: var(--space-6);
+    border-top: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground-faint));
+    font-size: var(--text-sm);
+    display: flex;
+    gap: var(--space-5);
+    flex-wrap: wrap;
+  }
+  .index-foot a {
+    color: hsl(var(--foreground-muted));
+    text-decoration: none;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  .index-foot a:hover { color: hsl(var(--foreground)); }
+</style>
+</head>
+<body>
+<div class="index">
+
+  <header class="index-head">
+    <div class="section-label" style="margin-bottom: var(--space-4);">Folio · design mockups</div>
+    <h1>Twelve screens, <em>one per file</em>.</h1>
+    <p>
+      Pick a screen below to open it in isolation. Each file is self-contained
+      and references <code>folio.css</code>, <code>folio.js</code>, and
+      <code>sidebar.js</code>. The original monolithic version is preserved at
+      <code>folio.html.bak</code> for reference.
+    </p>
+  </header>
+
+  <section class="index-group">
+    <div class="section-label">Portfolio overview</div>
+    <div class="index-list">
+      <a class="index-link" href="dashboard.html">
+        <div>
+          <div class="name">Dashboard</div>
+          <div class="desc">Portfolio pulse — KPI strip, cashflow trend, prompts.</div>
+        </div>
+        <div class="route">/dashboard</div>
+      </a>
+      <a class="index-link" href="household.html">
+        <div>
+          <div class="name">Household</div>
+          <div class="desc">Personal income, expenses, savings runway.</div>
+        </div>
+        <div class="route">/household</div>
+      </a>
+    </div>
+  </section>
+
+  <section class="index-group">
+    <div class="section-label">Properties</div>
+    <div class="index-list">
+      <a class="index-link" href="properties.html">
+        <div>
+          <div class="name">Properties</div>
+          <div class="desc">All-properties index with portfolio totals.</div>
+        </div>
+        <div class="route">/properties</div>
+      </a>
+      <a class="index-link" href="property.html">
+        <div>
+          <div class="name">Property detail</div>
+          <div class="desc">Per-property overview, tabs for loans / performance / documents.</div>
+        </div>
+        <div class="route">/properties/[id]</div>
+      </a>
+      <a class="index-link" href="add-property.html">
+        <div>
+          <div class="name">Add property</div>
+          <div class="desc">Guided form for a new property.</div>
+        </div>
+        <div class="route">/properties/new</div>
+      </a>
+    </div>
+  </section>
+
+  <section class="index-group">
+    <div class="section-label">Loans</div>
+    <div class="index-list">
+      <a class="index-link" href="loans.html">
+        <div>
+          <div class="name">Loans</div>
+          <div class="desc">All loan accounts, expandable rows.</div>
+        </div>
+        <div class="route">/loans</div>
+      </a>
+      <a class="index-link" href="loan.html">
+        <div>
+          <div class="name">Loan detail</div>
+          <div class="desc">Balance, rate, repayment history.</div>
+        </div>
+        <div class="route">/loans/[id]</div>
+      </a>
+      <a class="index-link" href="add-loan.html">
+        <div>
+          <div class="name">Add loan</div>
+          <div class="desc">Guided form for a new loan account.</div>
+        </div>
+        <div class="route">/loans/new</div>
+      </a>
+    </div>
+  </section>
+
+  <section class="index-group">
+    <div class="section-label">Workflow &amp; settings</div>
+    <div class="index-list">
+      <a class="index-link" href="upload.html">
+        <div>
+          <div class="name">Upload</div>
+          <div class="desc">Drop statements → AI extraction → review. Idle &amp; review states in-page.</div>
+        </div>
+        <div class="route">/upload</div>
+      </a>
+      <a class="index-link" href="plan.html">
+        <div>
+          <div class="name">Plan</div>
+          <div class="desc">Forecasting and calculators.</div>
+        </div>
+        <div class="route">/plan</div>
+      </a>
+      <a class="index-link" href="settings.html">
+        <div>
+          <div class="name">Settings</div>
+          <div class="desc">Account, entities, integrations.</div>
+        </div>
+        <div class="route">/settings</div>
+      </a>
+      <a class="index-link" href="entities.html">
+        <div>
+          <div class="name">Entities</div>
+          <div class="desc">Manage ownership structures.</div>
+        </div>
+        <div class="route">/settings/entities</div>
+      </a>
+    </div>
+  </section>
+
+  <footer class="index-foot">
+    <a href="landing.html">Landing page</a>
+    <a href="login.html">Login</a>
+    <a href="design-system.html">Design system</a>
+    <a href="folio.html.bak">Monolithic backup</a>
+  </footer>
+
+</div>
+</body>
+</html>

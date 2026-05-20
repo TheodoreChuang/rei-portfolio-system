@@ -907,6 +907,299 @@
   }
 
   /* =====================================================================
+     EDITABLE FIELD ROWS (referenced in 12a · Editing demo)
+     ===================================================================== */
+  .field-list { display: flex; flex-direction: column; }
+  .field-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    align-items: center;
+    gap: var(--space-5);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid hsl(var(--rule));
+  }
+  .field-row:last-child { border-bottom: none; }
+  .field-row .k {
+    font-size: var(--text-xs);
+    color: hsl(var(--foreground-subtle));
+    font-weight: 500;
+  }
+  .field-row .v {
+    font-size: var(--text-sm);
+    color: hsl(var(--foreground));
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    min-height: 24px;
+  }
+  .field-row .v.editable {
+    cursor: pointer;
+    padding: 2px var(--space-2);
+    margin-left: calc(var(--space-2) * -1);
+    border-radius: var(--radius-xs);
+  }
+  .field-row .v.editable:hover { background: hsl(var(--surface-sunken)); }
+  .field-row .v.editable::after {
+    content: "";
+    width: 9px; height: 9px;
+    display: inline-block;
+    opacity: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 10 10'><path d='M6.5 1.5l2 2L3 9H1V7z' fill='none' stroke='%23333' stroke-width='1.2' stroke-linejoin='round'/></svg>");
+    background-size: contain; background-repeat: no-repeat;
+  }
+  .field-row .v.editable:hover::after { opacity: 0.6; }
+  .field-row .v.is-dropdown {
+    background: hsl(var(--surface-sunken));
+    padding: 4px var(--space-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .field-row .v.is-dropdown:hover { border-color: hsl(var(--border)); }
+  .field-row .v.is-dropdown::after {
+    content: ""; width: 7px; height: 7px;
+    border-right: 1.4px solid hsl(var(--foreground-subtle));
+    border-bottom: 1.4px solid hsl(var(--foreground-subtle));
+    transform: rotate(45deg);
+    display: inline-block;
+    margin-left: 2px; margin-bottom: 2px;
+  }
+
+  /* =====================================================================
+     INPUT PREFIX (used in modal demo)
+     ===================================================================== */
+  .input-prefix { position: relative; }
+  .input-prefix > .glyph {
+    position: absolute;
+    left: var(--space-4);
+    top: 50%;
+    transform: translateY(-50%);
+    color: hsl(var(--foreground-subtle));
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    pointer-events: none;
+  }
+  .input-prefix > .input { padding-left: 28px; }
+
+  /* =====================================================================
+     MODAL — used in 12b · Confirming demo
+     ===================================================================== */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: hsl(30 10% 12% / 0.36);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    padding: var(--space-7);
+  }
+  .modal {
+    background: hsl(var(--surface-raised));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-pop);
+    width: 100%;
+    max-width: 480px;
+    max-height: calc(100vh - var(--space-9));
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .modal--sm { max-width: 380px; }
+  .modal .head {
+    padding: var(--space-7) var(--space-7) var(--space-5);
+    border-bottom: 1px solid hsl(var(--rule));
+    flex-shrink: 0;
+  }
+  .modal .head .eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: hsl(var(--foreground-subtle));
+    margin-bottom: var(--space-3);
+  }
+  .modal .head h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: var(--text-2xl);
+    letter-spacing: -0.015em;
+    line-height: var(--leading-tight);
+    margin: 0;
+    text-wrap: balance;
+  }
+  .modal .body {
+    padding: var(--space-6) var(--space-7);
+    display: flex; flex-direction: column;
+    gap: var(--space-5);
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .modal .foot {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-7);
+    background: hsl(var(--surface));
+    border-top: 1px solid hsl(var(--rule));
+    flex-shrink: 0;
+  }
+
+  /* =====================================================================
+     INLINE CONFIRM — used in 12b · Confirming demo
+     ===================================================================== */
+  .inline-confirm {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: hsl(var(--negative-soft));
+    border: 1px solid hsl(var(--negative) / 0.25);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+  }
+  .inline-confirm .copy { color: hsl(var(--negative)); font-weight: 500; }
+  .inline-confirm .copy strong { font-weight: 600; }
+  .inline-confirm .actions { display: inline-flex; gap: var(--space-2); }
+  .btn--danger {
+    background: hsl(var(--negative));
+    color: hsl(var(--surface-raised));
+    border-color: transparent;
+  }
+  .btn--danger:hover { background: hsl(var(--negative) / 0.9); }
+  .inline-confirm--block {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* =====================================================================
+     PATTERN CARDS — documentation primitive for 12 · Interaction patterns
+     ===================================================================== */
+  .pattern-card {
+    background: hsl(var(--surface));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    padding: var(--space-6);
+    display: flex; flex-direction: column;
+    gap: var(--space-4);
+  }
+  .pattern-card .pc-eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: hsl(var(--foreground-subtle));
+  }
+  .pattern-card .pc-title {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: var(--text-xl);
+    letter-spacing: -0.01em;
+    line-height: var(--leading-snug);
+    margin: 0;
+  }
+  .pattern-card .pc-rule {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 350;
+    font-size: var(--text-md);
+    color: hsl(var(--foreground-muted));
+    line-height: var(--leading-snug);
+    padding: var(--space-4);
+    background: hsl(var(--surface-sunken));
+    border-radius: var(--radius-sm);
+    border-left: 2px solid hsl(var(--accent));
+  }
+  .pattern-card .pc-body {
+    font-size: var(--text-sm);
+    color: hsl(var(--foreground-muted));
+    line-height: var(--leading-normal);
+    text-wrap: pretty;
+  }
+  .pattern-card .pc-when {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+  }
+  .pattern-card .pc-when .col { display: flex; flex-direction: column; gap: var(--space-2); }
+  .pattern-card .pc-when h5 {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0 0 var(--space-2);
+  }
+  .pattern-card .pc-when .yes h5 { color: hsl(var(--positive)); }
+  .pattern-card .pc-when .no  h5 { color: hsl(var(--negative)); }
+  .pattern-card .pc-when ul {
+    margin: 0; padding: 0; list-style: none;
+    display: flex; flex-direction: column; gap: var(--space-2);
+    color: hsl(var(--foreground));
+  }
+  .pattern-card .pc-when li {
+    display: grid;
+    grid-template-columns: 10px 1fr;
+    gap: var(--space-3);
+    line-height: var(--leading-snug);
+  }
+  .pattern-card .pc-when .yes li::before { content: "+"; color: hsl(var(--positive)); font-weight: 600; }
+  .pattern-card .pc-when .no  li::before { content: "−"; color: hsl(var(--negative)); font-weight: 600; }
+
+  .pattern-card .pc-demo {
+    background: hsl(var(--background));
+    border: 1px dashed hsl(var(--border));
+    border-radius: var(--radius-sm);
+    padding: var(--space-6);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 80px;
+  }
+  .pattern-card .pc-demo--field {
+    align-items: stretch;
+    padding: var(--space-4) var(--space-5);
+  }
+  .pattern-card .pc-demo--modal {
+    padding: 0;
+    min-height: 280px;
+    position: relative;
+    overflow: hidden;
+  }
+  .pattern-card .pc-demo--modal .modal-backdrop {
+    position: absolute;
+    background: hsl(30 10% 12% / 0.2);
+  }
+  .pattern-card .pc-demo--modal .modal { box-shadow: var(--shadow-pop); max-width: 380px; }
+
+  .pattern-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+  }
+
+  .pattern-note {
+    background: hsl(var(--surface));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    padding: var(--space-5) var(--space-6);
+    font-size: var(--text-sm);
+    color: hsl(var(--foreground-muted));
+    line-height: var(--leading-snug);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-5);
+    align-items: start;
+  }
+  .pattern-note .tag {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: hsl(var(--foreground-subtle));
+    padding-top: 2px;
+  }
+  .pattern-note strong { color: hsl(var(--foreground)); font-weight: 600; }
+
+  /* helper: positive-tinted help text in modal field */
+  .input-help.is-positive { color: hsl(var(--positive)); }
+
+  /* =====================================================================
      PAGE OUTRO
      ===================================================================== */
   .colophon {
@@ -1805,6 +2098,228 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         12 — INTERACTION PATTERNS
+         ================================================================ -->
+    <section class="sys" id="patterns">
+      <div class="sys-head">
+        <div class="label">12 — Interaction patterns</div>
+        <div>
+          <h2>How Folio behaves, not just how it looks.</h2>
+          <p>
+            Decisions on editing and confirming that should be the same everywhere in the app.
+            One edit pattern, two confirmation tiers — chosen for a calm, deliberate, single-user
+            product. Each entry below is a decision, not a suggestion.
+          </p>
+        </div>
+      </div>
+      <div class="sys-body">
+        <dl class="aside">
+          <dt>Rule of one</dt><dd>One edit pattern across the app. Don't mix inline-edit with edit-modes with drawers.</dd>
+          <dt>Stakes &gt; speed</dt><dd>If an action takes input, cascades, or can't be reversed cheaply — make the user pause.</dd>
+          <dt>Reconsider when</dt><dd>Folio adds bulk operations or a high-velocity triage flow. Until then, YAGNI.</dd>
+        </dl>
+        <div class="stack-7">
+
+          <!-- ───────── 12a · Editing ───────── -->
+          <div class="pattern-card">
+            <div class="pc-eyebrow">12a · Editing</div>
+            <h3 class="pc-title">Inline edit-in-place. One pattern, applied everywhere.</h3>
+            <div class="pc-rule">
+              Every editable value reveals an affordance on hover and becomes an input on click.
+              No edit modes, no per-record drawers, no "Save / Cancel" footers.
+            </div>
+            <div class="pc-body">
+              Core entities (properties, loans, entities) don't change often. When they do, the
+              user is making a single, considered tweak — not filling a form. Inline edit keeps
+              the record visible during the edit and removes a whole layer of UI chrome.
+              Relationship fields (entity, agent) use inline pickers; lifecycle actions
+              (sold, archive, delete) live in the overflow menu and use confirmations — they
+              are not edits.
+            </div>
+
+            <div class="pc-demo pc-demo--field" style="background: hsl(var(--surface));">
+              <div class="field-list" style="width: 100%;">
+                <div class="field-row" style="grid-template-columns: 130px 1fr;">
+                  <div class="k">Nickname</div>
+                  <div class="v editable">Elm St</div>
+                </div>
+                <div class="field-row" style="grid-template-columns: 130px 1fr;">
+                  <div class="k">Weekly rent</div>
+                  <div class="v editable num">$880.00</div>
+                </div>
+                <div class="field-row" style="grid-template-columns: 130px 1fr; border-bottom: none;">
+                  <div class="k">Entity</div>
+                  <div class="v"><span class="is-dropdown">Okafor Family Trust</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pc-when">
+              <div class="col yes">
+                <h5>Use inline edit</h5>
+                <ul>
+                  <li>Single field on a known record (nickname, weekly rent, lease date).</li>
+                  <li>Relationship pick (entity, agent) — opens an inline picker, not a modal.</li>
+                  <li>Anywhere the user reads the value and the edit; both should stay visible.</li>
+                </ul>
+              </div>
+              <div class="col no">
+                <h5>Do not use inline edit</h5>
+                <ul>
+                  <li>Creating a record (e.g. adding a property) — that's a dedicated flow.</li>
+                  <li>State transitions (mark as sold, archive, delete) — use confirmations.</li>
+                  <li>Multi-field forms with cross-validation — rare, but reach for a modal.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="pattern-note" style="margin-top: var(--space-3);">
+              <div class="tag">Affordance</div>
+              <div>
+                Hover reveals a subtle <strong>surface-sunken background</strong> and a small
+                pencil glyph. Editable fields never need a "Click to edit" label — the affordance
+                is the contract. If a field can't display its affordance clearly, the field is
+                not editable in place.
+              </div>
+            </div>
+          </div>
+
+          <!-- ───────── 12b · Confirming ───────── -->
+          <div class="pattern-card">
+            <div class="pc-eyebrow">12b · Confirming</div>
+            <h3 class="pc-title">Two tiers. Inline for contextual, modal for explicit.</h3>
+            <div class="pc-rule">
+              If an action takes input → modal. If it's a single contextual yes/no → inline confirm.
+              If it's irreversible or cascades to other records → always modal.
+            </div>
+
+            <div class="pc-body">
+              Confirmations are the moment the app slows the user down. We tier them so the
+              friction matches the stakes: contextual deletes and dismissals stay in place, while
+              state transitions and destructive actions become an explicit, focused decision.
+              Folio does <strong>not</strong> use toast-with-Undo — see the note below.
+            </div>
+
+            <!-- Decision matrix -->
+            <div style="margin-top: var(--space-3);">
+              <table class="table" style="margin: 0;">
+                <thead>
+                  <tr>
+                    <th style="width: 32%;">Action shape</th>
+                    <th style="width: 22%;">Pattern</th>
+                    <th>Example</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Single contextual yes/no</td>
+                    <td><span class="badge"><span class="dot"></span>Inline confirm</span></td>
+                    <td class="muted">Delete one valuation row · dismiss a prompt</td>
+                  </tr>
+                  <tr>
+                    <td>State transition with data</td>
+                    <td><span class="badge badge--estimated"><span class="dot"></span>Modal</span></td>
+                    <td class="muted">Mark property as sold · close a loan</td>
+                  </tr>
+                  <tr>
+                    <td>Destructive on a core entity</td>
+                    <td><span class="badge badge--missing"><span class="dot"></span>Modal · destructive</span></td>
+                    <td class="muted">Delete property · delete entity with linked records</td>
+                  </tr>
+                  <tr>
+                    <td>Reversible bulk action</td>
+                    <td class="muted">— (not adopted yet)</td>
+                    <td class="muted">Bulk archive · bulk re-categorise</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Two live demos side by side -->
+            <div class="pattern-grid" style="margin-top: var(--space-4);">
+
+              <!-- Inline confirm demo -->
+              <div>
+                <div class="footnote" style="margin-bottom: var(--space-4);">Inline confirm</div>
+                <div class="pc-demo" style="background: hsl(var(--surface)); padding: var(--space-5);">
+                  <div class="inline-confirm inline-confirm--block">
+                    <span class="copy">Delete <strong>$890,000 · 15 Jun 2025</strong>?</span>
+                    <span class="actions">
+                      <button class="btn btn--ghost btn--sm">Cancel</button>
+                      <button class="btn btn--danger btn--sm">Delete</button>
+                    </span>
+                  </div>
+                </div>
+                <div class="pc-body" style="margin-top: var(--space-4);">
+                  Replaces the trigger in place. The thing being deleted is named in the copy so
+                  there's no need to glance back at the row. No backdrop, no focus trap.
+                </div>
+              </div>
+
+              <!-- Modal demo -->
+              <div>
+                <div class="footnote" style="margin-bottom: var(--space-4);">Modal · with input</div>
+                <div class="pc-demo pc-demo--modal">
+                  <div class="modal-backdrop" style="padding: var(--space-5);">
+                    <div class="modal modal--sm">
+                      <div class="head" style="padding: var(--space-5) var(--space-6) var(--space-4);">
+                        <div class="eyebrow">Lifecycle</div>
+                        <h2 style="font-size: var(--text-xl);">Mark as sold?</h2>
+                      </div>
+                      <div class="body" style="padding: var(--space-5) var(--space-6); gap: var(--space-4);">
+                        <div>
+                          <label class="input-label">Sale date</label>
+                          <input class="input" value="15 May 2026" />
+                        </div>
+                        <div>
+                          <label class="input-label">Sale price</label>
+                          <div class="input-prefix">
+                            <span class="glyph">$</span>
+                            <input class="input num" value="945,000" />
+                          </div>
+                        </div>
+                      </div>
+                      <div class="foot" style="padding: var(--space-4) var(--space-6);">
+                        <button class="btn btn--ghost btn--sm">Cancel</button>
+                        <button class="btn btn--primary btn--sm">Mark as sold</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="pc-body" style="margin-top: var(--space-4);">
+                  Center-stage, focused. The eyebrow names the action class (Lifecycle / Destructive).
+                  Always include a "What this changes" block when the action cascades beyond the
+                  current record.
+                </div>
+              </div>
+
+            </div>
+
+            <div class="pattern-note">
+              <div class="tag">Toast · undo</div>
+              <div>
+                <strong>Deliberately not adopted yet.</strong> Folio is single-user, deliberate, and
+                low-velocity — the patterns that earn Toast-with-Undo (Gmail-style triage, multi-user
+                shared state, mobile fat-finger taps) don't apply. Two patterns are cheaper to learn
+                and to build. Revisit when we add bulk operations on transactions.
+              </div>
+            </div>
+          </div>
+
+          <!-- ───────── 12c · Future patterns placeholder ───────── -->
+          <div class="pattern-note">
+            <div class="tag">Next</div>
+            <div>
+              Empty-state, error, and loading patterns are not yet decided. When they are, they
+              join this section — one source of truth for "how Folio behaves."
+            </div>
+          </div>
+
         </div>
       </div>
     </section>

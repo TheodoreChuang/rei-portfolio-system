@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>Folio — Entities</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,30..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="folio.css" />
+</head>
+<!--
+  Folio — Entities screen
+  ─────────────────────────────────────────────────────────────────
+  Maps to Next.js route:  /settings/entities
+  Shared shell:           sidebar.js (injects <aside class="sidebar">)
+                          folio.css  (all design tokens + components)
+                          folio.js   (tabs, collapsibles, in-page state)
+  Screens linked from here use ordinary <a href="X.html"> patterns;
+  in the Next.js port these become <Link href="/X">.
+-->
+<body data-page="entities">
+<div class="app">
+
+  <!-- Sidebar is injected here by sidebar.js -->
+
+  <main class="main">
+    <div class="main-inner">
+
+    <section class="screen is-active" data-screen="entities" data-screen-label="Entities">
+
+      <a href="#" class="crumb-back" data-goto="settings">
+        <svg width="9" height="9" viewBox="0 0 10 10"><polyline points="6,2 2,5 6,8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Settings
+      </a>
+
+      <div class="page-head">
+        <div>
+          <h1 class="title">Entities</h1>
+          <p class="subtitle">Trusts, companies, and individuals that own property in Folio.</p>
+        </div>
+        <div class="controls">
+          <button class="btn btn--primary btn--sm">+ Add entity</button>
+        </div>
+      </div>
+
+      <div class="stack-7">
+
+        <!-- ACTIVE entities -->
+        <div>
+          <div class="section-label" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Active · 3</span>
+            <span style="font-size: var(--text-xs); text-transform: none; letter-spacing: 0; color: hsl(var(--foreground-subtle));">Click any name to rename it.</span>
+          </div>
+
+          <div class="entity-list">
+
+            <!-- =============== Entity 1: default state =============== -->
+            <article class="entity-card">
+              <div>
+                <div class="entity-top">
+                  <h3 class="entity-name">Okafor Family Trust</h3>
+                </div>
+                <div class="entity-meta">
+                  <span>Discretionary trust</span>
+                  <span class="dot"></span>
+                  <span class="num">ABN 22 444 555 666</span>
+                  <span class="dot"></span>
+                  <span>Created Apr 2021</span>
+                </div>
+                <div class="entity-stats">
+                  <div class="stat">
+                    <div class="k">Properties</div>
+                    <div class="v">2 <span class="label">· $1.56M value</span></div>
+                    <a href="#" data-goto="properties">View →</a>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Loans</div>
+                    <div class="v">2 <span class="label">· $1.10M balance</span></div>
+                    <a href="#" data-goto="loans">View →</a>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Last activity</div>
+                    <div class="v" style="font-weight: 500; font-size: var(--text-sm);">12 Apr 2026</div>
+                    <span style="font-size: var(--text-xs); color: hsl(var(--foreground-subtle));">CBA statement</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="entity-actions">
+                <span class="entity-status">Active</span>
+                <div class="kebab">
+                  <button type="button" class="kebab-trigger" aria-label="Actions">⋯</button>
+                </div>
+              </div>
+            </article>
+
+            <!-- =============== Entity 2: inline rename (typo fix) =============== -->
+            <article class="entity-card is-editing">
+              <div>
+                <div class="rename-row">
+                  <input class="input" value="Personal · Theo Okafor" autofocus />
+                  <button type="button" class="btn btn--ghost btn--sm">Cancel</button>
+                  <button type="button" class="btn btn--primary btn--sm">Save rename</button>
+                </div>
+                <div class="entity-meta" style="margin-top: 6px;">
+                  <span>Individual</span>
+                  <span class="dot"></span>
+                  <span>Created Jul 2022</span>
+                </div>
+                <div class="rename-warning">
+                  <span class="glyph">i</span>
+                  Renaming will update <strong style="font-weight: 600;">1 property</strong>, <strong style="font-weight: 600;">1 loan</strong>, and references in <strong style="font-weight: 600;">48 transactions</strong>. Historical statements remain unchanged.
+                </div>
+              </div>
+
+              <div class="entity-actions">
+                <span class="entity-status">Active</span>
+                <button type="button" class="kebab-trigger" aria-label="Actions" style="opacity: 0.4; cursor: not-allowed;">⋯</button>
+              </div>
+            </article>
+
+            <!-- =============== Entity 3: delete confirmation (empty, accident) =============== -->
+            <article class="entity-card is-confirming-delete">
+              <div>
+                <div class="entity-top">
+                  <h3 class="entity-name" style="cursor: default;">Okafer Investment Trust</h3>
+                  <span style="font-size: var(--text-xs); color: hsl(var(--negative)); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em;">About to delete</span>
+                </div>
+                <div class="entity-meta">
+                  <span>Discretionary trust</span>
+                  <span class="dot"></span>
+                  <span>Created 14 May 2026 · 1 day ago</span>
+                </div>
+                <div class="entity-stats">
+                  <div class="stat">
+                    <div class="k">Properties</div>
+                    <div class="v" style="color: hsl(var(--foreground-muted));">0</div>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Loans</div>
+                    <div class="v" style="color: hsl(var(--foreground-muted));">0</div>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Last activity</div>
+                    <div class="v" style="font-weight: 400; font-size: var(--text-sm); color: hsl(var(--foreground-muted));">never</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="entity-actions">
+                <span class="entity-status" style="background: hsl(var(--negative-soft)); color: hsl(var(--negative)); border-color: hsl(var(--negative) / 0.2);">Empty</span>
+              </div>
+
+              <div class="delete-confirm">
+                <div class="copy">
+                  <strong>Delete this entity?</strong>
+                  No properties, loans, or transactions are attached — deletion is safe and permanent.
+                </div>
+                <div class="actions">
+                  <button type="button" class="btn btn--ghost btn--sm">Cancel</button>
+                  <button type="button" class="btn btn--danger btn--sm">Delete permanently</button>
+                </div>
+              </div>
+            </article>
+
+            <!-- =============== Entity 4: kebab open, showing menu states =============== -->
+            <article class="entity-card">
+              <div>
+                <div class="entity-top">
+                  <h3 class="entity-name">Okafor Holdings Pty Ltd</h3>
+                </div>
+                <div class="entity-meta">
+                  <span>Company</span>
+                  <span class="dot"></span>
+                  <span class="num">ACN 123 456 789</span>
+                  <span class="dot"></span>
+                  <span class="num">ABN 33 555 666 777</span>
+                  <span class="dot"></span>
+                  <span>Created Mar 2024</span>
+                </div>
+                <div class="entity-stats">
+                  <div class="stat">
+                    <div class="k">Properties</div>
+                    <div class="v">1 <span class="label">· $510k value</span></div>
+                    <a href="#" data-goto="properties">View →</a>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Loans</div>
+                    <div class="v" style="color: hsl(var(--foreground-muted));">0</div>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Last activity</div>
+                    <div class="v" style="font-weight: 500; font-size: var(--text-sm);">28 Mar 2026</div>
+                    <span style="font-size: var(--text-xs); color: hsl(var(--foreground-subtle));">Rates notice</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="entity-actions">
+                <span class="entity-status">Active</span>
+                <div class="kebab">
+                  <button type="button" class="kebab-trigger is-open" aria-label="Actions">⋯</button>
+                  <div class="kebab-menu">
+                    <button type="button">
+                      <span class="glyph">
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 10L9 3l2 2-7 7H2v-2z"/></svg>
+                      </span>
+                      Rename…
+                    </button>
+                    <button type="button">
+                      <span class="glyph">
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="5"/><path d="M7 4v3l2 1"/></svg>
+                      </span>
+                      Edit details (ABN, type)…
+                    </button>
+                    <div class="sep"></div>
+                    <button type="button">
+                      <span class="glyph">
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="4" width="10" height="8" rx="0.5"/><path d="M2 7h10M5 4V2.5h4V4"/></svg>
+                      </span>
+                      Archive
+                    </button>
+                    <button type="button" class="is-disabled">
+                      <span class="glyph">
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4h8l-1 8H4z"/><path d="M5 4V2h4v2"/></svg>
+                      </span>
+                      Delete
+                    </button>
+                    <div class="menu-note">
+                      Delete is disabled while this entity holds <strong>1 property</strong>. Archive it first, or move the property to another entity.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+          </div>
+        </div>
+
+        <!-- ARCHIVED entities -->
+        <div class="archived-group">
+          <div class="head">
+            <span style="display: inline-flex; align-items: center;">
+              <span class="twist"></span>
+              Archived · 1
+            </span>
+            <span style="font-size: var(--text-xs); text-transform: none; letter-spacing: 0;">Hidden from filters &amp; pickers. History preserved.</span>
+          </div>
+
+          <div class="entity-list">
+
+            <!-- Archived entity -->
+            <article class="entity-card is-archived">
+              <div>
+                <div class="entity-top">
+                  <h3 class="entity-name" style="cursor: default;">Sunset Holdings Pty Ltd</h3>
+                </div>
+                <div class="entity-meta">
+                  <span>Company · wound up</span>
+                  <span class="dot"></span>
+                  <span class="num">ACN 998 877 766</span>
+                  <span class="dot"></span>
+                  <span>Archived 12 Nov 2025</span>
+                </div>
+                <div class="entity-stats">
+                  <div class="stat">
+                    <div class="k">Historical properties</div>
+                    <div class="v" style="font-size: var(--text-sm); font-weight: 500;">1 sold</div>
+                    <span style="font-size: var(--text-xs); color: hsl(var(--foreground-subtle));">3 Garibaldi Ave · settled Oct 2025</span>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Historical loans</div>
+                    <div class="v" style="font-size: var(--text-sm); font-weight: 500;">1 closed</div>
+                    <span style="font-size: var(--text-xs); color: hsl(var(--foreground-subtle));">CBA · paid out Oct 2025</span>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Records retained</div>
+                    <div class="v" style="font-size: var(--text-sm); font-weight: 500;">86 transactions</div>
+                    <a href="#">View history →</a>
+                  </div>
+                </div>
+              </div>
+
+              <div class="entity-actions">
+                <span class="entity-status">Archived</span>
+                <button type="button" class="btn btn--secondary btn--sm">Restore</button>
+              </div>
+            </article>
+
+          </div>
+        </div>
+
+        <!-- Safety footer -->
+        <div class="entity-safety-note">
+          <div>
+            <strong>Renaming is safe.</strong>
+            The new name appears everywhere — properties, loans, filter chips, transaction history — but the underlying records are untouched. Historical statements keep the name they were imported with.
+          </div>
+          <div>
+            <strong>Archive preserves history; delete is permanent.</strong>
+            Archive hides an entity from pickers and filters but keeps every record. Delete is only available when nothing is attached — most often, when you've just created an entity by mistake.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="sidebar.js"></script>
+<script src="folio.js"></script>
+</body>
+</html>
