@@ -29,22 +29,21 @@ See `docs/product-foundation.md` for full product vision, user profile, and bran
 | Upload | Done — PDF ingestion, AI extraction, property/loan matching, mortgage entry |
 
 ### Designed but not yet implemented
-| Screen | Design file location |
-|--------|---------------------|
-| Property Detail | docs/designs/folio.html — screen 03 |
-| Loan Detail | docs/designs/folio.html — loan detail section |
-| Household | docs/designs/folio.html — screen 04 |
-| Plan / Scenario modeling | docs/designs/folio.html — Plan screen |
-| Settings | docs/designs/folio.html — Settings screen |
-| Add Property form | docs/designs/folio.html — screen 06 |
-| Add Loan form | docs/designs/folio.html — screen 07 |
-| Sidebar (collapsible property/loan sections) | docs/designs/folio.html — nav |
-| Dashboard Prompts strip | docs/designs/folio.html — "Needs your attention" cards |
+| Screen | Design file |
+|--------|-------------|
+| Property Detail | `docs/visual-designs/property.html` |
+| Loan Detail | `docs/visual-designs/loan.html` |
+| Household | `docs/visual-designs/household.html` |
+| Plan / Scenario modeling | `docs/visual-designs/plan.html` |
+| Settings | `docs/visual-designs/settings.html` |
+| Add Property form | `docs/visual-designs/add-property.html` |
+| Add Loan form | `docs/visual-designs/add-loan.html` |
+| Sidebar (collapsible property/loan sections) | `docs/visual-designs/folio.html` (nav) |
+| Dashboard Prompts strip | `docs/visual-designs/dashboard.html` |
 
 ### Design system
-All designs live in `docs/designs/`. The canonical design reference is `folio.html`
-(main app) + `folio.css` (styles). Landing and login each have dedicated files.
-Visual designs are the source of truth for UI decisions.
+All designs live in `docs/visual-designs/`. Each screen has its own HTML file.
+Shared styles are in `folio.css`. Visual designs are the source of truth for UI decisions.
 
 ## Key tracks
 
