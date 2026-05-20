@@ -851,3 +851,53 @@ balance; sold properties are visually distinct.
   simply omitted from the card.
 - The `Mark estimated` CTA on the property prompt (U8) has no backend action in this uplift —
   render the button but disable it or omit the click handler with a TODO comment.
+
+---
+
+## Design Deviations
+
+Changes made during implementation that diverge from the visual designs. Sync these back into
+the design files before the next design pass.
+
+### Removed: "Renew lease" action on the Management tab
+
+The designs show a "Renew lease" button that pre-fills a new lease form from the current lease.
+This was removed because:
+- The tenancy model now supports multiple concurrent active leases (sharehouses, granny flats),
+  making "the current lease" ambiguous when more than one exists.
+- A plain "Add lease" achieves the same outcome — the UI can pre-fill fields if the investor
+  wants to copy details, but this is a UX affordance, not a separate action.
+
+**Design update needed:** Replace the "Renew lease" button with "Add lease". No pre-fill
+behaviour required in this uplift.
+
+### Removed: `is_current` flag from tenancies and management agreements
+
+The original design and plan used an `is_current` boolean to identify the active
+tenancy/agreement. This was removed in favour of date-range derivation:
+- **Active** = `deleted_at IS NULL AND (end_date IS NULL OR end_date >= today)`
+- **Expired** = `deleted_at IS NULL AND end_date < today` → shows a warning prompt in the UI
+
+**Rationale:** An `is_current` flag requires programmatic maintenance (promotion on delete,
+swap on renewal) that introduces correctness bugs and is redundant once end dates are editable.
+Date ranges carry the same information without the invariant overhead.
+
+**Design update needed:**
+- The "Periodic" lease label (for fixed-term leases that roll over) should instead display
+  as a **"Vacated / action needed"** warning when `leaseEnd < today`. The UI should prompt
+  the investor to: add a new fixed-term lease, add a new periodic lease (no end date), or
+  confirm the property is vacant.
+- Same pattern applies to management agreements: expired `effectiveTo` shows a warning rather
+  than silently implying the last agreement is still active.
+
+### Symmetric CRUD for management agreements (no auto-end)
+
+The plan specified a `setCurrentManagementAgent` operation that atomically deactivated the
+existing agent and inserted a new one. This was replaced with plain add/update/delete CRUD —
+the same API shape as tenancies. If an investor switches agents, they update the outgoing
+agent's `effectiveTo` and add the incoming agent with `effectiveFrom`.
+
+**Design update needed:** The "Change agent" flow on the Management tab (if designed as a
+single modal that replaces the current agent) should instead be two steps: close out the
+current agreement (set `effectiveTo`), then add the new agreement. Or handle this via an
+explicit "Add agreement" form with no implicit replacement logic.

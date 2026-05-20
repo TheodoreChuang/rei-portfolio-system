@@ -12,6 +12,11 @@ function makeProperty(overrides: Partial<Property> = {}): Property {
     endDate: null,
     entityId: null,
     createdAt: new Date(),
+    propertyType: null,
+    purchasePriceCents: null,
+    saleDate: null,
+    salePriceCents: null,
+    settlementDate: null,
     ...overrides,
   }
 }

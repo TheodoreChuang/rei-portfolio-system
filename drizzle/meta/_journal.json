@@ -92,6 +92,34 @@
       "when": 1747699200000,
       "tag": "0012_ingestion_staging",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1747872000000,
+      "tag": "0013_property_type_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1747872001000,
+      "tag": "0014_property_tenancies",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1747872002000,
+      "tag": "0015_property_management_agents",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1747872003000,
+      "tag": "0016_drop_is_current",
+      "breakpoints": true
     }
   ]
 }

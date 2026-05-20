@@ -1,4 +1,8 @@
 export { listProperties, findPropertyById, createProperty, updateProperty, deleteProperty } from './repositories/properties'
 export { findTrailing12mEntries, listLedgerEntriesByMonth, createLedgerEntry, upsertLoanPaymentEntry } from './repositories/ledger'
 export { listValuations, findLatestValuation, createValuation, deleteValuation } from './repositories/valuations'
+export { listTenancies, createTenancy, updateTenancy, deleteTenancy } from './repositories/tenancies'
+export { listManagementAgents, findActiveAgent, createManagementAgent, updateManagementAgent, deleteManagementAgent } from './repositories/management-agents'
+export { addTenancy, editTenancy, removeTenancy } from './services/tenancies'
+export { addManagementAgent, editManagementAgent, removeManagementAgent } from './services/management-agents'
 export { getPropertyWithStats } from './services/property'
