@@ -48,11 +48,14 @@ export async function listProperties(userId: string): Promise<PropertyWithLvr[]>
       saleDate: properties.saleDate,
       salePriceCents: properties.salePriceCents,
       saleSettlementDate: properties.saleSettlementDate,
+      // "properties"."id" / "properties"."user_id" — fully-qualified to correlate correctly.
+      // ${properties.id} renders as just "id", which inside a subquery resolves to the
+      // subquery's own column, not the outer row.
       lvrPercent: sql<number | null>`
         CASE
           WHEN (
             SELECT value_cents FROM property_valuations
-            WHERE property_id = ${properties.id}
+            WHERE property_id = "properties"."id"
             ORDER BY valued_at DESC
             LIMIT 1
           ) > 0
@@ -66,11 +69,11 @@ export async function listProperties(userId: string): Promise<PropertyWithLvr[]>
                 ORDER BY recorded_at DESC
                 LIMIT 1
               ) latest_bal ON true
-              WHERE il.property_id = ${properties.id}
-              AND il.user_id = ${properties.userId}
+              WHERE il.property_id = "properties"."id"
+              AND il.user_id = "properties"."user_id"
             )::numeric * 100 / (
               SELECT value_cents FROM property_valuations
-              WHERE property_id = ${properties.id}
+              WHERE property_id = "properties"."id"
               ORDER BY valued_at DESC
               LIMIT 1
             )
